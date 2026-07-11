@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0e131b;
+  --panel: #151c27;
+  --panel-2: #1b2432;
+  --line: #263141;
+  --ink: #e7edf5;
+  --muted: #8b98aa;
+  --accent: #e2b34c;      /* chip gold: actions, focus */
+  --accent-ink: #191203;
+  --gain: #4fc38a;        /* P&L only */
+  --loss: #e2635b;        /* P&L only */
+  --suit-red: #e2635b;
+  --info: #6aa6e8;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accentink: var(--accent-ink);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-info: var(--info);
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+html { color-scheme: dark; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.mono { font-family: var(--font-mono); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.08); }
+.btn-danger:hover { border-color: var(--loss); color: var(--loss); }
+
+.field {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  width: 100%;
+}
+.field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+input[type="range"] { accent-color: var(--accent); }
+
+::selection { background: var(--accent); color: var(--accent-ink); }

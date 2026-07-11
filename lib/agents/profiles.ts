@@ -1,0 +1,158 @@
+/**
+ * Opponent agent profiles.
+ *
+ * Each profile is a parameter vector; the decision function in agent.ts turns
+ * parameters + decision context into a sampled action. These are heuristic
+ * exploitable archetypes, NOT game-theory-optimal players — documented as such.
+ */
+
+export interface AgentProfile {
+  id: string;
+  name: string;
+  description: string;
+  /** 0..1 — fraction of hands voluntarily played preflop. */
+  vpip: number;
+  /** 0..1 — fraction of hands open-raised (must be <= vpip). */
+  pfr: number;
+  /** 0..1 — chance of 3-betting with a 3-bet-worthy hand instead of calling. */
+  threeBet: number;
+  /** 0..1 — chance of folding to a 3-bet with a marginal opening hand. */
+  foldToThreeBet: number;
+  /** 0..1 — chance of open-limping instead of raising when entering. */
+  limp: number;
+  /** Postflop aggression: probability of betting/raising when strong-ish. */
+  aggression: number;
+  /** Probability of continuation-betting as the preflop aggressor. */
+  cbet: number;
+  /** Probability of folding to a c-bet without a real hand or draw. */
+  foldToCbet: number;
+  /** Probability of bluffing when weak on later streets. */
+  bluff: number;
+  /** Equity threshold (vs pot odds) padding for calling: negative = calls too wide. */
+  callPadding: number;
+  /** Typical bet size as fraction of pot. */
+  betSizeMean: number;
+  betSizeStd: number;
+  /** How much position widens ranges (0..1). */
+  positionalAwareness: number;
+  /** How much short stacks tighten the profile (0..1). */
+  stackAwareness: number;
+  /** Skill 0..1 — scales hand-reading accuracy noise. */
+  skill: number;
+  /** Whether the agent adapts to observed opponent stats. */
+  adaptive: boolean;
+  /** Buy-in in big blinds when (re)joining. */
+  buyInBB: number;
+}
+
+const base: Omit<AgentProfile, "id" | "name" | "description"> = {
+  vpip: 0.24, pfr: 0.18, threeBet: 0.35, foldToThreeBet: 0.55, limp: 0.03,
+  aggression: 0.6, cbet: 0.65, foldToCbet: 0.45, bluff: 0.18, callPadding: 0,
+  betSizeMean: 0.66, betSizeStd: 0.15, positionalAwareness: 0.8, stackAwareness: 0.7,
+  skill: 0.7, adaptive: false, buyInBB: 100,
+};
+
+export const AGENT_PRESETS: AgentProfile[] = [
+  {
+    ...base, id: "tag", name: "Tight-aggressive",
+    description: "Solid winning-regular baseline: tight ranges, aggressive lines.",
+  },
+  {
+    ...base, id: "lag", name: "Loose-aggressive",
+    description: "Wide ranges, relentless pressure, high bluff frequency.",
+    vpip: 0.34, pfr: 0.28, threeBet: 0.5, aggression: 0.75, cbet: 0.75, bluff: 0.3,
+    foldToCbet: 0.35, callPadding: -0.03,
+  },
+  {
+    ...base, id: "tight-passive", name: "Tight-passive",
+    description: "Plays few hands and rarely raises; easy to read.",
+    vpip: 0.16, pfr: 0.08, threeBet: 0.15, limp: 0.08, aggression: 0.3, cbet: 0.4,
+    bluff: 0.06, betSizeMean: 0.5, skill: 0.45,
+  },
+  {
+    ...base, id: "loose-passive", name: "Loose-passive",
+    description: "Plays too many hands, calls too much, rarely raises.",
+    vpip: 0.42, pfr: 0.1, threeBet: 0.12, limp: 0.25, aggression: 0.25, cbet: 0.35,
+    foldToCbet: 0.3, bluff: 0.08, callPadding: -0.08, skill: 0.35,
+  },
+  {
+    ...base, id: "calling-station", name: "Calling station",
+    description: "Almost never folds once involved; value-bet relentlessly, never bluff.",
+    vpip: 0.5, pfr: 0.08, threeBet: 0.08, limp: 0.3, aggression: 0.15,
+    foldToCbet: 0.12, foldToThreeBet: 0.2, bluff: 0.04, callPadding: -0.18, skill: 0.25,
+  },
+  {
+    ...base, id: "nit", name: "Nit",
+    description: "Extremely tight; when a nit raises, believe them.",
+    vpip: 0.11, pfr: 0.09, threeBet: 0.2, foldToThreeBet: 0.7, aggression: 0.45,
+    cbet: 0.55, foldToCbet: 0.6, bluff: 0.03, callPadding: 0.08, skill: 0.55,
+  },
+  {
+    ...base, id: "maniac", name: "Maniac",
+    description: "Hyper-aggressive chaos: raises constantly with any two cards.",
+    vpip: 0.6, pfr: 0.45, threeBet: 0.6, foldToThreeBet: 0.2, aggression: 0.9,
+    cbet: 0.85, foldToCbet: 0.2, bluff: 0.45, callPadding: -0.12,
+    betSizeMean: 0.9, betSizeStd: 0.3, skill: 0.3,
+  },
+  {
+    ...base, id: "recreational", name: "Recreational player",
+    description: "Loose, curious, and inconsistent; here to see flops.",
+    vpip: 0.38, pfr: 0.14, threeBet: 0.18, limp: 0.18, aggression: 0.4, cbet: 0.5,
+    foldToCbet: 0.35, bluff: 0.15, callPadding: -0.06, positionalAwareness: 0.3,
+    stackAwareness: 0.3, skill: 0.3, betSizeStd: 0.3, buyInBB: 80,
+  },
+  {
+    ...base, id: "balanced-reg", name: "Balanced regular",
+    description: "Competent regular with mixed frequencies and fewer leaks.",
+    vpip: 0.26, pfr: 0.2, threeBet: 0.4, aggression: 0.65, cbet: 0.62, bluff: 0.22,
+    skill: 0.85, positionalAwareness: 0.95,
+  },
+  {
+    ...base, id: "short-stack", name: "Short-stack player",
+    description: "Buys in shallow and plays a push-heavy, commitment-driven game.",
+    vpip: 0.2, pfr: 0.16, threeBet: 0.45, aggression: 0.7, stackAwareness: 1,
+    buyInBB: 40, betSizeMean: 0.8, skill: 0.6,
+  },
+  {
+    ...base, id: "positional-reg", name: "Positionally aware regular",
+    description: "Range width swings heavily by position; strong in late seats.",
+    vpip: 0.25, pfr: 0.2, positionalAwareness: 1, skill: 0.8,
+  },
+  {
+    ...base, id: "adaptive", name: "Adaptive exploitative player",
+    description: "Tracks table tendencies and adjusts calling and bluffing to exploit them.",
+    vpip: 0.27, pfr: 0.21, threeBet: 0.42, aggression: 0.68, bluff: 0.24,
+    skill: 0.9, adaptive: true,
+  },
+  {
+    ...base, id: "random", name: "Random baseline",
+    description: "Uniform-random legal actions; the floor any strategy should beat.",
+    vpip: 1, pfr: 0.5, threeBet: 0.5, foldToThreeBet: 0.33, limp: 0.2, aggression: 0.5,
+    cbet: 0.5, foldToCbet: 0.33, bluff: 0.5, callPadding: -1, betSizeMean: 0.75,
+    betSizeStd: 0.5, positionalAwareness: 0, stackAwareness: 0, skill: 0, adaptive: false,
+  },
+];
+
+export function getPreset(id: string): AgentProfile {
+  const p = AGENT_PRESETS.find((x) => x.id === id);
+  if (!p) throw new Error(`Unknown agent preset: ${id}`);
+  return p;
+}
+
+/** Scale a profile's skill and looseness knobs. skillMult and loosenessMult ~ 0.5..1.5 */
+export function adjustProfile(
+  p: AgentProfile,
+  opts: { skill?: number; looseness?: number; aggression?: number },
+): AgentProfile {
+  const clamp = (x: number, lo = 0.01, hi = 0.99) => Math.max(lo, Math.min(hi, x));
+  const loos = opts.looseness ?? 1;
+  const aggr = opts.aggression ?? 1;
+  return {
+    ...p,
+    vpip: clamp(p.vpip * loos),
+    pfr: clamp(Math.min(p.pfr * loos * aggr, p.vpip * loos)),
+    aggression: clamp(p.aggression * aggr),
+    bluff: clamp(p.bluff * aggr),
+    skill: clamp(opts.skill ?? p.skill, 0, 1),
+  };
+}
