@@ -5,7 +5,7 @@ import { SerializedPolicy } from "@/lib/player-model/policy";
 import { PlayerTendencies } from "@/lib/player-model/stats";
 import { SimulationAggregates } from "@/lib/analytics/aggregate";
 
-export const SIMULATION_VERSION = "1.0.0";
+export const SIMULATION_VERSION = "1.1.0";
 
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),
@@ -51,6 +51,10 @@ export interface CalibrationDataset {
   id: string;
   name: string;
   createdAt: string;
+  /** Missing on legacy data, which is equivalent to a full manual session. */
+  method?: "full-session" | "range-first";
+  /** Exact 169-grid first-in range for range-first calibration. */
+  preflopRange?: string[];
   seed: string;
   handsPlayed: number;
   decisions: RecordedDecision[];

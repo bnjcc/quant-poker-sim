@@ -222,7 +222,12 @@ export class TableSession {
   }
 
   /** Start a hand and return the engine + tracker, or null if too few players. */
-  beginHand(includeUser: boolean, userName = "You", manual = false): { engine: HandEngine; tracker: ContextTracker } | null {
+  beginHand(
+    includeUser: boolean,
+    userName = "You",
+    manual = false,
+    userHoleCards?: DecisionContext["holeCards"],
+  ): { engine: HandEngine; tracker: ContextTracker } | null {
     this.manageTurnover();
     const participants: { seat: number; playerId: string; name: string; stack: number }[] = [];
     for (const [seat, a] of this.agents) {
@@ -244,6 +249,8 @@ export class TableSession {
       rng: this.rng,
       handNumber: this.handNumber,
       manualSeat: manual ? this.userSeat : null,
+      forcedHoleCards:
+        userHoleCards && this.userSeat !== null ? { [this.userSeat]: userHoleCards } : undefined,
     });
     return { engine, tracker: new ContextTracker(engine) };
   }

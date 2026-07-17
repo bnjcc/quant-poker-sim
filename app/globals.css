@@ -78,6 +78,24 @@ body {
 }
 .field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
+.range-cell {
+  aspect-ratio: 1;
+  min-height: 2.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.range-cell:hover { border-color: var(--accent); color: var(--ink); }
+.range-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.range-cell-selected { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.range-cell-selected:hover { color: var(--accent-ink); filter: brightness(1.08); }
+
 .label { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 
 input[type="range"] { accent-color: var(--accent); }

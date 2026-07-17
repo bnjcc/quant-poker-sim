@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 const LINKS: { href: string; label: string }[] = [
   { href: "/", label: "Dashboard" },
   { href: "/calibrate", label: "Calibration session" },
+  { href: "/range-calibrate", label: "Range-first calibration" },
   { href: "/profile", label: "Strategy profile" },
   { href: "/experiments/new", label: "New experiment" },
   { href: "/experiments", label: "Experiments" },

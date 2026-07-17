@@ -6,7 +6,23 @@ import { CalibrationDataset, Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
 import { PageHeader, Stat, fmtBB } from "@/components/ui";
 
-function StepCard({ n, title, body, href, cta, done }: { n: number; title: string; body: string; href: string; cta: string; done: boolean }) {
+function StepCard({
+  n,
+  title,
+  body,
+  href,
+  cta,
+  done,
+  secondary,
+}: {
+  n: number;
+  title: string;
+  body: string;
+  href: string;
+  cta: string;
+  done: boolean;
+  secondary?: { href: string; label: string };
+}) {
   return (
     <div className={`panel px-5 py-4 flex flex-col ${done ? "opacity-70" : ""}`}>
       <div className="flex items-center gap-2">
@@ -19,9 +35,16 @@ function StepCard({ n, title, body, href, cta, done }: { n: number; title: strin
         <h2 className="font-semibold">{title}</h2>
       </div>
       <p className="text-sm text-muted mt-2 flex-1">{body}</p>
-      <Link href={href} className={`btn mt-4 self-start ${done ? "" : "btn-primary"}`}>
-        {cta}
-      </Link>
+      <div className="flex flex-wrap gap-2 mt-4">
+        <Link href={href} className={`btn self-start ${done ? "" : "btn-primary"}`}>
+          {cta}
+        </Link>
+        {secondary && (
+          <Link href={secondary.href} className="btn self-start">
+            {secondary.label}
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
@@ -57,6 +80,7 @@ export default function Dashboard() {
           href="/calibrate"
           cta={cals.length ? "Add another session" : "Start playing"}
           done={cals.length > 0}
+          secondary={{ href: "/range-calibrate", label: "Choose range first" }}
         />
         <StepCard
           n={2}

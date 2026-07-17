@@ -2,6 +2,7 @@ import { ChosenAction, DecisionContext, RecordedDecision } from "@/types/decisio
 import { HandHistory, TableConfig } from "@/types/poker";
 import { decideAgentAction } from "@/lib/agents/agent";
 import { HandEngine } from "@/lib/poker/engine";
+import { cardsForStartingHand, isStartingHandNotation, startingHandCombos } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 import { ContextTracker, PoolConfig, TableSession } from "./table";
 
@@ -21,6 +22,7 @@ export class ManualSession {
   readonly decisions: RecordedDecision[] = [];
   readonly histories: HandHistory[] = [];
   readonly userSeatByHand = new Map<number, number>();
+  private readonly startingHands: string[] | null;
   private current: { engine: HandEngine; tracker: ContextTracker } | null = null;
   handsPlayed = 0;
 
@@ -30,8 +32,14 @@ export class ManualSession {
     seed: string;
     targetHands: number;
     userBuyInBB: number;
+    /** When provided, every calibration hand is dealt from this explicit 169-hand range. */
+    startingHands?: string[];
   }) {
     this.targetHands = opts.targetHands;
+    const startingHands = [...new Set(opts.startingHands ?? [])];
+    if (opts.startingHands && startingHands.length === 0) throw new Error("Choose at least one starting hand");
+    if (startingHands.some((hand) => !isStartingHandNotation(hand))) throw new Error("Starting-hand range contains invalid notation");
+    this.startingHands = opts.startingHands ? startingHands : null;
     this.session = new TableSession({
       config: opts.config,
       pool: opts.pool,
@@ -49,7 +57,13 @@ export class ManualSession {
   step(): ManualStep {
     if (this.handsPlayed >= this.targetHands) return { kind: "session-complete" };
     if (!this.current) {
-      const begun = this.session.beginHand(true, "You", true);
+      const handIndex = this.startingHands
+        ? this.session.rng.weighted(this.startingHands.map(startingHandCombos))
+        : -1;
+      const userHoleCards = handIndex >= 0
+        ? cardsForStartingHand(this.startingHands![handIndex], this.session.rng)
+        : undefined;
+      const begun = this.session.beginHand(true, "You", true, userHoleCards);
       if (!begun) return { kind: "session-complete" };
       this.current = begun;
       this.userSeatByHand.set(begun.engine.handNumber, this.userSeat);

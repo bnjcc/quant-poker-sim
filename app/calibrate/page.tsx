@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DecisionContext } from "@/types/decision";
 import { CalibrationDataset } from "@/types/experiment";
@@ -95,6 +96,7 @@ export default function CalibratePage() {
         id: newId("cal"),
         name: `Calibration ${new Date().toLocaleString()} (${ms.handsPlayed} hands)`,
         createdAt: new Date().toISOString(),
+        method: "full-session",
         seed: "manual",
         handsPlayed: ms.handsPlayed,
         decisions: ms.decisions,
@@ -141,6 +143,11 @@ export default function CalibratePage() {
       <div>
         <PageHeader
           title="Calibration session"
+          right={
+            <Link href="/range-calibrate" className="btn">
+              Choose my range first
+            </Link>
+          }
           sub="Play hands yourself so the system can learn your strategy. Every decision is recorded with its full context — position, stack, pot, action history — and turned into a behavioral model."
         />
         <div className="panel px-6 py-6 max-w-xl">

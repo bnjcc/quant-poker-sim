@@ -129,7 +129,7 @@ function NewExperimentInner() {
             <select className="field mt-1" value={calId} onChange={(e) => setCalId(e.target.value)}>
               {cals.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {c.method === "range-first" ? `[Range-first] ${c.name}` : c.name}
                 </option>
               ))}
             </select>

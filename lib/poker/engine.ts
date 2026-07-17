@@ -41,6 +41,7 @@ export class HandEngine {
   private pendingSeats: number[] = [];
   private startingStacks = new Map<number, number>();
   private manualSeat: number | null;
+  private forcedHoleCards = new Map<number, Card[]>();
   private seedState: string;
   private history: HandHistory | null = null;
 
@@ -51,6 +52,8 @@ export class HandEngine {
     rng: Rng;
     handNumber: number;
     manualSeat?: number | null;
+    /** Optional known hole cards for scenario-based calibration. */
+    forcedHoleCards?: Record<number, Card[]>;
     /** Injectable deck for tests (dealt from the end via pop). */
     deck?: Card[];
   }) {
@@ -78,6 +81,18 @@ export class HandEngine {
         sittingOut: false,
       }));
     for (const p of this.players) this.startingStacks.set(p.seat, p.stack);
+
+    for (const [seatText, cards] of Object.entries(opts.forcedHoleCards ?? {})) {
+      const seat = Number(seatText);
+      if (!this.players.some((player) => player.seat === seat)) throw new Error(`Cannot force cards for missing seat ${seat}`);
+      if (cards.length !== 2) throw new Error(`Forced hole cards for seat ${seat} must contain exactly two cards`);
+      for (const card of cards) {
+        const deckIndex = this.deck.findIndex((candidate) => candidate.rank === card.rank && candidate.suit === card.suit);
+        if (deckIndex < 0) throw new Error(`Forced card is duplicated or missing from the deck`);
+        this.deck.splice(deckIndex, 1);
+      }
+      this.forcedHoleCards.set(seat, cards.slice());
+    }
 
     this.postBlindsAndDeal();
   }
@@ -124,7 +139,7 @@ export class HandEngine {
       for (const seat of this.seatOrder(this.nextSeatAfter(this.buttonSeat))) {
         const p = this.player(seat);
         if (!p.holeCards) p.holeCards = [];
-        p.holeCards.push(this.deck.pop()!);
+        p.holeCards.push(this.forcedHoleCards.get(seat)?.[round] ?? this.deck.pop()!);
       }
     }
 

@@ -66,6 +66,8 @@ Two layers:
    - illegal actions get their mass redistributed to legal substitutes (e.g. bet→raise);
    - bet sizes are sampled from the user's empirical pot-fraction pool blended with a ⅔-pot prior.
 
+Range-first calibrations add an explicit 169-hand first-in range to the serialized policy. Unselected hands fold when voluntarily entering an unraised pot (or check a free big-blind option); selected hands always continue and the learned policy chooses the action and size. The explicit chart is deliberately not applied when facing a raise, where recorded reactions and the normal model prior still govern play.
+
    Every simulated decision logs its probabilities and its **confidence** (data-vs-prior weight); the experiment page reports the average so users can see how much of "their" play was actually theirs.
 
 ## Table session & turnover (`lib/simulation/table.ts`)

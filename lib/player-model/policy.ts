@@ -1,5 +1,6 @@
 import { ChosenAction, DecisionContext, RecordedDecision } from "@/types/decision";
 import { estimateEquity, preflopStrength } from "@/lib/poker/equity";
+import { handIsInRange, isStartingHandNotation } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 
 /**
@@ -36,6 +37,8 @@ export interface PolicyProbabilities {
 export interface SerializedPolicy {
   buckets: Record<string, BucketCounts>;
   totalDecisions: number;
+  /** Explicit first-in range used by range-first calibrations. */
+  preflopRange?: string[];
   version: 1;
 }
 
@@ -70,7 +73,16 @@ function keyOf(street: string, pos: PositionClass | "*", facing: Facing, bucket:
 
 export class BehavioralPolicy {
   private buckets = new Map<string, BucketCounts>();
+  private preflopRange: Set<string> | null = null;
   totalDecisions = 0;
+
+  setPreflopRange(range: string[]): this {
+    const unique = [...new Set(range)];
+    if (unique.length === 0) throw new Error("Preflop range cannot be empty");
+    if (unique.some((hand) => !isStartingHandNotation(hand))) throw new Error("Preflop range contains invalid notation");
+    this.preflopRange = new Set(unique);
+    return this;
+  }
 
   private bucket(key: string): BucketCounts {
     let b = this.buckets.get(key);
@@ -110,6 +122,17 @@ export class BehavioralPolicy {
    * grows with sample size (shrinkage), so small samples stay conservative.
    */
   probabilities(ctx: DecisionContext, sb: StrengthBucket): PolicyProbabilities {
+    const rangeState = this.rangeState(ctx);
+    if (rangeState === "excluded") {
+      const chosen: ActionLabel = ctx.legal.types.includes("check") ? "check" : "fold";
+      return {
+        probs: { fold: 0, check: 0, call: 0, bet: 0, raise: 0, [chosen]: 1 },
+        confidence: 1,
+        bucketKey: "preflop|explicit-range|excluded",
+        samplesUsed: 0,
+      };
+    }
+
     const pc = positionClass(ctx.position);
     const fc = facingClass(ctx);
     const keys = [
@@ -170,7 +193,26 @@ export class BehavioralPolicy {
       for (const a of ACTIONS) probs[a] /= total;
     }
 
+    // A selected first-in hand is always played; calibration determines how it is played.
+    if (rangeState === "selected" && probs.fold > 0) {
+      probs.fold = 0;
+      const playableTotal = ACTIONS.reduce((sum, action) => sum + probs[action], 0);
+      if (playableTotal > 0) {
+        for (const action of ACTIONS) probs[action] /= playableTotal;
+      } else {
+        const fallback = ctx.legal.types.includes("check") ? "check" : ctx.legal.types.includes("call") ? "call" : "raise";
+        probs[fallback] = 1;
+      }
+    }
+
     return { probs, confidence: w, bucketKey: chosenKey, samplesUsed: n };
+  }
+
+  private rangeState(ctx: DecisionContext): "selected" | "excluded" | null {
+    if (!this.preflopRange || ctx.street !== "preflop" || ctx.facedRaisePreflop || ctx.holeCards.length !== 2) {
+      return null;
+    }
+    return handIsInRange(ctx.holeCards, this.preflopRange) ? "selected" : "excluded";
   }
 
   /** Sample an action + size from the policy. */
@@ -212,6 +254,7 @@ export class BehavioralPolicy {
     return {
       buckets: Object.fromEntries(this.buckets),
       totalDecisions: this.totalDecisions,
+      preflopRange: this.preflopRange ? [...this.preflopRange].sort() : undefined,
       version: 1,
     };
   }
@@ -222,6 +265,7 @@ export class BehavioralPolicy {
       p["buckets"].set(k, v);
     }
     p.totalDecisions = data.totalDecisions;
+    if (data.preflopRange?.length) p.setPreflopRange(data.preflopRange);
     return p;
   }
 }
