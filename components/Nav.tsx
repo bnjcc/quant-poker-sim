@@ -13,6 +13,7 @@ const LINKS: { href: string; label: string }[] = [
   { href: "/profile", label: "Strategy profile" },
   { href: "/experiments/new", label: "New experiment" },
   { href: "/experiments", label: "Experiments" },
+  { href: "/accuracy", label: "Model accuracy" },
   { href: "/compare", label: "Compare" },
   { href: "/opponents", label: "Opponent profiles" },
   { href: "/glossary", label: "Stats glossary" },

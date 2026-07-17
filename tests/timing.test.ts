@@ -134,6 +134,8 @@ describe("online action timing", () => {
     expect(voluntaryActions.every((action) => action.decisionTimeMs !== undefined)).toBe(true);
     expect(voluntaryActions.every((action) => (action.decisionTimeMs ?? 0) <= ACTION_CLOCK_MS)).toBe(true);
     expect(output.userDecisionLog.every((decision) => decision.decisionTimeMs !== undefined)).toBe(true);
+    expect(output.userDecisionLog.every((decision) => decision.context?.holeCards.length === 2)).toBe(true);
+    expect(output.userDecisionLog.every((decision) => decision.actionIndex !== undefined)).toBe(true);
   });
 
   it("keeps heuristic timing reads small enough to preserve legal decisions", () => {

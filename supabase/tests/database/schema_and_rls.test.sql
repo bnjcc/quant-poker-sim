@@ -3,11 +3,12 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(19);
+select plan(28);
 
 select has_table('public', 'calibrations', 'calibrations table exists');
 select has_table('public', 'experiments', 'experiments table exists');
 select has_table('public', 'experiment_hands', 'experiment_hands table exists');
+select has_table('public', 'strategy_reviews', 'strategy_reviews table exists');
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.calibrations'::regclass),
@@ -21,19 +22,24 @@ select ok(
   (select relrowsecurity from pg_class where oid = 'public.experiment_hands'::regclass),
   'experiment_hands has RLS enabled'
 );
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.strategy_reviews'::regclass),
+  'strategy_reviews has RLS enabled'
+);
 
 select is(
   (select count(*)::integer from pg_policies
     where schemaname = 'public'
-      and tablename in ('calibrations', 'experiments', 'experiment_hands')),
-  12,
+      and tablename in ('calibrations', 'experiments', 'experiment_hands', 'strategy_reviews')),
+  16,
   'each user-owned table has CRUD policies'
 );
 
 select ok(
   not has_table_privilege('anon', 'public.calibrations', 'select')
   and not has_table_privilege('anon', 'public.experiments', 'select')
-  and not has_table_privilege('anon', 'public.experiment_hands', 'select'),
+  and not has_table_privilege('anon', 'public.experiment_hands', 'select')
+  and not has_table_privilege('anon', 'public.strategy_reviews', 'select'),
   'anonymous users have no table read grants'
 );
 
@@ -41,9 +47,11 @@ select ok(
   has_table_privilege('authenticated', 'public.calibrations', 'select,insert,update,delete')
   and has_table_privilege('authenticated', 'public.experiments', 'select,insert,update,delete')
   and has_table_privilege('authenticated', 'public.experiment_hands', 'select,insert,update,delete')
+  and has_table_privilege('authenticated', 'public.strategy_reviews', 'select,insert,update,delete')
   and not has_table_privilege('authenticated', 'public.calibrations', 'truncate')
   and not has_table_privilege('authenticated', 'public.experiments', 'truncate')
-  and not has_table_privilege('authenticated', 'public.experiment_hands', 'truncate'),
+  and not has_table_privilege('authenticated', 'public.experiment_hands', 'truncate')
+  and not has_table_privilege('authenticated', 'public.strategy_reviews', 'truncate'),
   'authenticated users have CRUD grants without unrestricted truncation'
 );
 
@@ -65,6 +73,26 @@ select ok(
       and confdeltype = 'c'
   ),
   'experiment hand ownership FK uses CASCADE'
+);
+
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conname = 'strategy_reviews_experiment_owner_fkey'
+      and conrelid = 'public.strategy_reviews'::regclass
+      and confdeltype = 'c'
+  ),
+  'strategy review experiment ownership FK uses CASCADE'
+);
+
+select ok(
+  exists (
+    select 1 from pg_constraint
+    where conname = 'strategy_reviews_calibration_owner_fkey'
+      and conrelid = 'public.strategy_reviews'::regclass
+      and confdeltype = 'n'
+  ),
+  'strategy review calibration ownership FK uses SET NULL'
 );
 
 insert into auth.users (id, email)
@@ -151,6 +179,39 @@ select is(
   'a user can store a hand for their experiment'
 );
 
+insert into public.strategy_reviews (
+  id, experiment_id, calibration_id, round_number, simulation_version,
+  reviewed_decisions, agreed_decisions, corrected_decisions, accuracy, accepted, payload
+) values (
+  'review_a', 'exp_a', 'cal_a', 1, '1.3.0', 8, 7, 1, 0.875, false, '{}'
+);
+
+select is(
+  (select count(*) from public.strategy_reviews where experiment_id = 'exp_a'),
+  1::bigint,
+  'a user can store strategy feedback for their experiment'
+);
+
+select public.save_experiment_strategy_review(
+  'exp_a',
+  'complete',
+  '{"status":"complete","review_saved":true}',
+  'review_rpc',
+  '{"id":"review_rpc","experimentId":"exp_a","roundNumber":2,"createdAt":"2026-07-17T00:00:00.000Z","simulationVersion":"1.3.0","answers":[{}],"agreedCount":1,"correctedCount":0,"accuracy":1,"accepted":true}'
+);
+
+select is(
+  (select count(*) from public.strategy_reviews where experiment_id = 'exp_a'),
+  2::bigint,
+  'atomic review finalizer stores the normalized feedback row'
+);
+
+select is(
+  (select payload ->> 'review_saved' from public.experiments where id = 'exp_a'),
+  'true',
+  'atomic review finalizer stores the matching experiment payload'
+);
+
 delete from public.calibrations where id = 'cal_a';
 
 select ok(
@@ -161,12 +222,26 @@ select ok(
   'deleting a calibration retains the experiment and clears its link'
 );
 
+select ok(
+  exists (
+    select 1 from public.strategy_reviews
+    where id = 'review_a' and calibration_id is null
+  ),
+  'deleting a calibration retains strategy feedback and clears its link'
+);
+
 delete from public.experiments where id = 'exp_a';
 
 select is(
   (select count(*) from public.experiment_hands where experiment_id = 'exp_a'),
   0::bigint,
   'deleting an experiment cascades to its hands'
+);
+
+select is(
+  (select count(*) from public.strategy_reviews where experiment_id = 'exp_a'),
+  0::bigint,
+  'deleting an experiment cascades to its strategy reviews'
 );
 
 select * from finish();

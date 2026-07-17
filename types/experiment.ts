@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { HandHistory } from "./poker";
-import { RecordedDecision } from "./decision";
+import { HandHistory, Street } from "./poker";
+import { ChosenAction, DecisionContext, RecordedDecision } from "./decision";
 import { SerializedPolicy } from "@/lib/player-model/policy";
 import { PlayerTendencies } from "@/lib/player-model/stats";
 import { SimulationAggregates } from "@/lib/analytics/aggregate";
 
-export const SIMULATION_VERSION = "1.2.0";
+export const SIMULATION_VERSION = "1.3.0";
 
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),
@@ -66,6 +66,62 @@ export interface CalibrationDataset {
   manualAggregates: SimulationAggregates | null;
 }
 
+export interface SimulatedUserDecision {
+  handNumber: number;
+  street: Street;
+  probs: Record<string, number>;
+  confidence: number;
+  /** Legacy payloads only stored the action label. */
+  chosen: string;
+  /** Full review data is present on simulations created by v1.3+. */
+  actionIndex?: number;
+  context?: DecisionContext;
+  toAmount?: number;
+  potFraction?: number | null;
+  decisionTimeMs?: number;
+  timedOut?: boolean;
+  opponentTiming?: "none" | "snap" | "normal" | "tank";
+}
+
+export interface StrategyReviewAnswer {
+  handNumber: number;
+  actionIndex: number;
+  context: DecisionContext;
+  modelAction: ChosenAction;
+  reviewedAction: ChosenAction;
+  agreed: boolean;
+  modelConfidence: number;
+  modelProbabilities: Record<string, number>;
+}
+
+/** One post-simulation tester review. Also stored as a normalized Supabase row. */
+export interface StrategyReviewRound {
+  id: string;
+  experimentId: string;
+  calibrationId: string | null;
+  roundNumber: number;
+  createdAt: string;
+  simulationVersion: string;
+  seed: string;
+  answers: StrategyReviewAnswer[];
+  agreedCount: number;
+  correctedCount: number;
+  accuracy: number;
+  accepted: boolean;
+  /** Set after a correction-driven simulation finishes successfully. */
+  rerunCompletedAt?: string;
+}
+
+export interface ExperimentStrategyReview {
+  rounds: StrategyReviewRound[];
+  /** Base calibration plus every reviewed answer, weighted as direct feedback. */
+  calibratedPolicy?: SerializedPolicy;
+  /** A correction round waiting for a successful rerun. */
+  pendingRerunRoundId?: string;
+  /** Set when the latest reviewed sample contains no corrections. */
+  acceptedAt?: string;
+}
+
 export interface Experiment {
   id: string;
   createdAt: string;
@@ -77,14 +133,7 @@ export interface Experiment {
   results: SimulationAggregates | null;
   /** Stored hand histories (all in detailed mode, sampled in high-speed). */
   handIds: string[];
-  userDecisionLog: {
-    handNumber: number;
-    street: string;
-    probs: Record<string, number>;
-    confidence: number;
-    chosen: string;
-    decisionTimeMs?: number;
-    timedOut?: boolean;
-    opponentTiming?: "none" | "snap" | "normal" | "tank";
-  }[];
+  userDecisionLog: SimulatedUserDecision[];
+  /** Optional for experiments saved before post-simulation review existed. */
+  strategyReview?: ExperimentStrategyReview;
 }

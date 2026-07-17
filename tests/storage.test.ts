@@ -5,6 +5,7 @@ import {
   decodeStorageJson,
   encodeStorageJson,
   experimentFromRow,
+  strategyReviewFromRow,
 } from "@/lib/storage/store";
 import type { CalibrationDataset, Experiment } from "@/types/experiment";
 
@@ -80,5 +81,43 @@ describe("Supabase row mapping", () => {
     expect(mapped.calibrationId).toBeNull();
     expect(mapped.status).toBe("complete");
     expect(mapped.results?.profitFactor).toBe(Infinity);
+  });
+
+  it("uses normalized strategy-review metrics for analysis", () => {
+    const mapped = strategyReviewFromRow({
+      id: "review_current",
+      experiment_id: "exp_current",
+      calibration_id: null,
+      round_number: 2,
+      created_at: "2026-07-17T00:00:00.000Z",
+      simulation_version: "1.3.0",
+      reviewed_decisions: 8,
+      agreed_decisions: 7,
+      corrected_decisions: 1,
+      accuracy: 0.875,
+      accepted: false,
+      payload: encodeStorageJson({
+        id: "stale",
+        experimentId: "stale",
+        calibrationId: "cal_deleted",
+        roundNumber: 1,
+        createdAt: "2020-01-01T00:00:00.000Z",
+        simulationVersion: "1.0.0",
+        seed: "seed",
+        answers: [],
+        agreedCount: 0,
+        correctedCount: 0,
+        accuracy: 0,
+        accepted: true,
+      }),
+    });
+
+    expect(mapped.id).toBe("review_current");
+    expect(mapped.experimentId).toBe("exp_current");
+    expect(mapped.calibrationId).toBeNull();
+    expect(mapped.roundNumber).toBe(2);
+    expect(mapped.accuracy).toBe(0.875);
+    expect(mapped.correctedCount).toBe(1);
+    expect(mapped.accepted).toBe(false);
   });
 });

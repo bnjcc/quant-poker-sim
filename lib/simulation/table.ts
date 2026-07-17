@@ -1,4 +1,5 @@
 import { DecisionContext } from "@/types/decision";
+import { SimulatedUserDecision } from "@/types/experiment";
 import { HandHistory, TableConfig } from "@/types/poker";
 import { AgentMemory, decideAgentAction, freshMemory, sampleAgentDecisionTiming } from "@/lib/agents/agent";
 import { AgentProfile, adjustProfile } from "@/lib/agents/profiles";
@@ -80,16 +81,7 @@ export class TableSession {
   buttonSeat = 0;
   handNumber = 0;
   /** Explanations of simulated-user decisions, keyed by hand number. */
-  userDecisionLog: {
-    handNumber: number;
-    street: string;
-    probs: Record<string, number>;
-    confidence: number;
-    chosen: string;
-    decisionTimeMs?: number;
-    timedOut?: boolean;
-    opponentTiming?: ReturnType<typeof decisionTimingBucket>;
-  }[] = [];
+  userDecisionLog: SimulatedUserDecision[] = [];
 
   constructor(opts: {
     config: TableConfig;
@@ -224,12 +216,24 @@ export class TableSession {
           timedOut: Boolean(decision.timedOut),
         };
         const action = timing.timedOut ? timeoutAction(ctx) : decision.action;
+        const actionIndex = engine.actions.length;
+        const potFraction =
+          (action.type === "bet" || action.type === "raise") &&
+          action.toAmount !== undefined &&
+          ctx.potSize > 0
+            ? (action.toAmount - (action.type === "raise" ? ctx.legal.callAmount : 0)) /
+              ctx.potSize
+            : null;
         this.userDecisionLog.push({
           handNumber: this.handNumber,
           street: ctx.street,
           probs: decision.probs ?? {},
           confidence: decision.confidence ?? 0,
           chosen: action.type,
+          actionIndex,
+          context: ctx,
+          toAmount: action.toAmount,
+          potFraction,
           decisionTimeMs: timing.decisionTimeMs,
           timedOut: timing.timedOut,
           opponentTiming: decisionTimingBucket(ctx.lastOpponentAction?.decisionTimeMs),

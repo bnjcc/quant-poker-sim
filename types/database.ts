@@ -88,6 +88,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      strategy_reviews: {
+        Row: {
+          id: string;
+          user_id: string;
+          experiment_id: string;
+          calibration_id: string | null;
+          round_number: number;
+          created_at: string;
+          simulation_version: string;
+          reviewed_decisions: number;
+          agreed_decisions: number;
+          corrected_decisions: number;
+          accuracy: number;
+          accepted: boolean;
+          payload: Json;
+        };
+        Insert: {
+          id: string;
+          user_id?: string;
+          experiment_id: string;
+          calibration_id?: string | null;
+          round_number: number;
+          created_at: string;
+          simulation_version: string;
+          reviewed_decisions: number;
+          agreed_decisions: number;
+          corrected_decisions: number;
+          accuracy: number;
+          accepted: boolean;
+          payload: Json;
+        };
+        Update: {
+          calibration_id?: string | null;
+          round_number?: number;
+          created_at?: string;
+          simulation_version?: string;
+          reviewed_decisions?: number;
+          agreed_decisions?: number;
+          corrected_decisions?: number;
+          accuracy?: number;
+          accepted?: boolean;
+          payload?: Json;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -97,6 +142,16 @@ export interface Database {
           p_hand_set_id: string;
           p_status: "pending" | "running" | "complete" | "cancelled";
           p_payload: Json;
+        };
+        Returns: undefined;
+      };
+      save_experiment_strategy_review: {
+        Args: {
+          p_experiment_id: string;
+          p_experiment_status: "pending" | "running" | "complete" | "cancelled";
+          p_experiment_payload: Json;
+          p_review_id: string;
+          p_review_payload: Json;
         };
         Returns: undefined;
       };

@@ -3,13 +3,18 @@ import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { Database, Json } from "@/types/database";
 import type { HandHistory } from "@/types/poker";
-import type { CalibrationDataset, Experiment } from "@/types/experiment";
+import type {
+  CalibrationDataset,
+  Experiment,
+  StrategyReviewRound,
+} from "@/types/experiment";
 
 export interface StorageSummary {
   mode: "local" | "supabase";
   calibrations: number;
   experiments: number;
   hands: number;
+  reviews: number;
   usageLabel: string;
   description: string;
 }
@@ -31,12 +36,17 @@ export interface DataStore {
   getHands(experimentId: string): Promise<HandHistory[]>;
   saveExperimentRun(experiment: Experiment, hands: HandHistory[]): Promise<Experiment>;
 
+  listStrategyReviews(): Promise<StrategyReviewRound[]>;
+  saveStrategyReview(review: StrategyReviewRound): Promise<void>;
+  saveExperimentReview(experiment: Experiment, review: StrategyReviewRound): Promise<void>;
+
   getStorageSummary(): Promise<StorageSummary>;
   deleteAll(): Promise<void>;
 }
 
 const CAL_KEY = "psim:calibrations";
 const EXP_KEY = "psim:experiments";
+const REVIEW_KEY = "psim:strategy-reviews";
 const HANDS_PREFIX = "psim:hands:";
 const MIGRATION_PREFIX = "psim:migrated:";
 const NON_FINITE_KEY = "__rangebench_non_finite_number__";
@@ -151,6 +161,7 @@ export class LocalStorageStore implements DataStore {
 
   async deleteExperiment(id: string): Promise<void> {
     this.write(EXP_KEY, (await this.listExperiments()).filter((item) => item.id !== id));
+    this.write(REVIEW_KEY, (await this.listStrategyReviews()).filter((item) => item.experimentId !== id));
     if (typeof window !== "undefined") window.localStorage.removeItem(HANDS_PREFIX + id);
   }
 
@@ -171,9 +182,25 @@ export class LocalStorageStore implements DataStore {
     return completed;
   }
 
+  async listStrategyReviews(): Promise<StrategyReviewRound[]> {
+    return this.read<StrategyReviewRound[]>(REVIEW_KEY, []);
+  }
+
+  async saveStrategyReview(review: StrategyReviewRound): Promise<void> {
+    const all = (await this.listStrategyReviews()).filter((item) => item.id !== review.id);
+    all.unshift(review);
+    this.write(REVIEW_KEY, all);
+  }
+
+  async saveExperimentReview(experiment: Experiment, review: StrategyReviewRound): Promise<void> {
+    await this.saveStrategyReview(review);
+    await this.saveExperiment(experiment);
+  }
+
   async getStorageSummary(): Promise<StorageSummary> {
     const calibrations = await this.listCalibrations();
     const experiments = await this.listExperiments();
+    const reviews = await this.listStrategyReviews();
     let bytes = 0;
     let hands = 0;
     if (typeof window !== "undefined") {
@@ -189,6 +216,7 @@ export class LocalStorageStore implements DataStore {
       calibrations: calibrations.length,
       experiments: experiments.length,
       hands,
+      reviews: reviews.length,
       usageLabel: `${(bytes / 1024 / 1024).toFixed(2)} MB in this browser`,
       description: "Supabase is not configured, so data stays in this browser only.",
     };
@@ -207,6 +235,7 @@ export class LocalStorageStore implements DataStore {
 
 type CalibrationRow = Database["public"]["Tables"]["calibrations"]["Row"];
 type ExperimentRow = Database["public"]["Tables"]["experiments"]["Row"];
+type StrategyReviewRow = Database["public"]["Tables"]["strategy_reviews"]["Row"];
 
 export function calibrationFromRow(
   row: Pick<CalibrationRow, "id" | "name" | "created_at" | "hands_played" | "payload">,
@@ -229,6 +258,24 @@ export function experimentFromRow(
     calibrationId: row.calibration_id,
     createdAt: row.created_at,
     status: row.status,
+  };
+}
+
+export function strategyReviewFromRow(
+  row: Pick<StrategyReviewRow, "id" | "experiment_id" | "calibration_id" | "round_number" | "created_at" | "simulation_version" | "reviewed_decisions" | "agreed_decisions" | "corrected_decisions" | "accuracy" | "accepted" | "payload">,
+): StrategyReviewRound {
+  return {
+    ...decodeStorageJson<StrategyReviewRound>(row.payload),
+    id: row.id,
+    experimentId: row.experiment_id,
+    calibrationId: row.calibration_id,
+    roundNumber: row.round_number,
+    createdAt: row.created_at,
+    simulationVersion: row.simulation_version,
+    agreedCount: row.agreed_decisions,
+    correctedCount: row.corrected_decisions,
+    accuracy: row.accuracy,
+    accepted: row.accepted,
   };
 }
 
@@ -441,6 +488,73 @@ export class SupabaseStore implements DataStore {
     return completed;
   }
 
+  async listStrategyReviews(): Promise<StrategyReviewRound[]> {
+    const { data, error } = await this.client
+      .from("strategy_reviews")
+      .select("id,experiment_id,calibration_id,round_number,created_at,simulation_version,reviewed_decisions,agreed_decisions,corrected_decisions,accuracy,accepted,payload")
+      .order("created_at", { ascending: false });
+    throwIfError("Load strategy reviews", error);
+    return (data ?? []).map(strategyReviewFromRow);
+  }
+
+  async saveStrategyReview(review: StrategyReviewRound): Promise<void> {
+    const userId = await this.userId();
+    const experiment = await this.getExperiment(review.experimentId);
+    if (!experiment) throw new Error("Cannot save strategy feedback for a missing experiment.");
+    const { error } = await this.client.from("strategy_reviews").upsert(
+      {
+        id: review.id,
+        user_id: userId,
+        experiment_id: review.experimentId,
+        calibration_id: experiment.calibrationId,
+        round_number: review.roundNumber,
+        created_at: review.createdAt,
+        simulation_version: review.simulationVersion,
+        reviewed_decisions: review.answers.length,
+        agreed_decisions: review.agreedCount,
+        corrected_decisions: review.correctedCount,
+        accuracy: review.accuracy,
+        accepted: review.accepted,
+        payload: encodeStorageJson(review),
+      },
+      { onConflict: "id" },
+    );
+    throwIfError("Save strategy review", error);
+  }
+
+  async saveExperimentReview(experiment: Experiment, review: StrategyReviewRound): Promise<void> {
+    const { error } = await this.client.rpc("save_experiment_strategy_review", {
+      p_experiment_id: experiment.id,
+      p_experiment_status: experiment.status,
+      p_experiment_payload: encodeStorageJson(experiment),
+      p_review_id: review.id,
+      p_review_payload: encodeStorageJson(review),
+    });
+    throwIfError("Save experiment strategy review", error);
+  }
+
+  async createStrategyReviewIfMissing(review: StrategyReviewRound): Promise<boolean> {
+    const userId = await this.userId();
+    const { error } = await this.client.from("strategy_reviews").insert({
+      id: review.id,
+      user_id: userId,
+      experiment_id: review.experimentId,
+      calibration_id: review.calibrationId,
+      round_number: review.roundNumber,
+      created_at: review.createdAt,
+      simulation_version: review.simulationVersion,
+      reviewed_decisions: review.answers.length,
+      agreed_decisions: review.agreedCount,
+      corrected_decisions: review.correctedCount,
+      accuracy: review.accuracy,
+      accepted: review.accepted,
+      payload: encodeStorageJson(review),
+    });
+    if (error?.code === "23505") return false;
+    throwIfError("Import strategy review", error);
+    return true;
+  }
+
   async getHands(experimentId: string): Promise<HandHistory[]> {
     const { data: experiment, error: experimentError } = await this.client
       .from("experiments")
@@ -468,19 +582,22 @@ export class SupabaseStore implements DataStore {
   }
 
   async getStorageSummary(): Promise<StorageSummary> {
-    const [calibrations, experiments, hands] = await Promise.all([
+    const [calibrations, experiments, hands, reviews] = await Promise.all([
       this.client.from("calibrations").select("id", { count: "exact", head: true }),
       this.client.from("experiments").select("id", { count: "exact", head: true }),
       this.client.from("experiment_hands").select("hand_number", { count: "exact", head: true }),
+      this.client.from("strategy_reviews").select("id", { count: "exact", head: true }),
     ]);
     throwIfError("Count calibrations", calibrations.error);
     throwIfError("Count experiments", experiments.error);
     throwIfError("Count experiment hands", hands.error);
+    throwIfError("Count strategy reviews", reviews.error);
     return {
       mode: "supabase",
       calibrations: calibrations.count ?? 0,
       experiments: experiments.count ?? 0,
       hands: hands.count ?? 0,
+      reviews: reviews.count ?? 0,
       usageLabel: "Managed by Supabase",
       description: "Your data is synced to your private Supabase account and protected by row-level security.",
     };
@@ -505,6 +622,7 @@ export interface ImportResult {
   calibrations: number;
   experiments: number;
   hands: number;
+  reviews: number;
   skipped: number;
 }
 
@@ -529,11 +647,17 @@ export async function importBrowserData(): Promise<ImportResult> {
 
   const calibrations = await localStore.listCalibrations();
   const experiments = await localStore.listExperiments();
-  const remoteCalibrations = await target.listCalibrations();
+  const reviews = await localStore.listStrategyReviews();
+  const [remoteCalibrations, remoteExperiments] = await Promise.all([
+    target.listCalibrations(),
+    target.listExperiments(),
+  ]);
   const calibrationIds = new Set(remoteCalibrations.map((calibration) => calibration.id));
+  const experimentIds = new Set(remoteExperiments.map((experiment) => experiment.id));
   let calibrationsImported = 0;
   let experimentsImported = 0;
   let handsImported = 0;
+  let reviewsImported = 0;
   let skipped = 0;
 
   for (const calibration of calibrations) {
@@ -553,6 +677,7 @@ export async function importBrowserData(): Promise<ImportResult> {
       ? { ...normalized, status: "running" as const, handIds: [] }
       : normalized;
     if (!(await target.createExperimentIfMissing(staged))) {
+      experimentIds.add(experiment.id);
       skipped++;
       continue;
     }
@@ -561,11 +686,23 @@ export async function importBrowserData(): Promise<ImportResult> {
         await target.saveExperimentRun(normalized, hands);
         handsImported += hands.length;
       }
+      experimentIds.add(experiment.id);
       experimentsImported++;
     } catch (error) {
       await target.deleteExperiment(experiment.id);
       throw error;
     }
+  }
+  for (const review of reviews) {
+    if (!experimentIds.has(review.experimentId)) {
+      skipped++;
+      continue;
+    }
+    const normalized = calibrationIds.has(review.calibrationId ?? "")
+      ? review
+      : { ...review, calibrationId: null };
+    if (await target.createStrategyReviewIfMissing(normalized)) reviewsImported++;
+    else skipped++;
   }
 
   const { data } = await createClient().auth.getUser();
@@ -573,7 +710,13 @@ export async function importBrowserData(): Promise<ImportResult> {
     window.localStorage.setItem(`${MIGRATION_PREFIX}${data.user.id}`, new Date().toISOString());
   }
 
-  return { calibrations: calibrationsImported, experiments: experimentsImported, hands: handsImported, skipped };
+  return {
+    calibrations: calibrationsImported,
+    experiments: experimentsImported,
+    hands: handsImported,
+    reviews: reviewsImported,
+    skipped,
+  };
 }
 
 export function newId(prefix: string): string {
