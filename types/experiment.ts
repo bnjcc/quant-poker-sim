@@ -5,7 +5,7 @@ import { SerializedPolicy } from "@/lib/player-model/policy";
 import { PlayerTendencies } from "@/lib/player-model/stats";
 import { SimulationAggregates } from "@/lib/analytics/aggregate";
 
-export const SIMULATION_VERSION = "1.3.0";
+export const SIMULATION_VERSION = "1.4.0";
 
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),

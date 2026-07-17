@@ -11,7 +11,7 @@ A calibrate → learn → simulate → analyze loop for 6-max NLHE cash games:
 3. Batch experiments (10–500,000 hands) against a 13-archetype opponent pool with realistic turnover, rebuys, stop-loss/win departures, and pool-level skill/looseness/aggression dials.
 4. Quant-grade analytics: bb/100 ± CI, significance, σ, drawdown, profit factor, risk of ruin, red/blue line, positional/stack/pot-type/hole-card breakdowns, sizing distributions, model confidence.
 5. Reproducibility: every experiment stores config + seed + engine version; same triple ⇒ identical run (tested).
-6. Hand explorer with street-by-street replay; JSON exports; experiment duplication and comparison.
+6. Hand explorer with street-by-street replay, in-browser decision review, experiment duplication, and comparison. User-facing exports are intentionally omitted.
 
 ## Key decisions
 
@@ -43,3 +43,13 @@ types → RNG/deck/evaluator → engine (+tests) → equity fast path → agents
 4. Select the Supabase adapter when configured; retain browser mode otherwise.
 5. Page hand-history reads, batch writes, preserve non-finite analytics values, and allow an explicit local-to-cloud import.
 6. Update Settings, docs, environment configuration, and regression tests, then run the complete validation suite.
+
+## Calibration, review, and experiment-history follow-up (executed)
+
+1. Audit the engine, bot proposals, and calibration table display for illegal check/call behavior.
+2. Keep `HandEngine` authoritative, normalize stale proposals to legal equivalents, close the short-all-in re-raise edge case, and add direct regression coverage.
+3. Replace predominantly sub-second calibration bot actions with seeded human-paced timing while retaining snaps, tanks, timeouts, and zero-wait batch execution.
+4. Present an explicit **Simulated Hand Review** after completed runs, sample review data across stored hands, and collect confirmation or corrected legal actions entirely in the browser.
+5. Persist review answers in experiment state and normalized owner-analyzable review rows; rebuild the experiment policy and rerun the same seed after corrections.
+6. Remove user-facing exports, expose a clear **Previous experiments** history on desktop and mobile, and add explicit saved-run entry points.
+7. Bump the simulation version, update the project handoff, and validate with the full tests, type check, lint, and production build.

@@ -6,45 +6,6 @@ import { Experiment, StrategyReviewRound } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
 import { Empty, PageHeader, Stat, fmtPct } from "@/components/ui";
 
-function downloadFile(filename: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
-function csvCell(value: unknown): string {
-  const text = String(value ?? "");
-  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
-
-function reviewsCsv(reviews: StrategyReviewRound[], experiments: Map<string, Experiment>): string {
-  const header = [
-    "review_id", "experiment_id", "experiment_name", "calibration_id", "round", "created_at",
-    "simulation_version", "seed", "reviewed_decisions", "agreed", "corrected", "accuracy", "accepted",
-    "rerun_completed_at",
-  ];
-  const rows = reviews.map((review) => [
-    review.id,
-    review.experimentId,
-    experiments.get(review.experimentId)?.config.name ?? "",
-    review.calibrationId ?? "",
-    review.roundNumber,
-    review.createdAt,
-    review.simulationVersion,
-    review.seed,
-    review.answers.length,
-    review.agreedCount,
-    review.correctedCount,
-    review.accuracy,
-    review.accepted,
-    review.rerunCompletedAt ?? "",
-  ]);
-  return [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
-}
-
 export default function AccuracyPage() {
   const [reviews, setReviews] = useState<StrategyReviewRound[] | null>(null);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -84,12 +45,6 @@ export default function AccuracyPage() {
       <PageHeader
         title="Model accuracy feedback"
         sub="Tester judgments are saved separately from simulation results so you can measure where the strategy model agrees with real decisions."
-        right={reviews.length > 0 ? (
-          <div className="flex gap-2">
-            <button className="btn" onClick={() => downloadFile("rangebench-strategy-reviews.csv", reviewsCsv(reviews, experimentById), "text/csv")}>Export CSV</button>
-            <button className="btn" onClick={() => downloadFile("rangebench-strategy-reviews.json", JSON.stringify(reviews, null, 2), "application/json")}>Export JSON</button>
-          </div>
-        ) : undefined}
       />
 
       {error && <div className="panel px-4 py-3 text-sm mb-4" style={{ color: "var(--loss)" }}>{error}</div>}

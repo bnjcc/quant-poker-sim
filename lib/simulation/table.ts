@@ -1,4 +1,4 @@
-import { DecisionContext } from "@/types/decision";
+import { ChosenAction, DecisionContext } from "@/types/decision";
 import { SimulatedUserDecision } from "@/types/experiment";
 import { HandHistory, TableConfig } from "@/types/poker";
 import { AgentMemory, decideAgentAction, freshMemory, sampleAgentDecisionTiming } from "@/lib/agents/agent";
@@ -58,6 +58,41 @@ export function policyDecider(policy: BehavioralPolicy): UserSeatDecider {
       return { action, probs: explain.probs, confidence: explain.confidence, decisionTimeMs, timedOut };
     },
   };
+}
+
+/**
+ * Keep every policy and bot proposal inside the engine's current legal action
+ * set. The engine remains the final rules authority; this conversion preserves
+ * the intent of a passive action when the available wording changes (for
+ * example, a stale "check" proposal becomes a call when facing a bet).
+ */
+export function normalizeActionToLegal(
+  action: ChosenAction,
+  legal: DecisionContext["legal"],
+): ChosenAction {
+  let type = action.type;
+
+  if (!legal.types.includes(type)) {
+    if (type === "check" && legal.types.includes("call")) type = "call";
+    else if (type === "call" && legal.types.includes("check")) type = "check";
+    else if (type === "bet" && legal.types.includes("raise")) type = "raise";
+    else if (type === "raise" && legal.types.includes("bet")) type = "bet";
+    else if (legal.types.includes("fold")) type = "fold";
+    else if (legal.types.includes("check")) type = "check";
+    else if (legal.types.includes("call")) type = "call";
+    else throw new Error("No legal action is available for the acting seat");
+  }
+
+  if (type === "bet" || type === "raise") {
+    const minimum = type === "bet" ? legal.minBet : legal.minRaiseTo;
+    const requested = Number.isFinite(action.toAmount) ? action.toAmount! : minimum;
+    return {
+      type,
+      toAmount: Math.min(Math.max(requested, minimum), legal.maxBetTo),
+    };
+  }
+
+  return { type };
 }
 
 let agentCounter = 0;
@@ -375,16 +410,9 @@ export class ContextTracker {
     action: { type: "fold" | "check" | "call" | "bet" | "raise"; toAmount?: number },
     timing?: DecisionTiming,
   ): void {
-    // Sanitize illegal samples defensively (agents can produce edge sizes).
+    // Normalize proposals defensively, then let HandEngine enforce the rules.
     const legal = this.engine.getLegalActions(seat);
-    let a = action;
-    if (!legal.types.includes(a.type)) {
-      a = legal.types.includes("check") ? { type: "check" } : { type: "fold" };
-    }
-    if ((a.type === "bet" || a.type === "raise") && a.toAmount !== undefined) {
-      const min = a.type === "bet" ? legal.minBet : legal.minRaiseTo;
-      a = { type: a.type, toAmount: Math.min(Math.max(a.toAmount, min), legal.maxBetTo) };
-    }
+    const a = normalizeActionToLegal(action, legal);
     if (a.type === "raise" || (a.type === "bet" && this.engine.street === "preflop")) {
       if (this.engine.street === "preflop") {
         this.preflopRaises++;

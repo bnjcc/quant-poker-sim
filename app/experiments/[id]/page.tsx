@@ -13,7 +13,7 @@ import {
 } from "@/types/experiment";
 import { runSimulation, SimulationProgress } from "@/lib/simulation/runner";
 import { buildPoolConfig, RELIABLE_SAMPLE_THRESHOLD } from "@/lib/simulation/defaults";
-import { buildCalibratedPolicy, reviewAccuracy } from "@/lib/player-model/review";
+import { buildCalibratedPolicy, reviewAccuracy, sampleStoredUserDecisions } from "@/lib/player-model/review";
 import { riskOfRuin } from "@/lib/analytics/aggregate";
 import { formatDecisionTime } from "@/lib/simulation/timing";
 import { getStore, newId } from "@/lib/storage/store";
@@ -24,16 +24,6 @@ import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct } from "@/components/ui";
 
 const POSITION_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
-
-function download(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +42,7 @@ export default function ExperimentDetailPage() {
   const [filterBigPots, setFilterBigPots] = useState(false);
   const [sortByLoss, setSortByLoss] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -104,12 +95,12 @@ export default function ExperimentDetailPage() {
         simulationVersion: SIMULATION_VERSION,
         status: out.cancelled ? "cancelled" : "complete",
         results: out.aggregates,
-        userDecisionLog: out.userDecisionLog.slice(0, 5000),
+        userDecisionLog: sampleStoredUserDecisions(out.hands, out.userDecisionLog),
         strategyReview,
       }, out.hands);
       setExp(updated);
       setHands(out.hands);
-      setReviewOpen(!out.cancelled);
+      setReviewOpen(false);
       if (completedReview) await store.saveStrategyReview(completedReview);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Simulation failed.");
@@ -133,8 +124,20 @@ export default function ExperimentDetailPage() {
   }, [exp]);
 
   const startReview = useCallback(async () => {
-    if (!hands) await loadHands();
-    setReviewOpen(true);
+    setReviewLoading(true);
+    setError(null);
+    try {
+      const loaded = hands ?? await loadHands();
+      if (loaded.length === 0) {
+        setError("No simulated hands were stored for review. Run the experiment again to create a review sample.");
+        return;
+      }
+      setReviewOpen(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load simulated hands for review.");
+    } finally {
+      setReviewLoading(false);
+    }
   }, [hands, loadHands]);
 
   const submitStrategyReview = useCallback(async (answers: StrategyReviewAnswer[]) => {
@@ -233,22 +236,12 @@ export default function ExperimentDetailPage() {
         sub={exp.config.description || undefined}
         right={
           <div className="flex gap-2">
+            <Link href="/experiments" className="btn">
+              Previous experiments
+            </Link>
             <Link href={`/experiments/new?duplicate=${exp.id}`} className="btn">
               Duplicate
             </Link>
-            {r && (
-              <button className="btn" onClick={() => download(`${exp.id}-summary.json`, { config: exp.config, calibrationId: exp.calibrationId, simulationVersion: exp.simulationVersion, results: r, strategyReview: exp.strategyReview })}>
-                Export summary
-              </button>
-            )}
-            {r && (
-              <button
-                className="btn"
-                onClick={async () => download(`${exp.id}-hands.json`, await getStore().getHands(exp.id))}
-              >
-                Export hands
-              </button>
-            )}
           </div>
         }
       />
@@ -341,9 +334,9 @@ export default function ExperimentDetailPage() {
           <section className="panel px-5 py-4 mb-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
               <div>
-                <h2 className="font-semibold">Review model accuracy</h2>
+                <h2 className="font-semibold">Simulated Hand Review</h2>
                 <p className="text-xs text-muted mt-1 max-w-2xl">
-                  Watch the model&apos;s line across eight spread-out hands, then confirm its decision or enter what you would do. Corrections calibrate this experiment and trigger a seeded rerun.
+                  Take a short in-browser survey across eight hands sampled from this run. Confirm the simulated decision or make the decision you would choose. Your answers are saved for model improvement; corrections recalibrate this experiment and trigger a seeded rerun.
                 </p>
               </div>
               <Link href="/accuracy" className="btn text-xs">View saved accuracy data</Link>
@@ -375,8 +368,8 @@ export default function ExperimentDetailPage() {
                 onComplete={submitStrategyReview}
               />
             ) : (
-              <button className="btn btn-primary" onClick={startReview} disabled={running}>
-                Start accuracy review
+              <button className="btn btn-primary" onClick={startReview} disabled={running || reviewLoading}>
+                {reviewLoading ? "Loading review hands..." : "Simulated Hand Review"}
               </button>
             )}
           </section>

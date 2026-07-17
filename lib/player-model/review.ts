@@ -17,6 +17,27 @@ export interface ReviewableDecision extends SimulatedUserDecision {
   context: NonNullable<SimulatedUserDecision["context"]>;
 }
 
+/**
+ * Keep a bounded, evenly distributed decision log that can actually be joined
+ * to the hands stored for browser review. This avoids keeping only the start of
+ * a long experiment while still representing the full run.
+ */
+export function sampleStoredUserDecisions(
+  hands: HandHistory[],
+  decisions: SimulatedUserDecision[],
+  limit = 5_000,
+): SimulatedUserDecision[] {
+  if (limit <= 0 || hands.length === 0) return [];
+  const storedHandNumbers = new Set(hands.map((hand) => hand.handNumber));
+  const eligible = decisions.filter((decision) => storedHandNumbers.has(decision.handNumber));
+  if (eligible.length <= limit) return eligible;
+  if (limit === 1) return [eligible[0]];
+
+  return Array.from({ length: limit }, (_, index) =>
+    eligible[Math.round((index * (eligible.length - 1)) / (limit - 1))],
+  );
+}
+
 export function simulatedAction(decision: SimulatedUserDecision): ChosenAction {
   return {
     type: decision.chosen as ChosenAction["type"],

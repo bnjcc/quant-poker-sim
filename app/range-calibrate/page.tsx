@@ -247,7 +247,11 @@ export default function RangeCalibratePage() {
       isActing: engine.currentSeat === player.seat,
       isUser: player.seat === session.userSeat,
       holeCards: player.seat === session.userSeat || engine.complete ? player.holeCards : null,
-      lastAction: lastActionBySeat.get(player.seat),
+      // Do not show a stale earlier action while this seat is deciding again.
+      lastAction:
+        engine.currentSeat === player.seat && !engine.complete
+          ? undefined
+          : lastActionBySeat.get(player.seat),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx, engine, phase, session]);

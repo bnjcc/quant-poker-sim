@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideAgentAction } from "@/lib/agents/agent";
+import { decideAgentAction, sampleAgentDecisionTiming } from "@/lib/agents/agent";
 import { getPreset } from "@/lib/agents/profiles";
 import { BehavioralPolicy, SerializedPolicy, strengthBucket } from "@/lib/player-model/policy";
 import { cardsFromString } from "@/lib/poker/deck";
@@ -7,7 +7,7 @@ import { HandEngine } from "@/lib/poker/engine";
 import { Rng } from "@/lib/poker/rng";
 import { buildPoolConfig, DEFAULT_POOL_SETTINGS, DEFAULT_TABLE } from "@/lib/simulation/defaults";
 import { runSimulation } from "@/lib/simulation/runner";
-import { ContextTracker } from "@/lib/simulation/table";
+import { ContextTracker, normalizeActionToLegal } from "@/lib/simulation/table";
 import {
   ACTION_CLOCK_MS,
   decisionTimingBucket,
@@ -36,12 +36,49 @@ const baseContext: DecisionContext = {
 };
 
 describe("online action timing", () => {
+  it("never permits a bot to check while facing a bet", () => {
+    const legal = baseContext.legal;
+    expect(legal.types).not.toContain("check");
+    expect(normalizeActionToLegal({ type: "check" }, legal)).toEqual({ type: "call" });
+
+    const engine = new HandEngine({
+      players: [0, 1].map((seat) => ({ seat, playerId: `p${seat}`, name: `P${seat}`, stack: 200 })),
+      buttonSeat: 0,
+      config: { ...DEFAULT_TABLE, rake: { percentage: 0, cap: 0, noFlopNoDrop: true } },
+      rng: new Rng("legal-check-facing-bet"),
+      handNumber: 1,
+    });
+    const tracker = new ContextTracker(engine);
+    tracker.apply(0, { type: "call" });
+    tracker.apply(1, { type: "check" });
+    tracker.apply(1, { type: "check" });
+    tracker.apply(0, { type: "bet", toAmount: 10 });
+
+    expect(engine.getLegalActions(1).types).toEqual(["fold", "call", "raise"]);
+    tracker.apply(1, { type: "check" });
+    expect(engine.actions.at(-1)?.type).toBe("call");
+  });
+
   it("classifies snaps and tanks and selects the legal timeout default", () => {
     expect(decisionTimingBucket(SNAP_DECISION_MS)).toBe("snap");
     expect(decisionTimingBucket(3_000)).toBe("normal");
     expect(decisionTimingBucket(8_000)).toBe("tank");
     expect(timeoutAction(baseContext).type).toBe("fold");
     expect(timeoutAction({ ...baseContext, legal: { ...baseContext.legal, types: ["check", "bet"] } }).type).toBe("check");
+  });
+
+  it("paces most visible bot actions like human decisions", () => {
+    const profile = getPreset("tag");
+    const rng = new Rng("human-paced-opponents");
+    const samples = Array.from({ length: 500 }, () =>
+      sampleAgentDecisionTiming(profile, baseContext, { type: "call" }, rng).decisionTimeMs,
+    );
+    const subSecond = samples.filter((sample) => sample < 1_000).length / samples.length;
+    const average = samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
+
+    expect(subSecond).toBeLessThan(0.2);
+    expect(average).toBeGreaterThan(2_500);
+    expect(samples.every((sample) => sample <= ACTION_CLOCK_MS)).toBe(true);
   });
 
   it("puts elapsed timing into actions and the next opponent context", () => {

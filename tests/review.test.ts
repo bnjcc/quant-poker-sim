@@ -10,6 +10,7 @@ import { BehavioralPolicy, strengthBucket } from "@/lib/player-model/policy";
 import {
   buildCalibratedPolicy,
   reviewAccuracy,
+  sampleStoredUserDecisions,
   selectReviewDecisions,
 } from "@/lib/player-model/review";
 import { Rng } from "@/lib/poker/rng";
@@ -73,6 +74,22 @@ function decision(handNumber: number): SimulatedUserDecision {
 }
 
 describe("strategy review sampling", () => {
+  it("keeps review decisions spread across the full stored run", () => {
+    const hands = Array.from({ length: 100 }, (_, index) => hand(index + 1));
+    const decisions = Array.from({ length: 100 }, (_, index) => decision(index + 1));
+
+    const sampled = sampleStoredUserDecisions(hands, decisions, 10);
+
+    expect(sampled).toHaveLength(10);
+    expect(sampled[0].handNumber).toBe(1);
+    expect(sampled.at(-1)?.handNumber).toBe(100);
+  });
+
+  it("excludes decisions whose hand history was not stored", () => {
+    const sampled = sampleStoredUserDecisions([hand(2), hand(4)], [1, 2, 3, 4].map(decision));
+    expect(sampled.map((item) => item.handNumber)).toEqual([2, 4]);
+  });
+
   it("selects reviewable decisions from distinct hands spread across the run", () => {
     const hands = Array.from({ length: 20 }, (_, index) => hand(index + 1));
     const decisions = Array.from({ length: 20 }, (_, index) => decision(index + 1));

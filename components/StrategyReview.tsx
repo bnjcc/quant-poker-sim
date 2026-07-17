@@ -231,7 +231,7 @@ export function StrategyReview({
 
       <div className="grid lg:grid-cols-[1fr_1.2fr] gap-4 mt-4">
         <div className="rounded-md border border-line bg-panel2 px-4 py-3">
-          <div className="label">Machine decision</div>
+          <div className="label">Simulated decision</div>
           <div className="mono text-xl font-bold text-accent mt-1">{formatAction(modelAction, bigBlind)}</div>
           <div className="text-xs text-muted mt-2">
             pot {(current.context.potSize / bigBlind).toFixed(1)} bb · call {(current.context.betFaced / bigBlind).toFixed(1)} bb · model confidence {(current.confidence * 100).toFixed(0)}%
@@ -248,8 +248,8 @@ export function StrategyReview({
           {answered && <div className="text-xs text-info mt-1">Previously marked: {answered.agreed ? "accurate" : formatAction(answered.reviewedAction, bigBlind)}</div>}
           {!correcting ? (
             <div className="flex flex-wrap gap-2 mt-3">
-              <button className="btn btn-primary" onClick={() => record(modelAction, true)} disabled={disabled}>Yes, this is accurate</button>
-              <button className="btn" onClick={() => setCorrecting(true)} disabled={disabled}>I would choose differently</button>
+              <button className="btn btn-primary" onClick={() => record(modelAction, true)} disabled={disabled}>Yes, I would do this</button>
+              <button className="btn" onClick={() => setCorrecting(true)} disabled={disabled}>No, make my decision</button>
             </div>
           ) : (
             <div className="mt-3">
