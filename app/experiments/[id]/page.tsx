@@ -4,28 +4,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { HandHistory } from "@/types/poker";
-import { CalibrationDataset, Experiment, SIMULATION_VERSION } from "@/types/experiment";
+import {
+  CalibrationDataset,
+  Experiment,
+  SIMULATION_VERSION,
+  StrategyReviewAnswer,
+  StrategyReviewRound,
+} from "@/types/experiment";
 import { runSimulation, SimulationProgress } from "@/lib/simulation/runner";
 import { buildPoolConfig, RELIABLE_SAMPLE_THRESHOLD } from "@/lib/simulation/defaults";
+import { buildCalibratedPolicy, reviewAccuracy, sampleStoredUserDecisions } from "@/lib/player-model/review";
 import { riskOfRuin } from "@/lib/analytics/aggregate";
 import { formatDecisionTime } from "@/lib/simulation/timing";
-import { getStore } from "@/lib/storage/store";
+import { getStore, newId } from "@/lib/storage/store";
 import { BetSizeChart, BreakdownBars, EquityCurve, FrequencyBars, StartingHandHeatmap } from "@/components/charts";
 import { HandReplayer } from "@/components/HandReplayer";
+import { StrategyReview } from "@/components/StrategyReview";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct } from "@/components/ui";
 
 const POSITION_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
-
-function download(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +41,8 @@ export default function ExperimentDetailPage() {
   const [filterShowdown, setFilterShowdown] = useState(false);
   const [filterBigPots, setFilterBigPots] = useState(false);
   const [sortByLoss, setSortByLoss] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -53,8 +53,7 @@ export default function ExperimentDetailPage() {
     })();
   }, [id]);
 
-  const run = useCallback(async () => {
-    if (!exp || !cal) return;
+  const executeRun = useCallback(async (source: Experiment, policy: CalibrationDataset["policy"]) => {
     setRunning(true);
     setError(null);
     cancelRef.current = false;
@@ -62,39 +61,128 @@ export default function ExperimentDetailPage() {
     try {
       const out = await runSimulation(
         {
-          hands: exp.config.hands,
-          seed: exp.config.seed,
-          config: exp.config.table,
-          pool: buildPoolConfig(exp.config.pool),
-          userBuyInBB: exp.config.userBuyInBB,
-          mode: exp.config.mode,
-          sampleEvery: exp.config.sampleEvery,
+          hands: source.config.hands,
+          seed: source.config.seed,
+          config: source.config.table,
+          pool: buildPoolConfig(source.config.pool),
+          userBuyInBB: source.config.userBuyInBB,
+          mode: source.config.mode,
+          sampleEvery: source.config.sampleEvery,
         },
-        cal.policy,
+        policy,
         (p) => setProgress({ ...p }),
         () => cancelRef.current,
       );
+
+      let strategyReview = source.strategyReview;
+      let completedReview: StrategyReviewRound | undefined;
+      if (!out.cancelled && strategyReview?.pendingRerunRoundId) {
+        const completedAt = new Date().toISOString();
+        const rounds = strategyReview.rounds.map((round) => {
+          if (round.id !== strategyReview!.pendingRerunRoundId) return round;
+          completedReview = { ...round, rerunCompletedAt: completedAt };
+          return completedReview;
+        });
+        strategyReview = {
+          ...strategyReview,
+          rounds,
+          pendingRerunRoundId: undefined,
+        };
+      }
+
       const updated = await store.saveExperimentRun({
-        ...exp,
+        ...source,
         simulationVersion: SIMULATION_VERSION,
         status: out.cancelled ? "cancelled" : "complete",
         results: out.aggregates,
-        userDecisionLog: out.userDecisionLog.slice(0, 5000),
+        userDecisionLog: sampleStoredUserDecisions(out.hands, out.userDecisionLog),
+        strategyReview,
       }, out.hands);
       setExp(updated);
-      setHands(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Simulation failed.");
+      setHands(out.hands);
+      setReviewOpen(false);
+      if (completedReview) await store.saveStrategyReview(completedReview);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Simulation failed.");
     } finally {
       setRunning(false);
       setProgress(null);
     }
-  }, [exp, cal]);
+  }, []);
 
-  const loadHands = useCallback(async () => {
-    if (!exp) return;
-    setHands(await getStore().getHands(exp.id));
+  const run = useCallback(async () => {
+    if (!exp || !cal) return;
+    const policy = exp.strategyReview?.calibratedPolicy ?? cal.policy;
+    await executeRun(exp, policy);
+  }, [exp, cal, executeRun]);
+
+  const loadHands = useCallback(async (): Promise<HandHistory[]> => {
+    if (!exp) return [];
+    const loaded = await getStore().getHands(exp.id);
+    setHands(loaded);
+    return loaded;
   }, [exp]);
+
+  const startReview = useCallback(async () => {
+    setReviewLoading(true);
+    setError(null);
+    try {
+      const loaded = hands ?? await loadHands();
+      if (loaded.length === 0) {
+        setError("No simulated hands were stored for review. Run the experiment again to create a review sample.");
+        return;
+      }
+      setReviewOpen(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load simulated hands for review.");
+    } finally {
+      setReviewLoading(false);
+    }
+  }, [hands, loadHands]);
+
+  const submitStrategyReview = useCallback(async (answers: StrategyReviewAnswer[]) => {
+    if (!exp || !cal || answers.length === 0) return;
+    const store = getStore();
+    const now = new Date().toISOString();
+    const stats = reviewAccuracy(answers);
+    const existingRounds = exp.strategyReview?.rounds ?? [];
+    const round: StrategyReviewRound = {
+      id: newId("review"),
+      experimentId: exp.id,
+      calibrationId: exp.calibrationId,
+      roundNumber: existingRounds.length + 1,
+      createdAt: now,
+      simulationVersion: exp.simulationVersion,
+      seed: exp.config.seed,
+      answers,
+      ...stats,
+      accepted: stats.correctedCount === 0,
+    };
+    const rounds = [...existingRounds, round];
+    const calibratedPolicy = stats.correctedCount > 0
+      ? buildCalibratedPolicy(cal.policy, rounds)
+      : exp.strategyReview?.calibratedPolicy;
+    const draft: Experiment = {
+      ...exp,
+      strategyReview: {
+        rounds,
+        calibratedPolicy,
+        pendingRerunRoundId: stats.correctedCount > 0 ? round.id : undefined,
+        acceptedAt: stats.correctedCount === 0 ? now : undefined,
+      },
+    };
+
+    setError(null);
+    try {
+      // Persist the analyzable review row and calibrated experiment state atomically before a long rerun.
+      await store.saveExperimentReview(draft, round);
+      setExp(draft);
+      setReviewOpen(false);
+      if (stats.correctedCount > 0 && calibratedPolicy) await executeRun(draft, calibratedPolicy);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save strategy feedback.");
+    }
+  }, [exp, cal, executeRun]);
 
   const filteredHands = useMemo(() => {
     if (!hands || !exp) return [];
@@ -148,22 +236,12 @@ export default function ExperimentDetailPage() {
         sub={exp.config.description || undefined}
         right={
           <div className="flex gap-2">
+            <Link href="/experiments" className="btn">
+              Previous experiments
+            </Link>
             <Link href={`/experiments/new?duplicate=${exp.id}`} className="btn">
               Duplicate
             </Link>
-            {r && (
-              <button className="btn" onClick={() => download(`${exp.id}-summary.json`, { config: exp.config, calibrationId: exp.calibrationId, simulationVersion: exp.simulationVersion, results: r })}>
-                Export summary
-              </button>
-            )}
-            {r && (
-              <button
-                className="btn"
-                onClick={async () => download(`${exp.id}-hands.json`, await getStore().getHands(exp.id))}
-              >
-                Export hands
-              </button>
-            )}
           </div>
         }
       />
@@ -180,6 +258,29 @@ export default function ExperimentDetailPage() {
             This experiment uses a model built from only {cal.handsPlayed} calibration hands — simulated behavior leans
             heavily on the prior, so results reflect your style only loosely.
           </WarningNote>
+        </div>
+      )}
+
+      {r && error && (
+        <div className="panel px-4 py-3 text-sm mb-4" style={{ color: "var(--loss)" }}>{error}</div>
+      )}
+
+      {r && running && (
+        <div className="panel px-5 py-4 mb-5 max-w-2xl">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span>{exp.strategyReview?.pendingRerunRoundId ? "Rerunning with calibrated decisions…" : "Simulating…"}</span>
+            <span className="mono">
+              {progress ? `${progress.handsDone.toLocaleString()} / ${progress.handsTotal.toLocaleString()}` : "Starting…"}
+            </span>
+          </div>
+          <div className="h-2 rounded bg-panel2 overflow-hidden">
+            <div
+              className="h-full bg-accent transition-all"
+              style={{ width: `${progress ? (progress.handsDone / progress.handsTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted mt-2">Your feedback is already saved. You can cancel and retry the rerun later.</p>
+          <button className="btn btn-danger mt-3" onClick={() => (cancelRef.current = true)}>Cancel rerun</button>
         </div>
       )}
 
@@ -229,6 +330,49 @@ export default function ExperimentDetailPage() {
               <WarningNote>Run was cancelled — results below cover the {r.totalHands.toLocaleString()} hands completed.</WarningNote>
             </div>
           )}
+
+          <section className="panel px-5 py-4 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div>
+                <h2 className="font-semibold">Simulated Hand Review</h2>
+                <p className="text-xs text-muted mt-1 max-w-2xl">
+                  Take a short in-browser survey across eight hands sampled from this run. Confirm the simulated decision or make the decision you would choose. Your answers are saved for model improvement; corrections recalibrate this experiment and trigger a seeded rerun.
+                </p>
+              </div>
+              <Link href="/accuracy" className="btn text-xs">View saved accuracy data</Link>
+            </div>
+
+            {exp.strategyReview?.acceptedAt ? (
+              <div className="rounded-md border border-line bg-panel2 px-4 py-3">
+                <div className="font-semibold text-sm" style={{ color: "var(--gain)" }}>Model accepted</div>
+                <p className="text-xs text-muted mt-1">
+                  The latest {exp.strategyReview.rounds.at(-1)?.answers.length ?? 0} reviewed decisions all matched your strategy. No additional rerun was needed.
+                </p>
+              </div>
+            ) : exp.strategyReview?.pendingRerunRoundId && !running ? (
+              <div className="rounded-md border border-line bg-panel2 px-4 py-3">
+                <div className="font-semibold text-sm">Calibrated rerun pending</div>
+                <p className="text-xs text-muted mt-1">The corrections are saved, but the rerun did not finish. Retry it to generate a new model sample for review.</p>
+                <button className="btn btn-primary mt-3" onClick={run} disabled={!cal}>Retry calibrated rerun</button>
+              </div>
+            ) : exp.status !== "complete" ? (
+              <div className="text-sm text-muted">Complete the simulation before reviewing model accuracy.</div>
+            ) : reviewOpen && hands ? (
+              <StrategyReview
+                key={`${exp.id}:${exp.strategyReview?.rounds.length ?? 0}:${exp.userDecisionLog[0]?.handNumber ?? 0}`}
+                hands={hands}
+                decisions={exp.userDecisionLog}
+                bigBlind={bb}
+                roundNumber={(exp.strategyReview?.rounds.length ?? 0) + 1}
+                disabled={running}
+                onComplete={submitStrategyReview}
+              />
+            ) : (
+              <button className="btn btn-primary" onClick={startReview} disabled={running || reviewLoading}>
+                {reviewLoading ? "Loading review hands..." : "Simulated Hand Review"}
+              </button>
+            )}
+          </section>
 
           <AnalyticsGlossary groups={["analytics", "model"]} title="How to read these advanced results" />
 

@@ -24,7 +24,7 @@ Without environment variables the demo still works with browser storage. Configu
 
 1. Create a Supabase project.
 2. Copy `.env.example` to `.env.local`, then set the project URL and publishable key from the Supabase Connect dialog.
-3. Apply `supabase/migrations/20260717000000_initial_user_data.sql` with the Supabase CLI (`supabase db push`) or paste it into the SQL editor.
+3. Apply the files in `supabase/migrations/` in timestamp order with the Supabase CLI (`supabase db push`) or paste them into the SQL editor.
 4. Add `http://localhost:3000/auth/confirm` and the deployed equivalent to the Auth redirect URL allow list.
 5. Start the app and create an account at `/login`.
 
@@ -36,7 +36,8 @@ The browser receives only the publishable key. Every table has row-level securit
 2. **Profile** (`/profile`) — the system estimates your tendencies (VPIP, PFR, 3-bet, fold-to-3-bet, c-bet, check-raise, river calls, bet sizing, positional looseness…) with **Wilson 95% confidence intervals** and explicit sample-size warnings. Beginner-friendly expandable guides and the full `/glossary` explain every acronym with examples and advanced interpretation. The profile also reports average/median response time, snap rate, and timeouts, then trains a bucketed behavioral policy (street × position × situation × hand-strength × opponent-timing cue) with hierarchical shrinkage toward a strength-aware prior.
 3. **Experiment** (`/experiments/new`) — configure blinds, rake (% + cap + no-flop-no-drop), buy-ins, hand count (10 to 500,000), a reproducible seed, and an opponent pool built from 13 archetypes (TAG, LAG, calling station, nit, maniac, adaptive, …) with pool-level skill/looseness/aggression multipliers, realistic session lengths, stop-loss/stop-win departures, rebuys, and seat turnover.
 4. **Analyze** (`/experiments/[id]`) — bb/100 with confidence interval and significance flag, standard deviation, max drawdown, profit factor, risk of ruin for any bankroll, showdown vs non-showdown (red line/blue line), win rate by position / stack depth / pot type, starting-hand heatmap, action mix, bet-size distribution, model-confidence per decision, manual-vs-simulated comparison, and a hand-history explorer with street-by-street replay.
-5. **Iterate** — duplicate an experiment, change one variable (e.g. rake, pool skill), re-run, and compare runs side by side (`/compare`). Same seed ⇒ identical results, verified by tests.
+5. **Simulated Hand Review** — replay eight model decisions from different stored hands in the browser, confirm each decision or enter the action and size you would actually choose. Feedback is saved in the experiment and in the dedicated `strategy_reviews` dataset. Any corrections retrain an experiment-specific policy and automatically rerun the same seeded simulation; an all-accurate round stops without rerunning. `/accuracy` summarizes the saved feedback without exposing user exports.
+6. **Iterate** — duplicate an experiment, change one variable (e.g. rake, pool skill), re-run, and compare runs side by side (`/compare`). Same seed ⇒ identical results within the same engine version, verified by tests.
 
 ## Honest limitations
 
@@ -51,7 +52,7 @@ The hot path uses an allocation-free bitmask hand evaluator; the batch runner pr
 
 ## Storage and run modes
 
-- **Supabase cloud** — authenticated users get private calibrations, experiments, and individually stored hand histories. Reads are ordered and paginated; experiment deletion cascades to its hands.
+- **Supabase cloud** — authenticated users get private calibrations, experiments, individually stored hand histories, and normalized strategy-review feedback. Reads are ordered and paginated; experiment deletion cascades to its hands and reviews. Project owners can analyze all tester feedback from the Supabase `strategy_reviews` table while public app access remains user-isolated by RLS.
 - **Browser fallback** — when Supabase is not configured, the original zero-setup local store remains available with its ~3,000-hand cap.
 - **Browser import** — after enabling Supabase, Settings can copy existing browser data into the signed-in account while retaining the local copy as a backup.
 

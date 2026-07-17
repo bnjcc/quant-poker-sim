@@ -91,6 +91,12 @@ describe("legal actions and min-raise", () => {
     // Full-raise increment stays 4: min raise-to remains 6+4=10... current bet is 7, but
     // the short all-in didn't reopen with a new increment, so min raise-to = 7 + 4 = 11.
     expect(legal.minRaiseTo).toBe(11);
+    e.applyAction(2, { type: "call" });
+
+    // Seat 0 already made the last full raise. The extra chip must be answered,
+    // but the short all-in does not reopen seat 0's raise option.
+    expect(e.currentSeat).toBe(0);
+    expect(e.getLegalActions(0).types).toEqual(["fold", "call"]);
   });
 });
 

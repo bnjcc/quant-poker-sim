@@ -97,6 +97,7 @@ export default function Dashboard() {
           href="/experiments/new"
           cta={completed.length ? "New experiment" : "Configure one"}
           done={completed.length > 0}
+          secondary={exps.length > 0 ? { href: "/experiments", label: "Previous experiments" } : undefined}
         />
       </div>
 

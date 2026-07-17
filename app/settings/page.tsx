@@ -31,7 +31,7 @@ export default function SettingsPage() {
       setSummary(storage);
       if (store.mode === "supabase") {
         const local = await getLocalStore().getStorageSummary();
-        setLocalCount(local.calibrations + local.experiments + local.hands);
+        setLocalCount(local.calibrations + local.experiments + local.hands + local.reviews);
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load storage details.");
@@ -69,7 +69,7 @@ export default function SettingsPage() {
     try {
       const result = await importBrowserData();
       setMessage(
-        `Imported ${result.calibrations} calibrations, ${result.experiments} experiments, and ${result.hands} hands. Skipped ${result.skipped} items already in the cloud; existing cloud data was not changed. The browser copy was kept as a backup.`,
+        `Imported ${result.calibrations} calibrations, ${result.experiments} experiments, ${result.hands} hands, and ${result.reviews} strategy reviews. Skipped ${result.skipped} items already in the cloud; existing cloud data was not changed. The browser copy was kept as a backup.`,
       );
       await load();
     } catch (error) {
@@ -96,6 +96,7 @@ export default function SettingsPage() {
             <div>Calibrations: <span className="mono text-ink">{summary?.calibrations ?? 0}</span></div>
             <div>Experiments: <span className="mono text-ink">{summary?.experiments ?? 0}</span></div>
             <div>Saved hands: <span className="mono text-ink">{summary?.hands ?? 0}</span></div>
+            <div>Strategy reviews: <span className="mono text-ink">{summary?.reviews ?? 0}</span></div>
           </div>
           <p className="text-xs text-muted mt-3">{summary?.description}</p>
           {summary?.mode === "supabase" && localCount > 0 && (

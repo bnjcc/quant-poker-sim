@@ -1,18 +1,20 @@
 # RangeBench Project Context
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
 
 This file is the handoff for future maintainers and LLM conversations. Read it before changing the project, then consult `README.md`, `docs/ARCHITECTURE.md`, and the relevant source files for implementation detail.
 
 ## Current repository state
 
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
-- Active branch: `agent/supabase-backend`
-- Branch tracks: `origin/agent/supabase-backend`
-- Latest committed implementation: `23935e6 Add Supabase user data backend`
+- Active branch: `agent/strategy-review-calibration`
+- Branch tracks: `origin/agent/strategy-review-calibration`
+- Latest committed implementation: `f4fbfd2 Harden poker review and experiment history`
+- Previous feature commits: `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
+- Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- The Supabase implementation was cleanly committed and pushed before this context file was added.
+- Application commit `91687fe`, including the prior version of this context file, is pushed to the remote default branch. This handoff was refreshed afterward to document that commit accurately.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -24,8 +26,8 @@ RangeBench is a Next.js 15 application for modeling and backtesting a user's 6-m
 
 The workflow is:
 
-1. The user manually plays a calibration sample.
-2. The app computes descriptive poker tendencies and trains a bucketed behavioral policy.
+1. The user manually plays an online-paced calibration sample, either from unrestricted deals or an explicit first-in range.
+2. The app records actions, sizing, response time, timeout behavior, and reactions to opponent timing, then trains a bucketed behavioral policy.
 3. The user configures an experiment against a weighted pool of heuristic opponent profiles.
 4. The browser runs a reproducible seeded simulation.
 5. The app stores and displays aggregate analytics, decision confidence, and replayable hand histories.
@@ -43,6 +45,86 @@ The poker engine, evaluator, agents, player model, simulator, and analytics rema
 - Vitest
 - Supabase Auth and Postgres
 - `@supabase/supabase-js` and `@supabase/ssr`
+
+## Timing-aware calibration and simulation completed
+
+The full-session and range-first calibration flows now behave like paced online poker tables.
+
+### Manual calibration experience
+
+- Every user decision has a 15-second action clock.
+- A timeout checks when checking is legal and folds otherwise.
+- Opponents have seeded virtual decision times, including snap decisions, normal decisions, occasional tanks, and rare timeouts.
+- Manual calibration visibly waits for opponent decisions so the user can react to their timing.
+- Seat action labels show elapsed decision time and timeout state.
+- The action panel identifies the most recent opponent action as `snap`, `normal`, or `tank`.
+- Both calibration pages record the user's real elapsed response time from when an action becomes available.
+
+### Timing data model
+
+- `RecordedDecision` optionally stores `responseTimeMs` and `timedOut` for legacy-data compatibility.
+- Voluntary engine actions optionally store `decisionTimeMs` and `timedOut`; forced blind posts remain untimed.
+- `DecisionContext.lastOpponentAction` exposes the most recent timed voluntary action by another player on the current street.
+- Hand histories therefore retain timing for in-browser replays, review, and future analysis.
+- No database migration was required because calibrations, experiment payloads, and hand histories already persist as versioned JSON payloads.
+
+### Learned timing policy
+
+- Behavioral policy serialization is now version 2 and remains able to deserialize version 1 policies.
+- Action buckets add an opponent-timing dimension: `none`, `snap`, `normal`, or `tank`.
+- Timing-specific buckets fall back to the original untimed hierarchy when samples are sparse.
+- Response-time samples are stored by chosen action and context, so simulated check/folds, calls, bets, and raises reproduce the user's observed pacing.
+- Learned timeouts reproduce the legal automatic check/fold behavior.
+- Batch experiments record virtual decision times but do not sleep, preserving high-speed simulation performance.
+- Heuristic opponents use only a deliberately weak, skill-scaled timing read capped to a few equity points. Timing tells are treated as noisy signals, not ground truth.
+- The initial timing work introduced simulation version `1.2.0`; pending experiments are always stamped with the current version when run.
+
+### Timing analytics surfaced in the UI
+
+- Strategy profiles show average/median decision time, snap-decision rate, timeout rate, and the count of decisions made after an opponent timing cue.
+- Experiment results show simulated average decision time and timeout rate.
+- Hand replays display action timing and timeouts.
+
+## Calibration legality, Simulated Hand Review, and experiment history completed
+
+The current working tree closes the calibration and post-run review gaps identified after the strategy-review feature landed.
+
+### Legal, human-paced calibration opponents
+
+- `HandEngine` remains the final poker-rules authority and rejects actions outside the acting seat's legal set.
+- Short all-in raises make prior actors answer the extra chips but no longer reopen their raise option; a later full raise still reopens action correctly.
+- `ContextTracker` now normalizes any stale bot or policy proposal into the current legal vocabulary before it reaches the engine. In particular, a passive `check` proposal becomes a `call` when a bet is being faced; a bot can never check behind a live bet.
+- Calibration tables hide a seat's earlier action label while that seat is deciding again. This prevents an earlier check from appearing to be an illegal response to the user's later bet.
+- Visible opponent timings now center on multi-second human decisions, with a smaller set of genuine 0.7-1.2 second snaps, later-street/raised-pot complexity, tanks, and rare timeouts.
+- Batch simulations still record virtual timing without sleeping.
+
+### In-browser Simulated Hand Review
+
+- Every completed experiment presents an explicit **Simulated Hand Review** button instead of opening the review automatically.
+- The survey replays eight decisions drawn from stored hands spread across the run, reveals no future board cards, and asks the tester either to confirm the simulated action or enter their own legal action and size.
+- The bounded decision log is evenly sampled across the stored run rather than truncating the beginning, so long experiments remain broadly reviewable.
+- Review answers are stored with experiment, seed, engine version, decision context, model probabilities/confidence, agreement, and correction details.
+- Cloud feedback is normalized into `strategy_reviews`, protected by RLS, and available to the project owner for learning-model analysis. Browser fallback retains the same records locally.
+- Corrections rebuild an experiment-specific policy from the immutable base calibration and all review rounds, then rerun the same seed. All-agree rounds are saved without an unnecessary rerun.
+- User-facing JSON/CSV export buttons were removed; review and hand verification stay in the browser.
+
+### Previous experiments
+
+- `/experiments` is now labeled **Previous experiments**, includes completed, pending, and cancelled runs, handles load/delete failures visibly, and provides an explicit **View** action for each saved run.
+- The dashboard links back to previous experiments, experiment details include a history link, and small screens now receive a scrollable navigation bar instead of losing navigation entirely.
+- `SIMULATION_VERSION` is now `1.4.0` because bot timing changes can alter timing-conditioned decisions and therefore seeded results.
+
+## Beginner analytics education completed
+
+RangeBench now explains its poker acronyms and advanced analytics without removing statistical depth.
+
+- `/glossary` provides the full beginner-friendly poker and analytics glossary.
+- The main navigation includes a **Stats glossary** link.
+- Reusable expandable guides appear on strategy profiles, opponent profiles, experiment results, and experiment comparisons.
+- Each glossary entry includes the acronym or term, full name, plain-English meaning, a concrete example, and an advanced interpretation.
+- Covered topics include VPIP, PFR, 3-bet, c-bet, AF, SPR, bb/BB, table-position abbreviations, bb/100, 95% CI, standard deviation, drawdown, profit factor, risk of ruin, rake, statistical significance, Wilson intervals, priors, sample size, model confidence, and reproducible seeds.
+- Important inline labels now expand unfamiliar terms, for example `PFR — preflop raise`, `C-bet — continuation bet`, `Volatility (std dev)`, and `SPR (stack/pot)`.
+- The glossary explicitly teaches users to interpret a statistic together with its opportunity count, uncertainty interval, and strategic context.
 
 ## Supabase work completed
 
@@ -75,6 +157,10 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 The initial migration is:
 
 `supabase/migrations/20260717000000_initial_user_data.sql`
+
+The strategy-review follow-up migration is:
+
+`supabase/migrations/20260717010000_strategy_reviews.sql`
 
 It creates:
 
@@ -166,11 +252,11 @@ The resulting persistent run state changes only through the row-locked database 
 
 ## Validation status
 
-Validation on the final Supabase implementation passed:
+Validation on the current working-tree implementation passed:
 
 - TypeScript: clean (`tsc --noEmit`)
 - ESLint: clean
-- Vitest: 5 test files, 40 tests passed
+- Vitest: 8 test files, 60 tests passed
 - Next.js production build: passed
 - `git diff --check`: clean apart from expected Windows LF/CRLF notices
 - Secret scan: no Supabase secret/service key or private key was committed
@@ -184,20 +270,30 @@ New application tests include:
 - `tests/redirect.test.ts`
   - Local redirect paths are retained
   - Absolute, scheme-relative, backslash, and JavaScript redirect attempts are rejected
+- `tests/timing.test.ts`
+  - Snap, normal, and tank classification plus legal timeout defaults
+  - Timing propagation from actions into subsequent opponent contexts
+  - Learned user reactions differ after snap and tank timing cues
+  - Behavioral policy v1 deserialization remains compatible with the v2 timing model
+  - High-speed simulations record bounded virtual action timing without waiting
+- `tests/review.test.ts`
+  - Review candidates are spread across stored hands and exclude missing histories
+  - Bounded decision logs retain coverage from the start through the end of a run
+  - Corrections measurably move the experiment-specific learned policy
 
 Database security tests are committed at:
 
 `supabase/tests/database/schema_and_rls.test.sql`
 
-The pgTAP file contains 19 assertions covering tables, RLS, grants, ownership defaults, user isolation, cross-owner rejection, calibration `SET NULL`, and experiment-hand cascade behavior. It was statically reviewed but has not yet been run in a local Supabase/Docker stack. Remote read-only verification confirmed all 3 tables, all 3 RLS-enabled relations, 12 policies, and the finalizer function.
+The pgTAP file contains 28 assertions covering all four tables, RLS, grants, ownership defaults, user isolation, cross-owner rejection, calibration `SET NULL`, experiment/review cascades, and review feedback behavior. It was statically reviewed but has not yet been run in a local Supabase/Docker stack. The earlier detailed remote verification confirmed the three initial tables, 12 initial policies, and the original finalizer function; Supabase CLI migration history now also confirms the strategy-review migration is applied.
 
 ## Hosted deployment status
 
 The production backend and deployment are connected:
 
 - The repository is linked to Supabase project `oxrqtwqkzkembnglhbtn`.
-- Migration `20260717000000_initial_user_data.sql` is recorded in remote migration history and applied.
-- Remote verification found 3 application tables, 3 RLS-enabled tables, 12 RLS policies, and 1 `finalize_experiment_run` function.
+- Migrations `20260717000000_initial_user_data.sql` and `20260717010000_strategy_reviews.sql` are both recorded in remote migration history and applied. A follow-up `supabase db push` reports the remote database is up to date.
+- The earlier detailed remote verification found the 3 initial application tables, 3 RLS-enabled tables, 12 policies, and `finalize_experiment_run`; the applied follow-up migration adds `strategy_reviews` and `save_experiment_strategy_review`.
 - Supabase Auth Site URL is `https://poker-sim-iota.vercel.app`.
 - Local, production, stable Vercel alias, and `*-optvis.vercel.app` preview confirmation URLs are allowed.
 - Email signup is enabled and email confirmation is required.
@@ -205,11 +301,12 @@ The production backend and deployment are connected:
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
 - Production deployment `dpl_EHAfxvN77MRrVENmSvk4N6ZkZgNU` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
+- Source commit `f4fbfd2` is pushed to `origin/agent/strategy-review-calibration`. The legality, pacing, review UX, no-export, and experiment-history refinements are published on that branch but have not been independently verified on the production Vercel deployment.
 
 Remaining external verification:
 
 1. Create the first real account and confirm its email.
-2. Save a calibration/experiment and verify persistence after sign-out/sign-in.
+2. Save a calibration/experiment/review and verify persistence after sign-out/sign-in.
 3. Run the committed pgTAP suite in a local Supabase/Docker stack.
 
 Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
@@ -217,12 +314,27 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 ## Important source map
 
 - `app/calibrate/page.tsx` — creates and saves calibration datasets
+- `app/range-calibrate/page.tsx` — explicit 169-hand range selection plus timed betting calibration
+- `app/glossary/page.tsx` — full beginner-friendly poker and advanced analytics glossary
 - `app/experiments/new/page.tsx` — creates experiments
 - `app/experiments/[id]/page.tsx` — runs simulations and atomically finalizes results/hands
+- `app/experiments/page.tsx` — previous-experiment history and saved-run entry points
+- `app/accuracy/page.tsx` — in-browser review-feedback summary
 - `app/settings/page.tsx` — active storage summary, delete operations, browser import
 - `app/login/page.tsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.ts` — authentication callback
-- `components/Nav.tsx` — storage/account indicator and sign-out
+- `components/Nav.tsx` — navigation, storage/account indicator, glossary link, and sign-out
+- `components/ActionClock.tsx` — reusable online-style decision countdown
+- `components/AnalyticsGlossary.tsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
+- `components/HandReplayer.tsx` — hand replay including voluntary-action timing and timeout labels
+- `components/StrategyReview.tsx` — in-browser simulated-decision survey over stored hands
+- `lib/simulation/timing.ts` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
+- `lib/simulation/manual.ts` — manual calibration loop with real user timing and paced opponents
+- `lib/simulation/table.ts` — virtual timing propagation, timing-aware decision contexts, and user decision logs
+- `lib/player-model/policy.ts` — v2 timing-aware behavioral policy with v1 compatibility
+- `lib/player-model/review.ts` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
+- `lib/agents/agent.ts` — heuristic decisions, virtual pacing, and deliberately weak timing reads
+- `lib/poker/engine.ts` — optional timing metadata on voluntary actions
 - `lib/storage/store.ts` — local and Supabase storage implementations
 - `lib/supabase/client.ts` — browser client
 - `lib/supabase/server.ts` — cookie-aware server client
@@ -230,9 +342,14 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `lib/supabase/config.ts` — environment detection
 - `lib/auth/redirect.ts` — safe internal redirect validation
 - `types/database.ts` — database client types
-- `types/experiment.ts` — domain types, including nullable calibration reference
+- `types/decision.ts` — decision context, opponent timing cue, user response timing, and timeout fields
+- `types/experiment.ts` — domain types, nullable calibration reference, timing-aware logs, and simulation version
+- `types/poker.ts` — poker domain models including optional action timing metadata
 - `supabase/migrations/20260717000000_initial_user_data.sql` — schema, RLS, triggers, finalizer
+- `supabase/migrations/20260717010000_strategy_reviews.sql` — normalized review feedback, RLS, and atomic experiment/review save function
 - `supabase/tests/database/schema_and_rls.test.sql` — pgTAP database tests
+- `tests/timing.test.ts` — timing classification, propagation, learning, compatibility, and batch-run coverage
+- `tests/review.test.ts` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage
 - `README.md` — operator setup
 - `docs/ARCHITECTURE.md` — system design
 - `docs/PLAN.md` — original build and executed Supabase plan
@@ -248,6 +365,7 @@ The most useful follow-ups are:
 4. Add an age-based cleanup function/job for inactive staged hand revisions.
 5. Move long simulations to a Web Worker, then eventually a server job queue for resumable very large runs.
 6. Add production monitoring for auth failures, database errors, and abandoned simulation uploads.
+7. Add browser-level tests for the visible action-clock countdown, timeout auto-action, paced opponent transitions, and glossary disclosure controls.
 
 Do not regress these design constraints:
 
@@ -257,3 +375,7 @@ Do not regress these design constraints:
 - Do not overwrite existing cloud data during browser import.
 - Do not activate a hand revision separately from its matching experiment payload/status.
 - Preserve the browser-only fallback unless the product explicitly drops zero-setup mode.
+- Keep timing fields optional when reading legacy calibrations and hand histories.
+- Keep high-speed simulations virtual-time only; never make batch execution sleep for recorded action delays.
+- Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
+- Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.

@@ -56,25 +56,27 @@ export function sampleAgentDecisionTiming(
   }
 
   const simpleAction = action.type === "check" || action.type === "fold";
-  const snapChance = simpleAction ? 0.42 : action.type === "call" ? 0.16 : 0.08;
+  // Genuine snap actions still occur, but most visible calibration decisions
+  // should take long enough to read as a person considering the spot.
+  const snapChance = simpleAction ? 0.16 : action.type === "call" ? 0.07 : 0.04;
   if (rng.chance(snapChance)) {
     return {
-      decisionTimeMs: Math.round(180 + rng.next() * (SNAP_DECISION_MS - 260)),
+      decisionTimeMs: Math.round(700 + rng.next() * (SNAP_DECISION_MS - 700)),
       timedOut: false,
     };
   }
 
-  const base = simpleAction ? 1_050 : action.type === "call" ? 1_650 : 2_150;
-  const streetExtra = ctx.street === "preflop" ? 0 : ctx.street === "flop" ? 180 : ctx.street === "turn" ? 420 : 650;
-  const pressure = Math.min(1_400, ctx.numRaisesThisStreet * 280 + (ctx.betFaced > 0 ? 250 : 0));
-  if (rng.chance(0.035 + profile.skill * 0.025)) {
+  const base = simpleAction ? 1_950 : action.type === "call" ? 3_000 : 3_900;
+  const streetExtra = ctx.street === "preflop" ? 0 : ctx.street === "flop" ? 500 : ctx.street === "turn" ? 950 : 1_400;
+  const pressure = Math.min(1_800, ctx.numRaisesThisStreet * 350 + (ctx.betFaced > 0 ? 350 : 0));
+  if (rng.chance(0.05 + profile.skill * 0.035)) {
     return {
       decisionTimeMs: Math.round(TANK_DECISION_MS + rng.next() * (ACTION_CLOCK_MS - TANK_DECISION_MS - 350)),
       timedOut: false,
     };
   }
   return {
-    decisionTimeMs: Math.round(Math.max(250, Math.min(ACTION_CLOCK_MS - 250, rng.gaussian(base + streetExtra + pressure, 550)))),
+    decisionTimeMs: Math.round(Math.max(900, Math.min(ACTION_CLOCK_MS - 250, rng.gaussian(base + streetExtra + pressure, 800)))),
     timedOut: false,
   };
 }

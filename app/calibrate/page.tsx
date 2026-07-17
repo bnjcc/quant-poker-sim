@@ -207,7 +207,10 @@ export default function CalibratePage() {
       isActing: engine.currentSeat === p.seat,
       isUser: p.seat === ms.userSeat,
       holeCards: p.seat === ms.userSeat || engine.complete ? p.holeCards : null,
-      lastAction: lastActionBySeat.get(p.seat),
+      // A player who is acting again may still have a check label from earlier
+      // in the street. Hide it while they face the new action so it cannot look
+      // like an illegal check-back against a bet.
+      lastAction: engine.currentSeat === p.seat && !engine.complete ? undefined : lastActionBySeat.get(p.seat),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, ms, ctx, phase]);

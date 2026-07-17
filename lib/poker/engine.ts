@@ -44,6 +44,8 @@ export class HandEngine {
   private actingSeat = -1;
   /** Seats that still need to act this street. */
   private pendingSeats: number[] = [];
+  /** Seats whose raise option is still open on the current betting round. */
+  private raiseAllowedSeats = new Set<number>();
   private startingStacks = new Map<number, number>();
   private manualSeat: number | null;
   private forcedHoleCards = new Map<number, Card[]>();
@@ -151,6 +153,7 @@ export class HandEngine {
     // Preflop action starts left of BB (or button/SB in heads-up).
     const firstToAct = n === 2 ? sbSeat : this.nextSeatAfter(bbSeat);
     this.pendingSeats = this.seatOrder(firstToAct).filter((s) => this.canAct(s));
+    this.raiseAllowedSeats = new Set(this.pendingSeats);
     this.advanceActor();
   }
 
@@ -195,7 +198,7 @@ export class HandEngine {
     if (toCall > 0) {
       types.push("fold", "call");
       const minRaiseTo = this.currentBet + this.lastRaiseIncrement;
-      if (maxTo > this.currentBet) types.push("raise");
+      if (maxTo > this.currentBet && this.raiseAllowedSeats.has(seat)) types.push("raise");
       return {
         types,
         callAmount: Math.min(toCall, p.stack),
@@ -226,15 +229,18 @@ export class HandEngine {
 
     switch (action.type) {
       case "fold": {
+        this.raiseAllowedSeats.delete(seat);
         p.folded = true;
         this.record(seat, "fold", 0, false, timing);
         break;
       }
       case "check": {
+        this.raiseAllowedSeats.delete(seat);
         this.record(seat, "check", 0, false, timing);
         break;
       }
       case "call": {
+        this.raiseAllowedSeats.delete(seat);
         const amount = Math.min(this.currentBet - p.streetCommitted, p.stack);
         this.commit(p, amount);
         this.record(seat, p.allIn ? "all-in" : "call", amount, p.allIn, timing);
@@ -251,6 +257,7 @@ export class HandEngine {
           if (to <= this.currentBet) throw new Error(`Raise to ${to} not above current bet ${this.currentBet}`);
           if (to < legal.minRaiseTo && !isAllIn) throw new Error(`Raise to ${to} below minimum ${legal.minRaiseTo}`);
         }
+        this.raiseAllowedSeats.delete(seat);
         const increment = to - this.currentBet;
         const fullRaise = increment >= this.lastRaiseIncrement;
         const amount = to - p.streetCommitted;
@@ -258,9 +265,16 @@ export class HandEngine {
         if (to > this.currentBet) {
           if (fullRaise || action.type === "bet") {
             this.lastRaiseIncrement = action.type === "bet" ? to : increment;
+            // A full bet or raise reopens raising for every other live player.
+            this.raiseAllowedSeats = new Set(
+              this.players
+                .filter((player) => player.seat !== seat && this.canAct(player.seat))
+                .map((player) => player.seat),
+            );
           }
           this.currentBet = to;
-          // Aggression reopens action for everyone else who can act.
+          // Even a short all-in makes earlier callers respond to the extra
+          // chips, but it does not restore their raise option.
           this.pendingSeats = this.seatOrder(this.nextSeatAfter(seat)).filter(
             (s) => s !== seat && this.canAct(s),
           );
@@ -362,6 +376,7 @@ export class HandEngine {
 
     const firstToAct = this.nextSeatAfter(this.buttonSeat);
     this.pendingSeats = this.seatOrder(firstToAct).filter((s) => this.canAct(s));
+    this.raiseAllowedSeats = new Set(this.pendingSeats);
     this.advanceActor();
   }
 

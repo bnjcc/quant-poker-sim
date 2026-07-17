@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
@@ -8,42 +8,59 @@ import { Empty, PageHeader, fmtBB } from "@/components/ui";
 
 export default function ExperimentsPage() {
   const [exps, setExps] = useState<Experiment[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const load = () => getStore().listExperiments().then(setExps);
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setExps(await getStore().listExperiments());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load previous experiments.");
+      setExps([]);
+    }
+  }, []);
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const remove = async (id: string) => {
     if (!confirm("Delete this experiment and its stored hands?")) return;
-    await getStore().deleteExperiment(id);
-    load();
+    try {
+      await getStore().deleteExperiment(id);
+      await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete the experiment.");
+    }
   };
 
   if (exps === null) return <div className="text-muted text-sm">Loading…</div>;
   if (exps.length === 0) {
     return (
-      <Empty
-        title="No experiments yet"
-        body="An experiment simulates your learned strategy over thousands of hands against a configurable opponent pool."
-        action={{ href: "/experiments/new", label: "Create your first experiment" }}
-      />
+      <div>
+        {error && <div className="panel px-4 py-3 text-sm mb-4 text-loss">{error}</div>}
+        <Empty
+          title="No previous experiments"
+          body="Completed, pending, and cancelled experiments will appear here and can be opened again at any time."
+          action={{ href: "/experiments/new", label: "Create your first experiment" }}
+        />
+      </div>
     );
   }
 
   return (
     <div>
       <PageHeader
-        title="Experiments"
-        sub="Each experiment stores its full configuration, seed, and version — re-running the same setup reproduces identical results."
+        title="Previous experiments"
+        sub="Open any saved run to revisit its results, stored hands, and Simulated Hand Review. Pending and cancelled runs remain available too."
         right={
           <Link href="/experiments/new" className="btn btn-primary">
             New experiment
           </Link>
         }
       />
-      <div className="panel overflow-hidden">
-        <table className="w-full text-sm">
+      {error && <div className="panel px-4 py-3 text-sm mb-4 text-loss">{error}</div>}
+      <div className="panel overflow-x-auto">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="text-left border-b border-line">
               <th className="label px-4 py-3 font-normal">Name</th>
@@ -86,6 +103,9 @@ export default function ExperimentsPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-muted">{new Date(e.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
+                    <Link href={`/experiments/${e.id}`} className="btn btn-primary text-xs px-2 py-1 mr-2">
+                      View
+                    </Link>
                     <Link href={`/experiments/new?duplicate=${e.id}`} className="btn text-xs px-2 py-1 mr-2">
                       Duplicate
                     </Link>

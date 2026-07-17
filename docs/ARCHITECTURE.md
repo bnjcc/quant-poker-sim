@@ -82,19 +82,26 @@ Every voluntary action also carries a seeded virtual decision time. Manual calib
 
 `runSimulation` is environment-agnostic: an async chunked loop (default 200 hands/chunk) that yields to the event loop, reports progress, honors a cancel callback, and returns aggregates + stored hands. In the browser it keeps the UI responsive; on a server it can run as-is inside a job worker.
 
+## Post-simulation strategy review (`components/StrategyReview.tsx`, `lib/player-model/review.ts`)
+
+Completed runs retain the full `DecisionContext`, action index, sampled action, sizing, probabilities, and confidence for simulated-user decisions. The review UI selects one low-confidence decision from each of eight hands spread across the stored run, reconstructs the table immediately before that action, and reveals no future board cards while the tester judges the decision.
+
+Every confirmation or correction becomes a `RecordedDecision`. Direct review feedback is weighted more heavily than an ordinary calibration observation, then replayed from the immutable base calibration to build an experiment-specific serialized policy. Explicit range-first charts are also updated when first-in feedback adds or removes a starting hand. A correction round is persisted before the same seeded experiment reruns; an all-agree round marks the model accepted without another run. Rerun cancellation leaves a durable pending state that can be retried.
+
 ## Analytics (`lib/analytics/aggregate.ts`)
 
 `Aggregator` is incremental — O(1) per hand plus a downsampled equity curve (max ~2,000 points, stride doubling) — so 500k-hand runs don't hold 500k objects. Outputs: bb/100, per-hand σ, 95% CI, significance flag, max drawdown, profit factor, showdown/non-showdown split, rake, breakdowns by position/hole cards/stack depth/pot type, action mix, bet-size histogram. `riskOfRuin` uses the classical diffusion approximation `exp(−2·wr·bankroll/σ²)`.
 
 ## Storage (`lib/storage/store.ts`)
 
-All persistence goes through the `DataStore` interface:
+All persistence goes through the `DataStore` interface. In addition to calibration, experiment, and hand operations, it exposes strategy-review list/save operations and an atomic experiment-review commit:
 
 ```ts
 interface DataStore {
   listCalibrations(); getCalibration(id); saveCalibration(c); deleteCalibration(id);
   listExperiments(); getExperiment(id); saveExperiment(e); deleteExperiment(id);
-  saveHands(experimentId, hands); getHands(experimentId);
+  saveHands(experimentId, hands); getHands(experimentId); saveExperimentRun(experiment, hands);
+  listStrategyReviews(); saveStrategyReview(review); saveExperimentReview(experiment, review);
   getStorageSummary(); deleteAll();
 }
 ```
@@ -102,6 +109,7 @@ interface DataStore {
 Two implementations ship:
 
 - `SupabaseStore` is selected when both public Supabase variables are configured. Supabase Auth owns identity; `calibrations`, `experiments`, and `experiment_hands` carry `user_id`, and RLS restricts every operation to `auth.uid()`. Large nested domain models remain JSONB payloads while query/order/status fields are normalized. Hand writes are batched into a new revision, which becomes active only after every batch succeeds; reads of the active revision are paginated.
+- `strategy_reviews` stores one normalized row per review round plus the complete answer payload. The `save_experiment_strategy_review` database function commits that row together with the experiment's calibrated policy and pending-rerun state. Testers can read only their own rows in the app; the Supabase project owner can analyze all rows from the backend dashboard.
 - `LocalStorageStore` remains the zero-setup fallback (~5 MB budget, 3,000-hand cap per experiment with eviction).
 
 The database definition is migration-driven in `supabase/migrations/`. Experiment hands cascade on experiment deletion. Calibration deletion sets the experiment's normalized calibration reference to null, preserving completed results while preventing a rerun. JSON storage uses a small codec so analytics values such as infinite profit factor do not degrade to `null`.
