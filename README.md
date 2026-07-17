@@ -2,7 +2,7 @@
 
 Play a small calibration sample yourself, let the system learn a behavioral model of *your* strategy, then backtest that model over hundreds of thousands of simulated hands against configurable opponent pools — and analyze the results like a quant.
 
-6-max No-Limit Hold'em cash games. Next.js 15 · TypeScript (strict) · Tailwind v4 · Recharts · Zod · Vitest.
+6-max No-Limit Hold'em cash games. Next.js 15 · Supabase · TypeScript (strict) · Tailwind v4 · Recharts · Zod · Vitest.
 
 ## Quick start
 
@@ -18,7 +18,17 @@ npm run lint
 npm run build      # production build
 ```
 
-No environment variables, database, or external services are required — the demo persists everything to browser `localStorage`.
+Without environment variables the demo still works with browser storage. Configure Supabase for authenticated, private, cross-device persistence.
+
+## Supabase setup
+
+1. Create a Supabase project.
+2. Copy `.env.example` to `.env.local`, then set the project URL and publishable key from the Supabase Connect dialog.
+3. Apply `supabase/migrations/20260717000000_initial_user_data.sql` with the Supabase CLI (`supabase db push`) or paste it into the SQL editor.
+4. Add `http://localhost:3000/auth/confirm` and the deployed equivalent to the Auth redirect URL allow list.
+5. Start the app and create an account at `/login`.
+
+The browser receives only the publishable key. Every table has row-level security tied to `auth.uid()`; never add a Supabase secret or service-role key to `NEXT_PUBLIC_*` variables.
 
 ## The workflow
 
@@ -39,45 +49,37 @@ No environment variables, database, or external services are required — the de
 
 The hot path uses an allocation-free bitmask hand evaluator; the batch runner processes roughly **1,500–2,000 hands/sec** in-browser (single thread) and yields between chunks so the UI stays responsive with progress and cancellation. 100k hands ≈ 1 minute. See `docs/ARCHITECTURE.md` for the worker-service scaling path.
 
-## Storage modes
+## Storage and run modes
 
-- **Detailed** — every hand history stored (capped at 3,000 per experiment due to browser storage limits).
+- **Supabase cloud** — authenticated users get private calibrations, experiments, and individually stored hand histories. Reads are ordered and paginated; experiment deletion cascades to its hands.
+- **Browser fallback** — when Supabase is not configured, the original zero-setup local store remains available with its ~3,000-hand cap.
+- **Browser import** — after enabling Supabase, Settings can copy existing browser data into the signed-in account while retaining the local copy as a backup.
+
+- **Detailed** — every hand history stored; browser fallback mode caps this at 3,000 per experiment.
 - **High-speed** — full aggregates plus 1-in-N sampled histories; automatic for runs over 20k hands.
-
-Swapping `localStorage` for Postgres requires implementing one interface (`DataStore` in `lib/storage/store.ts`); the schema sketch is in `docs/ARCHITECTURE.md`.
 
 ## Deploying to Vercel
 
 ```bash
 npm i -g vercel
-vercel        # follow the prompts; zero env vars needed
+vercel        # add the two NEXT_PUBLIC_SUPABASE_* values for cloud mode
 ```
 
 Or connect the GitHub repo in the Vercel dashboard — the default Next.js settings work as-is.
 
-## Pushing to GitHub
-
-The repo is already committed locally. From the project directory:
-
-```bash
-git remote add origin https://github.com/kcurley06-pixel/Poker-Simulation.git
-git branch -M main
-git push -u origin main
-```
-
-(Use your own GitHub credentials / token when prompted.)
-
 ## Project layout
 
 ```
-app/                  # Next.js App Router pages (all client-side; no server state)
+app/                  # Next.js App Router pages and auth confirmation endpoint
 components/           # PokerTable, HandReplayer, charts, UI primitives
 lib/poker/            # deck, RNG (seeded, checkpointable), evaluator (+ fast path), equity, engine
 lib/agents/           # 13 archetype profiles + decision logic
 lib/player-model/     # tendency statistics (Wilson CIs) + bucketed behavioral policy
 lib/simulation/       # table session (turnover), manual session, batch runner, defaults
 lib/analytics/        # incremental aggregator, risk of ruin
-lib/storage/          # DataStore interface + localStorage implementation
+lib/storage/          # DataStore interface + local and Supabase implementations
+lib/supabase/         # browser/server clients and auth session middleware
+supabase/             # local config, schema migration, and database security tests
 tests/                # engine correctness, side pots, seeds, turnover, model, analytics
 docs/                 # PLAN, ARCHITECTURE, LIMITATIONS
 ```

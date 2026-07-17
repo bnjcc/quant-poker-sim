@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const LINKS: { href: string; label: string }[] = [
   { href: "/", label: "Dashboard" },
@@ -16,6 +19,21 @@ const LINKS: { href: string; label: string }[] = [
 
 export function Nav() {
   const path = usePathname();
+  const cloudMode = isSupabaseConfigured();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cloudMode) return;
+    createClient().auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, [cloudMode]);
+
+  if (path === "/login" || path.startsWith("/auth/")) return null;
+
+  const signOut = async () => {
+    await createClient().auth.signOut({ scope: "local" });
+    window.location.assign("/login");
+  };
+
   return (
     <aside className="w-56 shrink-0 border-r border-line px-4 py-6 hidden md:flex md:flex-col gap-6 sticky top-0 h-screen">
       <Link href="/" className="block">
@@ -41,8 +59,19 @@ export function Nav() {
           );
         })}
       </nav>
-      <div className="mt-auto text-[11px] text-muted leading-relaxed">
-        Simulated results are estimates against heuristic opponents — not proof of real-world profitability.
+      <div className="mt-auto text-[11px] text-muted leading-relaxed space-y-3">
+        <div>
+          {cloudMode ? (
+            <>
+              <div className="text-ink truncate" title={email ?? undefined}>{email ?? "Cloud account"}</div>
+              <div>Supabase sync enabled</div>
+              <button className="text-accent hover:underline mt-1" type="button" onClick={signOut}>Sign out</button>
+            </>
+          ) : (
+            <div>Browser-only storage</div>
+          )}
+        </div>
+        <div>Simulated results are estimates against heuristic opponents — not proof of real-world profitability.</div>
       </div>
     </aside>
   );

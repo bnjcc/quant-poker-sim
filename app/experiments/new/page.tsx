@@ -59,7 +59,7 @@ function NewExperimentInner() {
         const e = await store.getExperiment(dup);
         if (e) {
           setCfg({ ...e.config, name: `${e.config.name} (copy)` });
-          setCalId(e.calibrationId);
+          if (e.calibrationId) setCalId(e.calibrationId);
         }
       }
     })();

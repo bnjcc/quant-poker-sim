@@ -1,0 +1,44 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import type { Database } from "@/types/database";
+import { getSupabaseConfig, isSupabaseConfigured } from "./config";
+import { safeRedirectPath } from "@/lib/auth/redirect";
+
+const PUBLIC_PATHS = ["/login", "/auth/confirm"];
+
+export async function updateSession(request: NextRequest) {
+  if (!isSupabaseConfigured()) return NextResponse.next({ request });
+
+  let response = NextResponse.next({ request });
+  const { url, publishableKey } = getSupabaseConfig();
+  const supabase = createServerClient<Database>(url, publishableKey, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+      },
+    },
+  });
+
+  const { data, error } = await supabase.auth.getClaims();
+  const isPublic = PUBLIC_PATHS.some(
+    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(`${path}/`),
+  );
+
+  if ((error || !data?.claims) && !isPublic) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.searchParams.set("next", `${request.nextUrl.pathname}${request.nextUrl.search}`);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (!error && data?.claims && request.nextUrl.pathname === "/login") {
+    return NextResponse.redirect(new URL(safeRedirectPath(request.nextUrl.searchParams.get("next")), request.url));
+  }
+
+  return response;
+}

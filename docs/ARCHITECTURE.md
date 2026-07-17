@@ -89,19 +89,20 @@ interface DataStore {
   listCalibrations(); getCalibration(id); saveCalibration(c); deleteCalibration(id);
   listExperiments(); getExperiment(id); saveExperiment(e); deleteExperiment(id);
   saveHands(experimentId, hands); getHands(experimentId);
+  getStorageSummary(); deleteAll();
 }
 ```
 
-The shipped implementation is `LocalStorageStore` (zero setup, demo-friendly, ~5 MB budget, 3,000-hand cap per experiment with eviction). A Postgres/Prisma implementation plugs in behind the same interface. Schema sketch:
+Two implementations ship:
 
-```
-calibrations(id pk, name, created_at, hands_played, tendencies jsonb, policy jsonb)
-decisions(id pk, calibration_id fk, hand_number, context jsonb, action jsonb)
-experiments(id pk, created_at, config jsonb, calibration_id fk, version, status, results jsonb)
-hands(id pk, experiment_id fk, hand_number, history jsonb)          -- consider partitioning
-```
+- `SupabaseStore` is selected when both public Supabase variables are configured. Supabase Auth owns identity; `calibrations`, `experiments`, and `experiment_hands` carry `user_id`, and RLS restricts every operation to `auth.uid()`. Large nested domain models remain JSONB payloads while query/order/status fields are normalized. Hand writes are batched into a new revision, which becomes active only after every batch succeeds; reads of the active revision are paginated.
+- `LocalStorageStore` remains the zero-setup fallback (~5 MB budget, 3,000-hand cap per experiment with eviction).
 
-With a DB, move `runSimulation` into a queue worker (the function needs no changes), stream progress over SSE/WebSocket, and drop the storage caps.
+The database definition is migration-driven in `supabase/migrations/`. Experiment hands cascade on experiment deletion. Calibration deletion sets the experiment's normalized calibration reference to null, preserving completed results while preventing a rerun. JSON storage uses a small codec so analytics values such as infinite profit factor do not degrade to `null`.
+
+Existing browser data is never silently merged. A signed-in user can explicitly import it from Settings; the import is insert-only, skips IDs already present in the cloud, and keeps the browser copy as a backup.
+
+Simulation still runs in-browser. A later queue worker can run the unchanged `runSimulation`, stream progress over SSE/WebSocket, and support much larger jobs.
 
 ## Scaling path
 

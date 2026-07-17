@@ -6,14 +6,14 @@ Stated plainly, because a simulation platform that hides its simplifications is 
 
 | Area | What ships | The honest gap | Production path |
 |---|---|---|---|
-| Persistence | `localStorage` behind a `DataStore` interface | ~5 MB budget; 3,000 stored hands per experiment; data is per-browser | Postgres + Prisma implementation of the same interface (schema in ARCHITECTURE.md) |
+| Persistence | Supabase Auth/Postgres with per-user RLS; browser fallback when unconfigured | Cloud writes still originate in the browser; a failed multi-batch hand upload can require retrying the run | Server-side jobs with transactional result finalization for very large runs |
 | Batch execution | In-browser chunked runner, ~1.5–2k hands/sec, progress + cancel | Tab must stay open; single thread | Web Worker first, then a server-side job queue running the identical `runSimulation` |
 | Opponents | 13 heuristic archetypes with realistic aggregate stats and per-instance jitter | Postflop play is simpler than strong humans; "adaptive" agent only tracks fold rates | Learned policies from hand-history corpora; richer opponent memory |
 | User model | Bucketed frequency policy with shrinkage, sizing imitation, confidence reporting | Buckets can't express card-specific nuance (blockers, combos) or multi-street planning | Finer bucketing with more data; sequence models once calibration samples are large |
 | Equity | Monte Carlo estimates (fast bitmask evaluator, cross-validated) | Sampling noise (small, but present) in agent decisions and strength bucketing | Exact enumeration on turn/river; larger iteration budgets server-side |
 | Statistics | Wilson CIs, bb/100 CI, significance flag, risk of ruin | Risk of ruin assumes stationary win rate/variance; per-hole-card samples are tiny | Bayesian shrinkage across the hand grid; block bootstrap for CI robustness |
 | E2E tests | Vitest unit/integration suite (engine, pots, seeds, turnover, model, analytics) | Playwright smoke suite is **not included** in this repo | Add `@playwright/test` with a 3-flow smoke: calibrate 5 hands → build profile → run 200-hand experiment |
-| Auth / multi-user | None — single-user demo | No accounts, no sharing | NextAuth + per-user rows once a DB exists |
+| Auth / multi-user | Supabase email/password accounts with cookie refresh and RLS | No password-reset UI, social login, teams, or sharing | Add recovery, OAuth, MFA, and explicit team-scoped policies as product needs emerge |
 
 ## Known modeling caveats
 
@@ -25,7 +25,7 @@ Stated plainly, because a simulation platform that hides its simplifications is 
 ## Roadmap (in order of leverage)
 
 1. Web Worker execution + parallel sharded runs merged by the aggregator.
-2. Postgres `DataStore` + job queue for 1M+ hand experiments.
+2. Server job queue for transactional, resumable 1M+ hand experiments.
 3. Playwright smoke suite in CI.
 4. Per-decision review: flag simulated spots where the model's chosen action had low confidence, and let the user correct them (active learning on the policy).
 5. Opponent pools estimated from imported real hand histories.

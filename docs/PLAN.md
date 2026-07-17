@@ -15,7 +15,8 @@ A calibrate → learn → simulate → analyze loop for 6-max NLHE cash games:
 
 ## Key decisions
 
-- **Persistence**: `localStorage` behind a `DataStore` interface. Zero-setup demo now; Postgres later behind the same interface. Chosen over shipping Prisma half-wired.
+- **Persistence (original MVP)**: `localStorage` behind a `DataStore` interface kept the demo zero-setup.
+- **Persistence (current)**: Supabase Auth + Postgres now provide private per-user cloud storage behind the same interface. Row-level security is the authorization boundary; browser storage remains an explicit unconfigured fallback and import source.
 - **Execution**: chunked in-browser runner with progress/cancel. The runner is environment-agnostic so the worker-service upgrade is a deployment change, not a rewrite.
 - **Hand evaluation**: readable reference evaluator + allocation-free bitmask fast path, cross-validated in tests. Needed to hit ~2k hands/sec with MC equity inside agent decisions.
 - **Equity**: Monte Carlo, always labeled an estimate.
@@ -33,3 +34,12 @@ A calibrate → learn → simulate → analyze loop for 6-max NLHE cash games:
 ## Build order (executed)
 
 types → RNG/deck/evaluator → engine (+tests) → equity fast path → agents → player model → table session/turnover → runner/manual session → aggregator → storage → tests (simulation/model) → UI (theme, table, calibrate, profile, experiments, results, replay, compare, opponents, settings, dashboard) → docs → build/lint/typecheck → git commit → package.
+
+## Supabase incorporation plan (executed)
+
+1. Audit the `DataStore` consumers and preserve their full-object contracts.
+2. Add email/password authentication with cookie refresh for Next.js 15.
+3. Add owner-scoped calibrations, experiments, and hand rows with foreign keys, indexes, grants, and RLS.
+4. Select the Supabase adapter when configured; retain browser mode otherwise.
+5. Page hand-history reads, batch writes, preserve non-finite analytics values, and allow an explicit local-to-cloud import.
+6. Update Settings, docs, environment configuration, and regression tests, then run the complete validation suite.

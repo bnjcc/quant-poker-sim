@@ -47,7 +47,7 @@ export default function ExperimentDetailPage() {
       const store = getStore();
       const e = await store.getExperiment(id);
       setExp(e);
-      if (e) setCal(await store.getCalibration(e.calibrationId));
+      if (e?.calibrationId) setCal(await store.getCalibration(e.calibrationId));
     })();
   }, [id]);
 
@@ -58,7 +58,6 @@ export default function ExperimentDetailPage() {
     cancelRef.current = false;
     const store = getStore();
     try {
-      await store.saveExperiment({ ...exp, status: "running" });
       const out = await runSimulation(
         {
           hands: exp.config.hands,
@@ -73,20 +72,16 @@ export default function ExperimentDetailPage() {
         (p) => setProgress({ ...p }),
         () => cancelRef.current,
       );
-      const handIds = await store.saveHands(exp.id, out.hands);
-      const updated: Experiment = {
+      const updated = await store.saveExperimentRun({
         ...exp,
         status: out.cancelled ? "cancelled" : "complete",
         results: out.aggregates,
-        handIds,
         userDecisionLog: out.userDecisionLog.slice(0, 5000),
-      };
-      await store.saveExperiment(updated);
+      }, out.hands);
       setExp(updated);
       setHands(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Simulation failed.");
-      await store.saveExperiment({ ...exp, status: "pending" });
     } finally {
       setRunning(false);
       setProgress(null);

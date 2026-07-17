@@ -66,7 +66,8 @@ export interface Experiment {
   id: string;
   createdAt: string;
   config: ExperimentConfig;
-  calibrationId: string;
+  /** Null when the source calibration was deleted after results were saved. */
+  calibrationId: string | null;
   simulationVersion: string;
   status: "pending" | "running" | "complete" | "cancelled";
   results: SimulationAggregates | null;
