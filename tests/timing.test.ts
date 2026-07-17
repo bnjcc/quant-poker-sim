@@ -4,9 +4,11 @@ import { getPreset } from "@/lib/agents/profiles";
 import { BehavioralPolicy, SerializedPolicy, strengthBucket } from "@/lib/player-model/policy";
 import { cardsFromString } from "@/lib/poker/deck";
 import { HandEngine } from "@/lib/poker/engine";
+import { visibleActionBySeat } from "@/lib/poker/action-display";
 import { Rng } from "@/lib/poker/rng";
 import { buildPoolConfig, DEFAULT_POOL_SETTINGS, DEFAULT_TABLE } from "@/lib/simulation/defaults";
 import { runSimulation } from "@/lib/simulation/runner";
+import { ManualSession } from "@/lib/simulation/manual";
 import { ContextTracker, normalizeActionToLegal } from "@/lib/simulation/table";
 import {
   ACTION_CLOCK_MS,
@@ -57,6 +59,95 @@ describe("online action timing", () => {
     expect(engine.getLegalActions(1).types).toEqual(["fold", "call", "raise"]);
     tracker.apply(1, { type: "check" });
     expect(engine.actions.at(-1)?.type).toBe("call");
+  });
+
+  it("removes stale check labels from every opponent still facing a bet", () => {
+    const actions = [
+      { seat: 1, type: "call", amount: 2, street: "preflop", allIn: false },
+      { seat: 1, type: "check", amount: 0, street: "flop", allIn: false },
+      { seat: 2, type: "check", amount: 0, street: "flop", allIn: false },
+      { seat: 0, type: "bet", amount: 10, street: "flop", allIn: false },
+    ] as const;
+
+    const facingBet = visibleActionBySeat([...actions], "flop");
+    expect([...facingBet.entries()].map(([seat, action]) => [seat, action.type])).toEqual([[0, "bet"]]);
+
+    const afterFirstResponse = visibleActionBySeat(
+      [...actions, { seat: 1, type: "call", amount: 10, street: "flop", allIn: false }],
+      "flop",
+    );
+    expect([...afterFirstResponse.entries()].map(([seat, action]) => [seat, action.type])).toEqual([
+      [0, "bet"],
+      [1, "call"],
+    ]);
+    expect(afterFirstResponse.has(2)).toBe(false);
+  });
+
+  it("records only legal checks throughout manual calibration hands", () => {
+    const session = new ManualSession({
+      config: { ...DEFAULT_TABLE, rake: { percentage: 0, cap: 0, noFlopNoDrop: true } },
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: "manual-legal-responses",
+      targetHands: 20,
+      userBuyInBB: 100,
+    });
+
+    let guard = 0;
+    while (guard++ < 1_000) {
+      const step = session.step(false);
+      if (step.kind === "session-complete") break;
+      if (step.kind !== "awaiting-user") continue;
+
+      const legal = step.context.legal;
+      if (legal.types.includes("bet")) {
+        session.submitUserAction(step.context, { type: "bet", toAmount: legal.minBet });
+      } else if (legal.types.includes("raise")) {
+        session.submitUserAction(step.context, { type: "raise", toAmount: legal.minRaiseTo });
+      } else if (legal.types.includes("call")) {
+        session.submitUserAction(step.context, { type: "call" });
+      } else if (legal.types.includes("check")) {
+        session.submitUserAction(step.context, { type: "check" });
+      } else {
+        session.submitUserAction(step.context, { type: "fold" });
+      }
+    }
+
+    expect(session.handsPlayed).toBe(20);
+    let opponentResponsesToUserBet = 0;
+    for (const history of session.histories) {
+      let street = history.actions[0]?.street;
+      let highestCommitment = 0;
+      let priceSetter: number | null = null;
+      let committedBySeat = new Map<number, number>();
+
+      for (const action of history.actions) {
+        if (action.street !== street) {
+          street = action.street;
+          highestCommitment = 0;
+          priceSetter = null;
+          committedBySeat = new Map<number, number>();
+        }
+        const committedBefore = committedBySeat.get(action.seat) ?? 0;
+        if (action.type === "check") {
+          expect(committedBefore).toBe(highestCommitment);
+        }
+        if (
+          action.seat !== history.manualSeat &&
+          committedBefore < highestCommitment &&
+          priceSetter === history.manualSeat
+        ) {
+          opponentResponsesToUserBet++;
+          expect(["fold", "call", "raise", "all-in"]).toContain(action.type);
+        }
+        const committedAfter = committedBefore + action.amount;
+        committedBySeat.set(action.seat, committedAfter);
+        if (committedAfter > highestCommitment) {
+          highestCommitment = committedAfter;
+          priceSetter = action.type === "post-sb" || action.type === "post-bb" ? null : action.seat;
+        }
+      }
+    }
+    expect(opponentResponsesToUserBet).toBeGreaterThan(0);
   });
 
   it("classifies snaps and tanks and selects the legal timeout default", () => {

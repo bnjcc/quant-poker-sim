@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DecisionContext } from "@/types/decision";
 import { CalibrationDataset } from "@/types/experiment";
 import { HandEngine } from "@/lib/poker/engine";
+import { visibleActionBySeat } from "@/lib/poker/action-display";
 import { Rng } from "@/lib/poker/rng";
 import { ManualSession } from "@/lib/simulation/manual";
 import {
@@ -189,9 +190,9 @@ export default function CalibratePage() {
   const ms = sessionRef.current;
   const seats: SeatView[] = useMemo(() => {
     if (!engine || !ms) return [];
+    const visibleActions = visibleActionBySeat(engine.actions, engine.street);
     const lastActionBySeat = new Map<number, string>();
-    for (const a of engine.actions) {
-      if (a.type === "post-sb" || a.type === "post-bb") continue;
+    for (const a of visibleActions.values()) {
       const elapsed = formatDecisionTime(a.decisionTimeMs);
       const timing = elapsed ? ` · ${a.timedOut ? "timeout" : elapsed}` : "";
       lastActionBySeat.set(a.seat, `${a.amount > 0 ? `${a.type} ${a.amount}` : a.type}${timing}`);
@@ -207,9 +208,8 @@ export default function CalibratePage() {
       isActing: engine.currentSeat === p.seat,
       isUser: p.seat === ms.userSeat,
       holeCards: p.seat === ms.userSeat || engine.complete ? p.holeCards : null,
-      // A player who is acting again may still have a check label from earlier
-      // in the street. Hide it while they face the new action so it cannot look
-      // like an illegal check-back against a bet.
+      // The helper removes every action made before the latest wager; hiding
+      // the current seat as well covers any remaining repeated-action edge.
       lastAction: engine.currentSeat === p.seat && !engine.complete ? undefined : lastActionBySeat.get(p.seat),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps

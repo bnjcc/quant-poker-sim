@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { DecisionContext } from "@/types/decision";
 import { CalibrationDataset } from "@/types/experiment";
 import { HandEngine } from "@/lib/poker/engine";
+import { visibleActionBySeat } from "@/lib/poker/action-display";
 import { holeNotation } from "@/lib/poker/deck";
 import { ALL_STARTING_HANDS, rangeComboCount } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
@@ -224,9 +225,9 @@ export default function RangeCalibratePage() {
   const session = sessionRef.current;
   const seats: SeatView[] = useMemo(() => {
     if (!engine || !session) return [];
+    const visibleActions = visibleActionBySeat(engine.actions, engine.street);
     const lastActionBySeat = new Map<number, string>();
-    for (const action of engine.actions) {
-      if (action.type === "post-sb" || action.type === "post-bb") continue;
+    for (const action of visibleActions.values()) {
       lastActionBySeat.set(
         action.seat,
         `${action.amount > 0 ? `${action.type} ${action.amount}` : action.type}${
@@ -247,7 +248,7 @@ export default function RangeCalibratePage() {
       isActing: engine.currentSeat === player.seat,
       isUser: player.seat === session.userSeat,
       holeCards: player.seat === session.userSeat || engine.complete ? player.holeCards : null,
-      // Do not show a stale earlier action while this seat is deciding again.
+      // Earlier checks disappear for every seat that still owes a response.
       lastAction:
         engine.currentSeat === player.seat && !engine.complete
           ? undefined
