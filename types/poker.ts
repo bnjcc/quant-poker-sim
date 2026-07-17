@@ -28,6 +28,10 @@ export interface Action {
   street: Street;
   /** True when the action put the player all-in. */
   allIn: boolean;
+  /** Virtual or real decision time for voluntary actions; absent on blinds and legacy histories. */
+  decisionTimeMs?: number;
+  /** True when the action clock forced the action. */
+  timedOut?: boolean;
 }
 
 export type LegalActionType = "fold" | "check" | "call" | "bet" | "raise";

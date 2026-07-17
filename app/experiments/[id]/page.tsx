@@ -4,13 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { HandHistory } from "@/types/poker";
-import { CalibrationDataset, Experiment } from "@/types/experiment";
+import { CalibrationDataset, Experiment, SIMULATION_VERSION } from "@/types/experiment";
 import { runSimulation, SimulationProgress } from "@/lib/simulation/runner";
 import { buildPoolConfig, RELIABLE_SAMPLE_THRESHOLD } from "@/lib/simulation/defaults";
 import { riskOfRuin } from "@/lib/analytics/aggregate";
+import { formatDecisionTime } from "@/lib/simulation/timing";
 import { getStore } from "@/lib/storage/store";
 import { BetSizeChart, BreakdownBars, EquityCurve, FrequencyBars, StartingHandHeatmap } from "@/components/charts";
 import { HandReplayer } from "@/components/HandReplayer";
+import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct } from "@/components/ui";
 
 const POSITION_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
@@ -74,6 +76,7 @@ export default function ExperimentDetailPage() {
       );
       const updated = await store.saveExperimentRun({
         ...exp,
+        simulationVersion: SIMULATION_VERSION,
         status: out.cancelled ? "cancelled" : "complete",
         results: out.aggregates,
         userDecisionLog: out.userDecisionLog.slice(0, 5000),
@@ -125,6 +128,16 @@ export default function ExperimentDetailPage() {
     exp.userDecisionLog.length > 0
       ? exp.userDecisionLog.reduce((s, d) => s + d.confidence, 0) / exp.userDecisionLog.length
       : null;
+  const timedModelDecisions = exp.userDecisionLog.filter(
+    (decision): decision is typeof decision & { decisionTimeMs: number } =>
+      decision.decisionTimeMs !== undefined && Number.isFinite(decision.decisionTimeMs),
+  );
+  const avgDecisionTime = timedModelDecisions.length
+    ? timedModelDecisions.reduce((sum, decision) => sum + decision.decisionTimeMs, 0) / timedModelDecisions.length
+    : null;
+  const timeoutRate = timedModelDecisions.length
+    ? timedModelDecisions.filter((decision) => decision.timedOut).length / timedModelDecisions.length
+    : null;
   const ror = r && r.bb100 !== 0 ? riskOfRuin(r.bb100, r.stdDevBBPerHand, bankroll) : null;
   const manual = cal?.manualAggregates ?? null;
 
@@ -217,6 +230,8 @@ export default function ExperimentDetailPage() {
             </div>
           )}
 
+          <AnalyticsGlossary groups={["analytics", "model"]} title="How to read these advanced results" />
+
           {/* Headline stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mb-4">
             <Stat
@@ -226,14 +241,14 @@ export default function ExperimentDetailPage() {
               sub={r.statisticallySignificant ? "statistically significant" : "not significant"}
               title="Big blinds won per 100 hands"
             />
-            <Stat label="95% CI" value={`${r.ciLow.toFixed(1)} … ${r.ciHigh.toFixed(1)}`} sub="bb/100" title="If the interval includes 0, the sample can't distinguish winning from losing" />
+            <Stat label="95% CI" value={`${r.ciLow.toFixed(1)} … ${r.ciHigh.toFixed(1)}`} sub="confidence interval · bb/100" title="If the interval includes 0, the sample can't distinguish winning from losing" />
             <Stat label="Total" value={fmtBB(r.bbWon, 0)} tone={r.bbWon >= 0 ? "gain" : "loss"} sub={`${r.totalHands.toLocaleString()} hands`} />
-            <Stat label="Std dev" value={`${r.stdDevBB100.toFixed(0)}`} sub="bb/100 per 100-hand block" />
+            <Stat label="Volatility (std dev)" value={`${r.stdDevBB100.toFixed(0)}`} sub="bb/100 per 100-hand block" />
             <Stat label="Max drawdown" value={`${r.maxDrawdownBB.toFixed(0)} bb`} tone="loss" />
             <Stat label="Rake paid" value={`${(r.rakePaid / bb).toFixed(0)} bb`} sub={fmtPct(r.rakePaid / Math.max(1, Math.abs(r.userNet) + r.rakePaid), 0) + " of gross"} />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
             <Stat label="Showdown winnings" value={fmtBB(r.showdownNetBB, 0)} tone={r.showdownNetBB >= 0 ? "gain" : "loss"} />
             <Stat label="Non-showdown" value={fmtBB(r.nonShowdownNetBB, 0)} tone={r.nonShowdownNetBB >= 0 ? "gain" : "loss"} title="Red-line: chips won without showdown" />
             <Stat label="Profit factor" value={r.profitFactor === Infinity ? "∞" : r.profitFactor.toFixed(2)} title="Gross winnings / gross losses" />
@@ -241,6 +256,16 @@ export default function ExperimentDetailPage() {
               label="Model confidence"
               value={avgConfidence !== null ? fmtPct(avgConfidence) : "—"}
               sub="avg. data-vs-prior weight per decision"
+            />
+            <Stat
+              label="Decision time"
+              value={formatDecisionTime(avgDecisionTime) ?? "—"}
+              sub="simulated model average"
+            />
+            <Stat
+              label="Timeout rate"
+              value={timeoutRate === null ? "—" : fmtPct(timeoutRate, 2)}
+              sub="auto check/fold"
             />
           </div>
 

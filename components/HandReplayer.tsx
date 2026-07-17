@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { HandHistory, Street } from "@/types/poker";
 import { PokerTable, SeatView } from "./PokerTable";
 import { fmtChips } from "./ui";
+import { formatDecisionTime } from "@/lib/simulation/timing";
 
 /** Reconstruct table state after the first `upto` actions of a hand history. */
 function stateAt(h: HandHistory, upto: number) {
@@ -33,12 +34,14 @@ function stateAt(h: HandHistory, upto: number) {
     p.total += a.amount;
     pot += a.amount;
     if (a.allIn) p.allIn = true;
+    const elapsed = formatDecisionTime(a.decisionTimeMs);
+    const timing = elapsed ? ` · ${a.timedOut ? "timeout" : elapsed}` : "";
     p.lastAction =
       a.type === "post-sb" || a.type === "post-bb"
         ? `posts ${a.amount}`
         : a.amount > 0
-          ? `${a.type} ${a.amount}`
-          : a.type;
+          ? `${a.type} ${a.amount}${timing}`
+          : `${a.type}${timing}`;
   }
   // If we've replayed past the last action, show the final street.
   if (upto >= h.actions.length && h.actions.length > 0) {

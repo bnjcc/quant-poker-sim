@@ -1,10 +1,11 @@
 import { DecisionContext } from "@/types/decision";
 import { HandHistory, TableConfig } from "@/types/poker";
-import { AgentMemory, decideAgentAction, freshMemory } from "@/lib/agents/agent";
+import { AgentMemory, decideAgentAction, freshMemory, sampleAgentDecisionTiming } from "@/lib/agents/agent";
 import { AgentProfile, adjustProfile } from "@/lib/agents/profiles";
 import { HandEngine } from "@/lib/poker/engine";
 import { Rng } from "@/lib/poker/rng";
 import { BehavioralPolicy } from "@/lib/player-model/policy";
+import { DecisionTiming, decisionTimingBucket, timeoutAction } from "./timing";
 
 export interface PoolConfig {
   /** Preset profiles and their weights when drawing replacements. */
@@ -40,14 +41,20 @@ export interface SeatedAgent {
 }
 
 export interface UserSeatDecider {
-  decide(ctx: DecisionContext, rng: Rng): { action: { type: "fold" | "check" | "call" | "bet" | "raise"; toAmount?: number }; probs?: Record<string, number>; confidence?: number };
+  decide(ctx: DecisionContext, rng: Rng): {
+    action: { type: "fold" | "check" | "call" | "bet" | "raise"; toAmount?: number };
+    probs?: Record<string, number>;
+    confidence?: number;
+    decisionTimeMs?: number;
+    timedOut?: boolean;
+  };
 }
 
 export function policyDecider(policy: BehavioralPolicy): UserSeatDecider {
   return {
     decide(ctx, rng) {
-      const { action, explain } = policy.sample(ctx, rng);
-      return { action, probs: explain.probs, confidence: explain.confidence };
+      const { action, explain, decisionTimeMs, timedOut } = policy.sample(ctx, rng);
+      return { action, probs: explain.probs, confidence: explain.confidence, decisionTimeMs, timedOut };
     },
   };
 }
@@ -73,7 +80,16 @@ export class TableSession {
   buttonSeat = 0;
   handNumber = 0;
   /** Explanations of simulated-user decisions, keyed by hand number. */
-  userDecisionLog: { handNumber: number; street: string; probs: Record<string, number>; confidence: number; chosen: string }[] = [];
+  userDecisionLog: {
+    handNumber: number;
+    street: string;
+    probs: Record<string, number>;
+    confidence: number;
+    chosen: string;
+    decisionTimeMs?: number;
+    timedOut?: boolean;
+    opponentTiming?: ReturnType<typeof decisionTimingBucket>;
+  }[] = [];
 
   constructor(opts: {
     config: TableConfig;
@@ -202,19 +218,28 @@ export class TableSession {
       const seat = engine.currentSeat!;
       const ctx = tracker.buildContext(seat);
       if (seat === this.userSeat && userDecider) {
-        const { action, probs, confidence } = userDecider.decide(ctx, this.rng);
+        const decision = userDecider.decide(ctx, this.rng);
+        const timing: DecisionTiming = {
+          decisionTimeMs: decision.decisionTimeMs ?? 0,
+          timedOut: Boolean(decision.timedOut),
+        };
+        const action = timing.timedOut ? timeoutAction(ctx) : decision.action;
         this.userDecisionLog.push({
           handNumber: this.handNumber,
           street: ctx.street,
-          probs: probs ?? {},
-          confidence: confidence ?? 0,
+          probs: decision.probs ?? {},
+          confidence: decision.confidence ?? 0,
           chosen: action.type,
+          decisionTimeMs: timing.decisionTimeMs,
+          timedOut: timing.timedOut,
+          opponentTiming: decisionTimingBucket(ctx.lastOpponentAction?.decisionTimeMs),
         });
-        tracker.apply(seat, action);
+        tracker.apply(seat, action, timing);
       } else {
         const agent = this.agents.get(seat)!;
-        const action = decideAgentAction(agent.profile, ctx, this.rng, agent.memory);
-        tracker.apply(seat, action);
+        const proposed = decideAgentAction(agent.profile, ctx, this.rng, agent.memory);
+        const timing = sampleAgentDecisionTiming(agent.profile, ctx, proposed, this.rng);
+        tracker.apply(seat, timing.timedOut ? timeoutAction(ctx) : proposed, timing);
       }
     }
     if (!engine.complete) throw new Error("Hand failed to complete (guard tripped)");
@@ -304,6 +329,16 @@ export class ContextTracker {
     const maxOtherStack = Math.max(0, ...others.map((x) => x.stack + x.streetCommitted));
     const effective = Math.min(p.stack + p.streetCommitted, maxOtherStack);
     const pot = e.potSize;
+    const previous = [...e.actions]
+      .reverse()
+      .find(
+        (action) =>
+          action.street === e.street &&
+          action.seat !== seat &&
+          action.type !== "post-sb" &&
+          action.type !== "post-bb" &&
+          action.decisionTimeMs !== undefined,
+      );
     return {
       handNumber: e.handNumber,
       street: e.street,
@@ -320,10 +355,22 @@ export class ContextTracker {
       isPreflopAggressor: this.lastPreflopAggressor === seat,
       legal,
       bigBlind: e.config.bigBlind,
+      lastOpponentAction: previous
+        ? {
+            seat: previous.seat,
+            type: previous.type,
+            decisionTimeMs: previous.decisionTimeMs!,
+            timedOut: Boolean(previous.timedOut),
+          }
+        : null,
     };
   }
 
-  apply(seat: number, action: { type: "fold" | "check" | "call" | "bet" | "raise"; toAmount?: number }): void {
+  apply(
+    seat: number,
+    action: { type: "fold" | "check" | "call" | "bet" | "raise"; toAmount?: number },
+    timing?: DecisionTiming,
+  ): void {
     // Sanitize illegal samples defensively (agents can produce edge sizes).
     const legal = this.engine.getLegalActions(seat);
     let a = action;
@@ -344,6 +391,6 @@ export class ContextTracker {
     } else if (a.type === "bet") {
       this.raisesThisStreet++;
     }
-    this.engine.applyAction(seat, a);
+    this.engine.applyAction(seat, a, timing);
   }
 }

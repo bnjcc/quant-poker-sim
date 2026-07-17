@@ -2,6 +2,13 @@ import { ChosenAction, DecisionContext, RecordedDecision } from "@/types/decisio
 import { estimateEquity, preflopStrength } from "@/lib/poker/equity";
 import { handIsInRange, isStartingHandNotation } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
+import {
+  ACTION_CLOCK_MS,
+  clampDecisionTime,
+  DecisionTiming,
+  decisionTimingBucket,
+  sampleDefaultDecisionTiming,
+} from "@/lib/simulation/timing";
 
 /**
  * Behavioral policy learned from the user's calibration hands.
@@ -24,6 +31,8 @@ interface BucketCounts {
   counts: Record<ActionLabel, number>;
   total: number;
   sizings: number[]; // pot fractions for bets/raises
+  /** Observed response times grouped by chosen action. Missing on v1 policies. */
+  timings?: Partial<Record<ActionLabel, { decisionTimeMs: number; timedOut: boolean }[]>>;
 }
 
 export interface PolicyProbabilities {
@@ -39,7 +48,7 @@ export interface SerializedPolicy {
   totalDecisions: number;
   /** Explicit first-in range used by range-first calibrations. */
   preflopRange?: string[];
-  version: 1;
+  version: 1 | 2;
 }
 
 function positionClass(pos: string): PositionClass {
@@ -71,6 +80,31 @@ function keyOf(street: string, pos: PositionClass | "*", facing: Facing, bucket:
   return `${street}|${pos}|${facing}|${bucket}`;
 }
 
+function timedKeyOf(
+  street: string,
+  pos: PositionClass | "*",
+  facing: Facing,
+  bucket: StrengthBucket | "*",
+  timing: ReturnType<typeof decisionTimingBucket>,
+): string {
+  return `${keyOf(street, pos, facing, bucket)}|${timing}`;
+}
+
+function lookupKeys(ctx: DecisionContext, sb: StrengthBucket): string[] {
+  const pc = positionClass(ctx.position);
+  const fc = facingClass(ctx);
+  const timing = decisionTimingBucket(ctx.lastOpponentAction?.decisionTimeMs);
+  return [
+    timedKeyOf(ctx.street, pc, fc, sb, timing),
+    timedKeyOf(ctx.street, "*", fc, sb, timing),
+    timedKeyOf(ctx.street, "*", fc, "*", timing),
+    // Untimed keys retain a dense fallback and make v1 serialized policies compatible.
+    keyOf(ctx.street, pc, fc, sb),
+    keyOf(ctx.street, "*", fc, sb),
+    keyOf(ctx.street, "*", fc, "*"),
+  ];
+}
+
 export class BehavioralPolicy {
   private buckets = new Map<string, BucketCounts>();
   private preflopRange: Set<string> | null = null;
@@ -87,7 +121,12 @@ export class BehavioralPolicy {
   private bucket(key: string): BucketCounts {
     let b = this.buckets.get(key);
     if (!b) {
-      b = { counts: { fold: 0, check: 0, call: 0, bet: 0, raise: 0 }, total: 0, sizings: [] };
+      b = {
+        counts: { fold: 0, check: 0, call: 0, bet: 0, raise: 0 },
+        total: 0,
+        sizings: [],
+        timings: {},
+      };
       this.buckets.set(key, b);
     }
     return b;
@@ -97,20 +136,23 @@ export class BehavioralPolicy {
   train(decisions: RecordedDecision[], rng: Rng): void {
     for (const d of decisions) {
       const sb = strengthBucket(d.context, rng);
-      const pc = positionClass(d.context.position);
-      const fc = facingClass(d.context);
       const label = d.action.type as ActionLabel;
-      // Record into the specific bucket plus generalized fallbacks.
-      const keys = [
-        keyOf(d.context.street, pc, fc, sb),
-        keyOf(d.context.street, "*", fc, sb),
-        keyOf(d.context.street, "*", fc, "*"),
-      ];
+      // Record timed buckets for reactions plus untimed buckets for dense fallback.
+      const keys = lookupKeys(d.context, sb);
       for (const k of keys) {
         const b = this.bucket(k);
         b.counts[label]++;
         b.total++;
         if (d.potFraction !== null) b.sizings.push(d.potFraction);
+        if (d.responseTimeMs !== undefined && Number.isFinite(d.responseTimeMs)) {
+          b.timings ??= {};
+          const samples = b.timings[label] ?? [];
+          samples.push({
+            decisionTimeMs: clampDecisionTime(d.responseTimeMs),
+            timedOut: Boolean(d.timedOut),
+          });
+          b.timings[label] = samples;
+        }
       }
       this.totalDecisions++;
     }
@@ -133,13 +175,7 @@ export class BehavioralPolicy {
       };
     }
 
-    const pc = positionClass(ctx.position);
-    const fc = facingClass(ctx);
-    const keys = [
-      keyOf(ctx.street, pc, fc, sb),
-      keyOf(ctx.street, "*", fc, sb),
-      keyOf(ctx.street, "*", fc, "*"),
-    ];
+    const keys = lookupKeys(ctx, sb);
     let chosen: BucketCounts | null = null;
     let chosenKey = keys[keys.length - 1];
     for (const k of keys) {
@@ -216,11 +252,15 @@ export class BehavioralPolicy {
   }
 
   /** Sample an action + size from the policy. */
-  sample(ctx: DecisionContext, rng: Rng): { action: ChosenAction; explain: PolicyProbabilities } {
+  sample(
+    ctx: DecisionContext,
+    rng: Rng,
+  ): { action: ChosenAction; explain: PolicyProbabilities; decisionTimeMs: number; timedOut: boolean } {
     const sb = strengthBucket(ctx, rng);
     const explain = this.probabilities(ctx, sb);
     const idx = rng.weighted(ACTIONS.map((a) => explain.probs[a]));
     const type = ACTIONS[idx];
+    let action: ChosenAction;
     if (type === "bet" || type === "raise") {
       const frac = this.sampleSizing(ctx, rng);
       const to =
@@ -229,12 +269,34 @@ export class BehavioralPolicy {
           : type === "raise"
             ? Math.round(ctx.legal.minRaiseTo + frac * ctx.potSize)
             : Math.max(ctx.legal.minBet, Math.round(frac * ctx.potSize));
+      action = { type, toAmount: Math.min(Math.max(to, 1), ctx.legal.maxBetTo) };
+    } else {
+      action = { type };
+    }
+    const timing = this.sampleDecisionTiming(ctx, action, explain.bucketKey, rng);
+    return { action, explain, ...timing };
+  }
+
+  private sampleDecisionTiming(
+    ctx: DecisionContext,
+    action: ChosenAction,
+    bucketKey: string,
+    rng: Rng,
+  ): DecisionTiming {
+    const label = action.type as ActionLabel;
+    const primary = this.buckets.get(bucketKey)?.timings?.[label] ?? [];
+    const denseFallback =
+      this.buckets.get(keyOf(ctx.street, "*", facingClass(ctx), "*"))?.timings?.[label] ?? [];
+    const samples = primary.length >= 3 ? primary : denseFallback;
+    if (samples.length > 0 && rng.chance(Math.min(0.92, samples.length / (samples.length + 3)))) {
+      const observed = samples[rng.int(samples.length)];
+      if (observed.timedOut) return { decisionTimeMs: ACTION_CLOCK_MS, timedOut: true };
       return {
-        action: { type, toAmount: Math.min(Math.max(to, 1), ctx.legal.maxBetTo) },
-        explain,
+        decisionTimeMs: clampDecisionTime(observed.decisionTimeMs * Math.max(0.65, rng.gaussian(1, 0.12))),
+        timedOut: false,
       };
     }
-    return { action: { type }, explain };
+    return sampleDefaultDecisionTiming(action, ctx, rng);
   }
 
   /** Empirical bet-size sampling with a mild prior toward 2/3 pot. */
@@ -255,7 +317,7 @@ export class BehavioralPolicy {
       buckets: Object.fromEntries(this.buckets),
       totalDecisions: this.totalDecisions,
       preflopRange: this.preflopRange ? [...this.preflopRange].sort() : undefined,
-      version: 1,
+      version: 2,
     };
   }
 

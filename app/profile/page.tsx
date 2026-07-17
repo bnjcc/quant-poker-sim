@@ -6,8 +6,10 @@ import { CalibrationDataset } from "@/types/experiment";
 import { FreqStat } from "@/lib/player-model/stats";
 import { rangeComboCount } from "@/lib/poker/range";
 import { RELIABLE_SAMPLE_THRESHOLD } from "@/lib/simulation/defaults";
+import { formatDecisionTime, SNAP_DECISION_MS } from "@/lib/simulation/timing";
 import { getStore } from "@/lib/storage/store";
 import { ConfidenceBar, Empty, PageHeader, Stat, WarningNote, fmtPct } from "@/components/ui";
+import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 
 function TendencyRow({ label, stat, hint }: { label: string; stat: FreqStat; hint: string }) {
   return (
@@ -54,6 +56,18 @@ export default function ProfilePage() {
   const small = cal.handsPlayed < RELIABLE_SAMPLE_THRESHOLD;
   const rangeFirst = cal.method === "range-first" && Boolean(cal.preflopRange?.length);
   const rangeCombos = rangeFirst ? rangeComboCount(cal.preflopRange ?? []) : 0;
+  const timedDecisions = cal.decisions.filter(
+    (decision): decision is typeof decision & { responseTimeMs: number } =>
+      decision.responseTimeMs !== undefined && Number.isFinite(decision.responseTimeMs),
+  );
+  const sortedTimes = timedDecisions.map((decision) => decision.responseTimeMs).sort((a, b) => a - b);
+  const averageTime = sortedTimes.length
+    ? sortedTimes.reduce((sum, time) => sum + time, 0) / sortedTimes.length
+    : null;
+  const medianTime = sortedTimes.length ? sortedTimes[Math.floor(sortedTimes.length / 2)] : null;
+  const snapCount = timedDecisions.filter((decision) => decision.responseTimeMs <= SNAP_DECISION_MS).length;
+  const timeoutCount = timedDecisions.filter((decision) => decision.timedOut).length;
+  const timingCueCount = timedDecisions.filter((decision) => decision.context.lastOpponentAction).length;
 
   return (
     <div>
@@ -91,6 +105,8 @@ export default function ProfilePage() {
         </div>
       )}
 
+      <AnalyticsGlossary groups={["poker", "positions", "model"]} title="What do VPIP, PFR, 3-bet, and confidence mean?" />
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat label={rangeFirst ? "Betting samples" : "Calibration hands"} value={String(cal.handsPlayed)} sub={`${cal.decisions.length} decisions`} />
         {rangeFirst ? (
@@ -111,6 +127,38 @@ export default function ProfilePage() {
         />
       </div>
 
+      {timedDecisions.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <Stat
+              label="Decision time"
+              value={formatDecisionTime(averageTime) ?? "—"}
+              sub={`median ${formatDecisionTime(medianTime) ?? "—"}`}
+            />
+            <Stat
+              label="Snap decisions"
+              value={fmtPct(snapCount / timedDecisions.length, 1)}
+              sub={`≤ ${(SNAP_DECISION_MS / 1_000).toFixed(1)}s · ${snapCount}/${timedDecisions.length}`}
+            />
+            <Stat
+              label="Timeouts"
+              value={fmtPct(timeoutCount / timedDecisions.length, 1)}
+              sub={`${timeoutCount} auto check/folds`}
+            />
+            <Stat
+              label="Timing reads"
+              value={String(timingCueCount)}
+              sub="decisions after opponent timing cues"
+            />
+          </div>
+          <p className="text-xs text-muted mb-6 max-w-3xl">
+            The simulated policy samples your observed response times by action and situation. Its action frequencies
+            also condition on whether the previous opponent action was a snap, normal decision, or tank when enough
+            matching observations exist.
+          </p>
+        </>
+      )}
+
       {rangeFirst && (
         <section className="panel px-5 py-4 mb-4">
           <h2 className="font-semibold">Explicit preflop range</h2>
@@ -125,16 +173,16 @@ export default function ProfilePage() {
       <div className="grid lg:grid-cols-2 gap-4">
         <section className="panel px-5 py-4">
           <h2 className="font-semibold mb-2">{rangeFirst ? "Actions within the selected range" : "Preflop tendencies"}</h2>
-          <TendencyRow label={rangeFirst ? "VPIP when selected" : "VPIP"} stat={t.vpip} hint="Share of hands where you voluntarily put chips in preflop" />
-          <TendencyRow label={rangeFirst ? "Raise when selected" : "Preflop raise (PFR)"} stat={t.pfr} hint="Share of hands you raised preflop" />
-          <TendencyRow label="3-bet" stat={t.threeBet} hint="Re-raise frequency when facing one raise" />
+          <TendencyRow label={rangeFirst ? "VPIP — play when selected" : "VPIP — voluntarily play"} stat={t.vpip} hint="Share of hands where you voluntarily put chips in preflop" />
+          <TendencyRow label={rangeFirst ? "PFR — raise when selected" : "PFR — preflop raise"} stat={t.pfr} hint="Share of hands you raised preflop" />
+          <TendencyRow label="3-bet — preflop re-raise" stat={t.threeBet} hint="Re-raise frequency when facing one raise" />
           <TendencyRow label="Fold to 3-bet" stat={t.foldToThreeBet} hint="Fold frequency after raising and facing a 3-bet" />
           <TendencyRow label="Open-limp" stat={t.limp} hint="Entering unraised pots with a call instead of a raise" />
         </section>
 
         <section className="panel px-5 py-4">
           <h2 className="font-semibold mb-2">Postflop tendencies</h2>
-          <TendencyRow label="Continuation bet" stat={t.cbet} hint="Betting the flop after raising preflop" />
+          <TendencyRow label="C-bet — continuation bet" stat={t.cbet} hint="Betting the flop after raising preflop" />
           <TendencyRow label="Fold to c-bet" stat={t.foldToCbet} hint="Folding the flop when facing a continuation bet" />
           <TendencyRow label="Raise vs bet (check-raise proxy)" stat={t.checkRaise} hint="Raising when facing a postflop bet" />
           <TendencyRow label="River call" stat={t.riverCall} hint="Calling frequency when facing a river bet" />
@@ -164,8 +212,8 @@ export default function ProfilePage() {
 
       <div className="text-xs text-muted mt-6 max-w-3xl">
         How to read this: the model behind simulation is a bucketed behavioral policy (street × position × situation ×
-        hand strength), shrunk toward a strength-aware prior when a bucket has few samples. The confidence bars show how
-        much observed data — versus prior — drives each estimate.
+        hand strength × opponent timing), shrunk toward a strength-aware prior when a bucket has few samples. The
+        confidence bars show how much observed data — versus prior — drives each estimate.
       </div>
     </div>
   );

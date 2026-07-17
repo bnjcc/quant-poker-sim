@@ -60,11 +60,13 @@ Per-instance jitter means two "TAGs" at the same table play slightly differently
 Two layers:
 
 1. **Descriptive tendencies** (`stats.ts`) — classic HUD-style frequencies computed from recorded decisions, each reported as a Laplace-smoothed estimate with a **Wilson 95% interval** and a sample-size-based confidence weight. These power the profile page; nothing here feeds simulation directly.
-2. **Behavioral policy** (`policy.ts`) — the generative model used in simulation. Decisions are bucketed by `street × position-class × facing-situation × hand-strength-quartile` (strength via MC equity at decision time). Each bucket stores action counts and observed bet sizes. At simulation time:
+2. **Behavioral policy** (`policy.ts`) — the generative model used in simulation. Decisions are bucketed by `street × position-class × facing-situation × hand-strength-quartile × opponent-timing` (strength via MC equity at decision time; timing is none/snap/normal/tank). Each bucket stores action counts, observed bet sizes, and response-time samples by action. At simulation time:
    - probabilities = shrinkage blend of bucket counts with a strength-aware prior, `weight = n / (n + K)` with `K = 8`;
    - hierarchical fallback to coarser buckets when the exact one is empty;
+   - timing-specific buckets fall back to untimed v1-compatible buckets when samples are sparse;
    - illegal actions get their mass redistributed to legal substitutes (e.g. bet→raise);
    - bet sizes are sampled from the user's empirical pot-fraction pool blended with a ⅔-pot prior.
+   - decision time is sampled from matching empirical action/context observations, with an online-style human prior when no timing data exists; learned timeouts produce the legal check/fold default.
 
 Range-first calibrations add an explicit 169-hand first-in range to the serialized policy. Unselected hands fold when voluntarily entering an unraised pot (or check a free big-blind option); selected hands always continue and the learned policy chooses the action and size. The explicit chart is deliberately not applied when facing a raise, where recorded reactions and the normal model prior still govern play.
 
@@ -73,6 +75,8 @@ Range-first calibrations add an explicit 169-hand first-in range to the serializ
 ## Table session & turnover (`lib/simulation/table.ts`)
 
 `TableSession` owns seats across hands: geometric session lengths, stop-loss/stop-win departures measured in buy-ins, rebuy probability when felted, random churn, and replacement draws from the weighted pool with pool-level skill/looseness/aggression multipliers. The user auto-rebuys and buy-ins are counted. Button rotation skips empty seats; short-handed play (down to HU) works.
+
+Every voluntary action also carries a seeded virtual decision time. Manual calibration waits for those opponent delays and gives the user a real 15-second clock; batch runs record the same timing metadata without sleeping. `DecisionContext` exposes the most recent opponent action time on the current street. Learned user behavior conditions directly on that cue. Heuristic opponents use only a deliberately capped timing tell (a few equity points at most), because real-world timing signals are noisy.
 
 ## Batch runner (`lib/simulation/runner.ts`)
 

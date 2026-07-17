@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
 import { Empty, PageHeader, fmtPct } from "@/components/ui";
+import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 
 export default function ComparePage() {
   const [exps, setExps] = useState<Experiment[] | null>(null);
@@ -58,6 +59,7 @@ export default function ComparePage() {
   return (
     <div>
       <PageHeader title="Compare experiments" sub="Pick up to four completed runs. Differences smaller than the confidence intervals are noise, not signal." />
+      <AnalyticsGlossary groups={["analytics"]} title="How to read the comparison metrics" />
       <div className="flex flex-wrap gap-2 mb-5">
         {exps.map((e) => (
           <button key={e.id} className={`btn text-xs ${picked.includes(e.id) ? "btn-primary" : ""}`} onClick={() => toggle(e.id)}>

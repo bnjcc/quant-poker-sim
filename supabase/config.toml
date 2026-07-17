@@ -37,10 +37,13 @@ port = 54324
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
+site_url = "https://poker-sim-iota.vercel.app"
 additional_redirect_urls = [
   "http://127.0.0.1:3000/auth/confirm",
   "http://localhost:3000/auth/confirm",
+  "https://poker-sim-iota.vercel.app/auth/confirm",
+  "https://poker-sim-optvis.vercel.app/auth/confirm",
+  "https://*-optvis.vercel.app/**",
 ]
 jwt_expiry = 3600
 enable_signup = true
@@ -48,4 +51,10 @@ enable_signup = true
 [auth.email]
 enable_signup = true
 double_confirm_changes = true
-enable_confirmations = false
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true

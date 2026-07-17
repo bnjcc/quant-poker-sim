@@ -1,13 +1,15 @@
 import { ChosenAction, DecisionContext, RecordedDecision } from "@/types/decision";
 import { HandHistory, TableConfig } from "@/types/poker";
-import { decideAgentAction } from "@/lib/agents/agent";
+import { decideAgentAction, sampleAgentDecisionTiming } from "@/lib/agents/agent";
 import { HandEngine } from "@/lib/poker/engine";
 import { cardsForStartingHand, isStartingHandNotation, startingHandCombos } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 import { ContextTracker, PoolConfig, TableSession } from "./table";
+import { clampDecisionTime, DecisionTiming, timeoutAction } from "./timing";
 
 export type ManualStep =
   | { kind: "awaiting-user"; context: DecisionContext; engine: HandEngine }
+  | { kind: "opponent-acting"; seat: number; decisionTimeMs: number; engine: HandEngine }
   | { kind: "hand-complete"; history: HandHistory; engine: HandEngine }
   | { kind: "session-complete" };
 
@@ -24,6 +26,7 @@ export class ManualSession {
   readonly userSeatByHand = new Map<number, number>();
   private readonly startingHands: string[] | null;
   private current: { engine: HandEngine; tracker: ContextTracker } | null = null;
+  private pendingOpponent: { seat: number; action: ChosenAction; timing: DecisionTiming } | null = null;
   handsPlayed = 0;
 
   constructor(opts: {
@@ -54,8 +57,16 @@ export class ManualSession {
   }
 
   /** Advance until the user must act or the hand/session ends. */
-  step(): ManualStep {
+  step(paceOpponents = false): ManualStep {
     if (this.handsPlayed >= this.targetHands) return { kind: "session-complete" };
+    if (this.pendingOpponent && this.current) {
+      return {
+        kind: "opponent-acting",
+        seat: this.pendingOpponent.seat,
+        decisionTimeMs: this.pendingOpponent.timing.decisionTimeMs,
+        engine: this.current.engine,
+      };
+    }
     if (!this.current) {
       const handIndex = this.startingHands
         ? this.session.rng.weighted(this.startingHands.map(startingHandCombos))
@@ -77,8 +88,14 @@ export class ManualSession {
         return { kind: "awaiting-user", context: ctx, engine };
       }
       const agent = this.session.agents.get(seat)!;
-      const action = decideAgentAction(agent.profile, ctx, this.session.rng, agent.memory);
-      tracker.apply(seat, action);
+      const proposed = decideAgentAction(agent.profile, ctx, this.session.rng, agent.memory);
+      const timing = sampleAgentDecisionTiming(agent.profile, ctx, proposed, this.session.rng);
+      const action = timing.timedOut ? timeoutAction(ctx) : proposed;
+      if (paceOpponents) {
+        this.pendingOpponent = { seat, action, timing };
+        return { kind: "opponent-acting", seat, decisionTimeMs: timing.decisionTimeMs, engine };
+      }
+      tracker.apply(seat, action, timing);
     }
     const history = this.session.finishHand(engine);
     this.histories.push(history);
@@ -87,14 +104,38 @@ export class ManualSession {
     return { kind: "hand-complete", history, engine };
   }
 
+  /** Complete a paced opponent action after its virtual online delay. */
+  completeOpponentAction(): void {
+    if (!this.current || !this.pendingOpponent) throw new Error("No opponent action is pending");
+    const pending = this.pendingOpponent;
+    this.pendingOpponent = null;
+    this.current.tracker.apply(pending.seat, pending.action, pending.timing);
+  }
+
   /** Apply the user's chosen action, recording full context. */
-  submitUserAction(context: DecisionContext, action: ChosenAction): void {
+  submitUserAction(
+    context: DecisionContext,
+    action: ChosenAction,
+    responseTimeMs?: number,
+    timedOut = false,
+  ): void {
     if (!this.current) throw new Error("No hand in progress");
+    const chosen = timedOut ? timeoutAction(context) : action;
     const potFraction =
-      (action.type === "bet" || action.type === "raise") && action.toAmount !== undefined && context.potSize > 0
-        ? (action.toAmount - (action.type === "raise" ? context.legal.callAmount : 0)) / context.potSize
+      (chosen.type === "bet" || chosen.type === "raise") && chosen.toAmount !== undefined && context.potSize > 0
+        ? (chosen.toAmount - (chosen.type === "raise" ? context.legal.callAmount : 0)) / context.potSize
         : null;
-    this.decisions.push({ context, action, potFraction });
-    this.current.tracker.apply(this.userSeat, action);
+    const elapsed = responseTimeMs === undefined ? undefined : clampDecisionTime(responseTimeMs);
+    this.decisions.push({
+      context,
+      action: chosen,
+      potFraction,
+      ...(elapsed === undefined ? {} : { responseTimeMs: elapsed, timedOut }),
+    });
+    this.current.tracker.apply(
+      this.userSeat,
+      chosen,
+      elapsed === undefined ? undefined : { decisionTimeMs: elapsed, timedOut },
+    );
   }
 }

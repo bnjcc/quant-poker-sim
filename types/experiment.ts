@@ -5,7 +5,7 @@ import { SerializedPolicy } from "@/lib/player-model/policy";
 import { PlayerTendencies } from "@/lib/player-model/stats";
 import { SimulationAggregates } from "@/lib/analytics/aggregate";
 
-export const SIMULATION_VERSION = "1.1.0";
+export const SIMULATION_VERSION = "1.2.0";
 
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),
@@ -77,5 +77,14 @@ export interface Experiment {
   results: SimulationAggregates | null;
   /** Stored hand histories (all in detailed mode, sampled in high-speed). */
   handIds: string[];
-  userDecisionLog: { handNumber: number; street: string; probs: Record<string, number>; confidence: number; chosen: string }[];
+  userDecisionLog: {
+    handNumber: number;
+    street: string;
+    probs: Record<string, number>;
+    confidence: number;
+    chosen: string;
+    decisionTimeMs?: number;
+    timedOut?: boolean;
+    opponentTiming?: "none" | "snap" | "normal" | "tank";
+  }[];
 }

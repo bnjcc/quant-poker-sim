@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DecisionContext } from "@/types/decision";
 import { CalibrationDataset } from "@/types/experiment";
@@ -9,6 +9,12 @@ import { holeNotation } from "@/lib/poker/deck";
 import { ALL_STARTING_HANDS, rangeComboCount } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 import { ManualSession } from "@/lib/simulation/manual";
+import {
+  ACTION_CLOCK_MS,
+  decisionTimingBucket,
+  formatDecisionTime,
+  timeoutAction,
+} from "@/lib/simulation/timing";
 import {
   buildPoolConfig,
   CALIBRATION_SIZES,
@@ -20,14 +26,19 @@ import { BehavioralPolicy } from "@/lib/player-model/policy";
 import { computeTendencies } from "@/lib/player-model/stats";
 import { getStore, newId } from "@/lib/storage/store";
 import { PokerTable, SeatView } from "@/components/PokerTable";
+import { ActionClock } from "@/components/ActionClock";
 import { StartingHandGrid } from "@/components/StartingHandGrid";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 
-type Phase = "range" | "playing" | "hand-done" | "done";
+type Phase = "range" | "opponent-acting" | "playing" | "hand-done" | "done";
 
 export default function RangeCalibratePage() {
   const router = useRouter();
   const sessionRef = useRef<ManualSession | null>(null);
+  const advanceRef = useRef<(session: ManualSession) => void>(() => undefined);
+  const opponentTimerRef = useRef<number | null>(null);
+  const activeDecisionRef = useRef<DecisionContext | null>(null);
+  const decisionStartedAtRef = useRef(0);
   const [phase, setPhase] = useState<Phase>("range");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [target, setTarget] = useState<number>(50);
@@ -38,6 +49,11 @@ export default function RangeCalibratePage() {
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [decisionRemainingMs, setDecisionRemainingMs] = useState(ACTION_CLOCK_MS);
+  const [opponentRemainingMs, setOpponentRemainingMs] = useState(0);
+  const [opponentTotalMs, setOpponentTotalMs] = useState(1);
+  const [opponentDeadline, setOpponentDeadline] = useState(0);
+  const [opponentName, setOpponentName] = useState("Opponent");
   const [, force] = useState(0);
   const rerender = () => force((value) => value + 1);
 
@@ -59,8 +75,11 @@ export default function RangeCalibratePage() {
   };
 
   const advance = (session: ManualSession) => {
-    const step = session.step();
+    const step = session.step(true);
     if (step.kind === "awaiting-user") {
+      activeDecisionRef.current = step.context;
+      decisionStartedAtRef.current = Date.now();
+      setDecisionRemainingMs(ACTION_CLOCK_MS);
       setCtx(step.context);
       setEngine(step.engine);
       const legal = step.context.legal;
@@ -70,7 +89,22 @@ export default function RangeCalibratePage() {
           : Math.max(legal.minBet, Math.round(step.context.potSize * 0.66)),
       );
       setPhase("playing");
+    } else if (step.kind === "opponent-acting") {
+      activeDecisionRef.current = null;
+      setCtx(null);
+      setEngine(step.engine);
+      setOpponentName(step.engine.players.find((player) => player.seat === step.seat)?.name ?? "Opponent");
+      setOpponentTotalMs(Math.max(1, step.decisionTimeMs));
+      setOpponentRemainingMs(step.decisionTimeMs);
+      setOpponentDeadline(Date.now() + step.decisionTimeMs);
+      setPhase("opponent-acting");
+      opponentTimerRef.current = window.setTimeout(() => {
+        opponentTimerRef.current = null;
+        session.completeOpponentAction();
+        advanceRef.current(session);
+      }, step.decisionTimeMs);
     } else if (step.kind === "hand-complete") {
+      activeDecisionRef.current = null;
       setEngine(step.engine);
       setCtx(null);
       const result = step.history.results.find((item) => item.seat === session.userSeat);
@@ -79,10 +113,12 @@ export default function RangeCalibratePage() {
       );
       setPhase(session.handsPlayed >= session.targetHands ? "done" : "hand-done");
     } else {
+      activeDecisionRef.current = null;
       setPhase("done");
     }
     rerender();
   };
+  advanceRef.current = advance;
 
   const start = useCallback(() => {
     if (selected.size === 0) return;
@@ -97,21 +133,57 @@ export default function RangeCalibratePage() {
     });
     sessionRef.current = session;
     setPhase("playing");
-    advance(session);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    advanceRef.current(session);
   }, [customTarget, selected, target]);
 
   const act = (type: "fold" | "check" | "call" | "bet" | "raise") => {
     const session = sessionRef.current;
-    if (!session || !ctx) return;
+    if (!session || !ctx || activeDecisionRef.current !== ctx) return;
+    activeDecisionRef.current = null;
     const action = type === "bet" || type === "raise" ? { type, toAmount: betTo } : { type };
-    session.submitUserAction(ctx, action);
-    advance(session);
+    session.submitUserAction(ctx, action, Date.now() - decisionStartedAtRef.current);
+    setCtx(null);
+    advanceRef.current(session);
   };
+
+  useEffect(() => {
+    if (phase !== "playing" || !ctx) return;
+    const deadline = decisionStartedAtRef.current + ACTION_CLOCK_MS;
+    const update = () => setDecisionRemainingMs(Math.max(0, deadline - Date.now()));
+    update();
+    const interval = window.setInterval(update, 100);
+    const timeout = window.setTimeout(() => {
+      const session = sessionRef.current;
+      if (!session || activeDecisionRef.current !== ctx) return;
+      activeDecisionRef.current = null;
+      session.submitUserAction(ctx, timeoutAction(ctx), ACTION_CLOCK_MS, true);
+      setCtx(null);
+      advanceRef.current(session);
+    }, Math.max(0, deadline - Date.now()));
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [ctx, phase]);
+
+  useEffect(() => {
+    if (phase !== "opponent-acting" || opponentDeadline <= 0) return;
+    const update = () => setOpponentRemainingMs(Math.max(0, opponentDeadline - Date.now()));
+    update();
+    const interval = window.setInterval(update, 100);
+    return () => window.clearInterval(interval);
+  }, [opponentDeadline, phase]);
+
+  useEffect(
+    () => () => {
+      if (opponentTimerRef.current !== null) window.clearTimeout(opponentTimerRef.current);
+    },
+    [],
+  );
 
   const nextHand = () => {
     const session = sessionRef.current;
-    if (session) advance(session);
+    if (session) advanceRef.current(session);
   };
 
   const save = async () => {
@@ -157,7 +229,11 @@ export default function RangeCalibratePage() {
       if (action.type === "post-sb" || action.type === "post-bb") continue;
       lastActionBySeat.set(
         action.seat,
-        action.amount > 0 ? `${action.type} ${action.amount}` : action.type,
+        `${action.amount > 0 ? `${action.type} ${action.amount}` : action.type}${
+          formatDecisionTime(action.decisionTimeMs)
+            ? ` · ${action.timedOut ? "timeout" : formatDecisionTime(action.decisionTimeMs)}`
+            : ""
+        }`,
       );
     }
     return engine.players.map((player) => ({
@@ -183,7 +259,7 @@ export default function RangeCalibratePage() {
       <div>
         <PageHeader
           title="Range-first calibration"
-          sub="Choose the starting hands you play, then make decisions only with those hands. The range becomes an exact preflop rule while the session learns your actions and bet sizes."
+          sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. The range is exact; actions, sizing, response time, and reactions to opponent timing are learned."
         />
 
         <div className="panel px-5 py-5">
@@ -273,7 +349,7 @@ export default function RangeCalibratePage() {
         <div className="mt-4 max-w-2xl">
           <WarningNote>
             The selected range controls first-in preflop play. When the simulation faces a raise, your recorded reactions
-            and the model prior still determine whether it folds, calls, or raises.
+            and the model prior still determine whether it folds, calls, or raises. Timeouts check when free and fold otherwise.
           </WarningNote>
         </div>
       </div>
@@ -324,7 +400,20 @@ export default function RangeCalibratePage() {
 
       <div className="panel mt-5 px-5 py-4">
         {phase === "playing" && ctx && legal ? (
-          <div className="flex flex-wrap items-center gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-3 mb-3 pb-3 border-b border-line">
+              <ActionClock remainingMs={decisionRemainingMs} />
+              <div className="text-xs text-muted">
+                Timeout: <span className="text-ink">{legal.types.includes("check") ? "check" : "fold"}</span>
+              </div>
+              {ctx.lastOpponentAction && (
+                <div className="ml-auto text-xs text-muted mono">
+                  last opponent: {ctx.lastOpponentAction.type} · {formatDecisionTime(ctx.lastOpponentAction.decisionTimeMs)} ·{" "}
+                  {decisionTimingBucket(ctx.lastOpponentAction.decisionTimeMs)}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
             {legal.types.includes("fold") && (
               <button className="btn btn-danger" type="button" onClick={() => act("fold")}>
                 Fold
@@ -387,8 +476,14 @@ export default function RangeCalibratePage() {
               </div>
             )}
             <div className="ml-auto text-xs text-muted mono">
-              pot {ctx.potSize} · to call {legal.callAmount} · SPR {ctx.stackToPotRatio.toFixed(1)}
+              pot {ctx.potSize} · to call {legal.callAmount} · SPR (stack/pot) {ctx.stackToPotRatio.toFixed(1)}
             </div>
+            </div>
+          </div>
+        ) : phase === "opponent-acting" ? (
+          <div className="flex items-center gap-4">
+            <ActionClock remainingMs={opponentRemainingMs} totalMs={opponentTotalMs} label={opponentName} />
+            <span className="text-sm text-muted">{opponentName} is thinking…</span>
           </div>
         ) : phase === "hand-done" ? (
           <div className="flex items-center gap-4">

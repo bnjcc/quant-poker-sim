@@ -2,6 +2,7 @@
 
 import { AGENT_PRESETS } from "@/lib/agents/profiles";
 import { PageHeader, fmtPct } from "@/components/ui";
+import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 
 function Bar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
   return (
@@ -22,6 +23,7 @@ export default function OpponentsPage() {
         title="Opponent profiles"
         sub="Thirteen behavioral archetypes. Each is a parameter vector — looseness, aggression, sizing, skill, positional awareness — with per-player randomization so no two instances play identically. Pool-level multipliers in the experiment config shift the whole table."
       />
+      <AnalyticsGlossary groups={["poker"]} title="New to opponent statistics?" />
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
         {AGENT_PRESETS.map((p) => (
           <div key={p.id} className="panel px-5 py-4">

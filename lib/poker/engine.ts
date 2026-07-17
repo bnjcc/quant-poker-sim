@@ -19,6 +19,11 @@ export interface EngineAction {
   toAmount?: number;
 }
 
+export interface EngineActionTiming {
+  decisionTimeMs: number;
+  timedOut?: boolean;
+}
+
 /**
  * Deterministic single-hand engine for No-Limit Hold'em.
  * Pure game rules: no agent logic, no persistence, no UI concerns.
@@ -210,7 +215,7 @@ export class HandEngine {
     };
   }
 
-  applyAction(seat: number, action: EngineAction): void {
+  applyAction(seat: number, action: EngineAction, timing?: EngineActionTiming): void {
     if (this.complete) throw new Error("Hand is complete");
     if (seat !== this.actingSeat) throw new Error(`Not seat ${seat}'s turn`);
     const legal = this.getLegalActions(seat);
@@ -222,17 +227,17 @@ export class HandEngine {
     switch (action.type) {
       case "fold": {
         p.folded = true;
-        this.record(seat, "fold", 0, false);
+        this.record(seat, "fold", 0, false, timing);
         break;
       }
       case "check": {
-        this.record(seat, "check", 0, false);
+        this.record(seat, "check", 0, false, timing);
         break;
       }
       case "call": {
         const amount = Math.min(this.currentBet - p.streetCommitted, p.stack);
         this.commit(p, amount);
-        this.record(seat, p.allIn ? "all-in" : "call", amount, p.allIn);
+        this.record(seat, p.allIn ? "all-in" : "call", amount, p.allIn, timing);
         break;
       }
       case "bet":
@@ -260,7 +265,7 @@ export class HandEngine {
             (s) => s !== seat && this.canAct(s),
           );
         }
-        this.record(seat, p.allIn ? "all-in" : action.type, amount, p.allIn);
+        this.record(seat, p.allIn ? "all-in" : action.type, amount, p.allIn, timing);
         break;
       }
     }
@@ -277,8 +282,26 @@ export class HandEngine {
     if (p.stack === 0) p.allIn = true;
   }
 
-  private record(seat: number, type: ActionType, amount: number, allIn: boolean): void {
-    this.actions.push({ seat, type, amount, street: this.street, allIn });
+  private record(
+    seat: number,
+    type: ActionType,
+    amount: number,
+    allIn: boolean,
+    timing?: EngineActionTiming,
+  ): void {
+    this.actions.push({
+      seat,
+      type,
+      amount,
+      street: this.street,
+      allIn,
+      ...(timing
+        ? {
+            decisionTimeMs: Math.max(0, Math.round(timing.decisionTimeMs)),
+            timedOut: Boolean(timing.timedOut),
+          }
+        : {}),
+    });
   }
 
   private removePending(seat: number): void {

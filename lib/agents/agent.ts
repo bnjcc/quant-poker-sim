@@ -1,6 +1,13 @@
 import { ChosenAction, DecisionContext } from "@/types/decision";
 import { estimateEquity, preflopStrength } from "@/lib/poker/equity";
 import { Rng } from "@/lib/poker/rng";
+import {
+  ACTION_CLOCK_MS,
+  DecisionTiming,
+  decisionTimingBucket,
+  SNAP_DECISION_MS,
+  TANK_DECISION_MS,
+} from "@/lib/simulation/timing";
 import { AgentProfile } from "./profiles";
 
 /** Lightweight running memory of table events an agent can react to. */
@@ -36,6 +43,42 @@ export function decideAgentAction(
   return postflopDecision(profile, ctx, rng, memory);
 }
 
+/** Virtual online-poker action time. Batch simulations record it but never wait for it. */
+export function sampleAgentDecisionTiming(
+  profile: AgentProfile,
+  ctx: DecisionContext,
+  action: ChosenAction,
+  rng: Rng,
+): DecisionTiming {
+  // Rare distracted timeout; the caller converts it to the legal check/fold default.
+  if (rng.chance(0.003 * (1 - profile.skill))) {
+    return { decisionTimeMs: ACTION_CLOCK_MS, timedOut: true };
+  }
+
+  const simpleAction = action.type === "check" || action.type === "fold";
+  const snapChance = simpleAction ? 0.42 : action.type === "call" ? 0.16 : 0.08;
+  if (rng.chance(snapChance)) {
+    return {
+      decisionTimeMs: Math.round(180 + rng.next() * (SNAP_DECISION_MS - 260)),
+      timedOut: false,
+    };
+  }
+
+  const base = simpleAction ? 1_050 : action.type === "call" ? 1_650 : 2_150;
+  const streetExtra = ctx.street === "preflop" ? 0 : ctx.street === "flop" ? 180 : ctx.street === "turn" ? 420 : 650;
+  const pressure = Math.min(1_400, ctx.numRaisesThisStreet * 280 + (ctx.betFaced > 0 ? 250 : 0));
+  if (rng.chance(0.035 + profile.skill * 0.025)) {
+    return {
+      decisionTimeMs: Math.round(TANK_DECISION_MS + rng.next() * (ACTION_CLOCK_MS - TANK_DECISION_MS - 350)),
+      timedOut: false,
+    };
+  }
+  return {
+    decisionTimeMs: Math.round(Math.max(250, Math.min(ACTION_CLOCK_MS - 250, rng.gaussian(base + streetExtra + pressure, 550)))),
+    timedOut: false,
+  };
+}
+
 function positionAdj(profile: AgentProfile, ctx: DecisionContext): number {
   return (POSITION_LOOSENESS[ctx.position] ?? 0) * profile.positionalAwareness;
 }
@@ -46,6 +89,25 @@ function stackAdj(profile: AgentProfile, ctx: DecisionContext): number {
   if (bbDepth < 40) return -0.05 * profile.stackAwareness;
   if (bbDepth > 150) return 0.03 * profile.stackAwareness;
   return 0;
+}
+
+/**
+ * A deliberately weak timing tell, capped to a few equity points. Real timing
+ * is noisy; learned-user reactions are modeled from observations instead.
+ */
+function timingStrengthRead(profile: AgentProfile, ctx: DecisionContext): number {
+  const cue = ctx.lastOpponentAction;
+  if (!cue || cue.timedOut) return 0;
+  const bucket = decisionTimingBucket(cue.decisionTimeMs);
+  let raw = 0;
+  if (cue.type === "bet" || cue.type === "raise" || cue.type === "all-in") {
+    raw = bucket === "tank" ? 0.03 : bucket === "snap" ? -0.012 : 0;
+  } else if (cue.type === "check") {
+    raw = bucket === "snap" ? -0.03 : bucket === "tank" ? 0.008 : 0;
+  } else if (cue.type === "call" && bucket === "snap") {
+    raw = 0.008;
+  }
+  return raw * (0.25 + profile.skill * 0.75);
 }
 
 function sizeBet(profile: AgentProfile, ctx: DecisionContext, rng: Rng, raising: boolean): number {
@@ -75,7 +137,7 @@ function preflopDecision(profile: AgentProfile, ctx: DecisionContext, rng: Rng):
   const strength = preflopStrength(ctx.holeCards);
   const loose = positionAdj(profile, ctx) + stackAdj(profile, ctx);
   // Skill noise: weaker players misjudge hand strength more.
-  const noisy = strength + rng.gaussian(0, 0.08 * (1 - profile.skill));
+  const noisy = strength + rng.gaussian(0, 0.08 * (1 - profile.skill)) - timingStrengthRead(profile, ctx);
   const canCheck = ctx.legal.types.includes("check");
 
   if (!ctx.facedRaisePreflop) {
@@ -138,6 +200,7 @@ function postflopDecision(
   const eq = estimateEquity(ctx.holeCards, ctx.board, Math.max(1, ctx.activePlayers - 1), rng, iterations);
   const noisyEq = Math.max(0, Math.min(1, eq + rng.gaussian(0, 0.1 * (1 - profile.skill))));
   const facingBet = ctx.legal.callAmount > 0;
+  const timingRead = timingStrengthRead(profile, ctx);
 
   // Adaptive agents exploit a table that folds too much by bluffing more.
   let bluffBoost = 1;
@@ -148,11 +211,12 @@ function postflopDecision(
 
   if (!facingBet) {
     const isAggressor = ctx.isPreflopAggressor;
+    const timingAggressionBoost = Math.max(0, -timingRead) * 3;
     const streetAggr =
       ctx.street === "flop" ? profile.aggression : ctx.street === "turn" ? profile.aggression * 0.9 : profile.aggression * 0.85;
 
     // Value bet
-    if (noisyEq > 0.62 && rng.chance(streetAggr + 0.15)) {
+    if (noisyEq > 0.62 && rng.chance(streetAggr + 0.15 + timingAggressionBoost)) {
       return { type: "bet", toAmount: sizeBet(profile, ctx, rng, false) };
     }
     // Continuation bet
@@ -160,7 +224,7 @@ function postflopDecision(
       return { type: "bet", toAmount: sizeBet(profile, ctx, rng, false) };
     }
     // Bluff
-    if (noisyEq < 0.4 && rng.chance(profile.bluff * bluffBoost * 0.5)) {
+    if (noisyEq < 0.4 && rng.chance(profile.bluff * bluffBoost * 0.5 + timingAggressionBoost)) {
       return { type: "bet", toAmount: sizeBet(profile, ctx, rng, false) };
     }
     return { type: "check" };
@@ -168,7 +232,7 @@ function postflopDecision(
 
   // Facing a bet.
   const potOdds = ctx.legal.callAmount / (ctx.potSize + ctx.legal.callAmount);
-  const required = potOdds + profile.callPadding * 0.5 - stackAdj(profile, ctx);
+  const required = potOdds + profile.callPadding * 0.5 - stackAdj(profile, ctx) + timingRead;
 
   // Raise for value.
   if (noisyEq > 0.78 && ctx.legal.types.includes("raise") && rng.chance(profile.aggression)) {
