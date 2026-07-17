@@ -9,7 +9,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
 - Active branch: `agent/strategy-review-calibration`
 - Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest committed implementation: `ea11d56 Add strategy review calibration loop`
+- Latest committed implementation: `f4fbfd2 Harden poker review and experiment history`
 - Previous feature commits: `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
@@ -301,7 +301,7 @@ The production backend and deployment are connected:
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
 - Production deployment `dpl_EHAfxvN77MRrVENmSvk4N6ZkZgNU` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
-- Source commit `ea11d56` is pushed to `origin/agent/strategy-review-calibration`. The legality, pacing, review UX, no-export, and experiment-history refinements documented above are currently working-tree changes and have not been pushed or deployed.
+- Source commit `f4fbfd2` is pushed to `origin/agent/strategy-review-calibration`. The legality, pacing, review UX, no-export, and experiment-history refinements are published on that branch but have not been independently verified on the production Vercel deployment.
 
 Remaining external verification:
 
