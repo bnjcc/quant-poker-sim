@@ -226,6 +226,17 @@ input[type="range"] { accent-color: var(--accent); }
     linear-gradient(90deg, rgba(4,4,5,.9) 0%, transparent 34%, transparent 75%, rgba(4,4,5,.55) 100%);
 }
 body:has(.auth-shell) .app-atmosphere { opacity: .7; }
+.faulty-terminal-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: .3;
+  contain: strict;
+  transform: translateZ(0);
+}
 .app-shell { position: relative; z-index: 1; isolation: isolate; }
 .app-main { position: relative; z-index: 1; animation: contentIn 480ms cubic-bezier(.2,.7,.2,1) both; }
 .ambient-orb { position: fixed; z-index: -1; pointer-events: none; width: 30rem; height: 30rem; border-radius: 999px; filter: blur(1px); opacity: 0.12; background: radial-gradient(circle, rgba(var(--accent-rgb), .75), transparent 68%); }
@@ -372,4 +383,5 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .faulty-terminal-background { opacity: .22; }
 }
