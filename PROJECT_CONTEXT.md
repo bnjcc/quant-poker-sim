@@ -164,6 +164,7 @@ QuantPoker now explains its poker acronyms and advanced analytics without removi
 - Dashboard, experiment history, comparison tables, chart tooltips, starting-hand heatmaps, manual comparisons, and the glossary use the same percentage presentation.
 - Strategy profiles show their simple overview before the glossary and detailed statistical interpretation.
 - Simulated Hand Review makes review lengths above eight discoverable with 8, 16, 25, 50, and all-available shortcuts while retaining an exact custom count.
+- An accepted all-agree review no longer closes the workflow permanently; the results page keeps a **Review more simulated hands** action for another round over the stored run.
 - A corrected review bet or raise automatically starts at the calibration flow's legal two-thirds-pot suggestion. Review corrections also expose the same sizing slider and 50%, 66%, pot, and all-in shortcuts.
 - Both all-hands and range-first calibration synthesize lightweight card-deal and decision sounds without external media files. Sounds default on after a user gesture, persist their mute state locally, and have an in-session toggle.
 - Calibration hole cards and newly revealed board cards turn into view with staggered card animation. Reduced-motion preferences continue to collapse animation duration globally.

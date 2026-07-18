@@ -347,22 +347,7 @@ export default function ExperimentDetailPage() {
               <Link href="/accuracy" className="btn text-xs">View saved accuracy data</Link>
             </div>
 
-            {exp.strategyReview?.acceptedAt ? (
-              <div className="rounded-md border border-line bg-panel2 px-4 py-3">
-                <div className="font-semibold text-sm" style={{ color: "var(--gain)" }}>Model accepted</div>
-                <p className="text-xs text-muted mt-1">
-                  The latest {exp.strategyReview.rounds.at(-1)?.answers.length ?? 0} reviewed decisions all matched your strategy. No additional rerun was needed.
-                </p>
-              </div>
-            ) : exp.strategyReview?.pendingRerunRoundId && !running ? (
-              <div className="rounded-md border border-line bg-panel2 px-4 py-3">
-                <div className="font-semibold text-sm">Calibrated rerun pending</div>
-                <p className="text-xs text-muted mt-1">The corrections are saved, but the rerun did not finish. Retry it to generate a new model sample for review.</p>
-                <button className="btn btn-primary mt-3" onClick={run} disabled={!cal}>Retry calibrated rerun</button>
-              </div>
-            ) : exp.status !== "complete" ? (
-              <div className="text-sm text-muted">Complete the simulation before reviewing model accuracy.</div>
-            ) : reviewOpen && hands ? (
+            {reviewOpen && hands ? (
               <StrategyReview
                 key={`${exp.id}:${exp.strategyReview?.rounds.length ?? 0}:${exp.userDecisionLog[0]?.handNumber ?? 0}`}
                 hands={hands}
@@ -373,10 +358,32 @@ export default function ExperimentDetailPage() {
                 disabled={running}
                 onComplete={submitStrategyReview}
               />
+            ) : exp.strategyReview?.pendingRerunRoundId && !running ? (
+              <div className="rounded-md border border-line bg-panel2 px-4 py-3">
+                <div className="font-semibold text-sm">Calibrated rerun pending</div>
+                <p className="text-xs text-muted mt-1">The corrections are saved, but the rerun did not finish. Retry it to generate a new model sample for review.</p>
+                <button className="btn btn-primary mt-3" onClick={run} disabled={!cal}>Retry calibrated rerun</button>
+              </div>
+            ) : exp.status !== "complete" ? (
+              <div className="text-sm text-muted">Complete the simulation before reviewing model accuracy.</div>
             ) : (
-              <button className="btn btn-primary" onClick={startReview} disabled={running || reviewLoading}>
-                {reviewLoading ? "Loading review hands..." : "Simulated Hand Review"}
-              </button>
+              <div>
+                {exp.strategyReview?.acceptedAt && (
+                  <div className="rounded-md border border-line bg-panel2 px-4 py-3 mb-3">
+                    <div className="font-semibold text-sm" style={{ color: "var(--gain)" }}>Latest review accepted</div>
+                    <p className="text-xs text-muted mt-1">
+                      All {exp.strategyReview.rounds.at(-1)?.answers.length ?? 0} decisions in the latest round matched your strategy. You can review another sample whenever you want.
+                    </p>
+                  </div>
+                )}
+                <button className="btn btn-primary" onClick={startReview} disabled={running || reviewLoading}>
+                  {reviewLoading
+                    ? "Loading review hands..."
+                    : exp.strategyReview?.acceptedAt
+                      ? "Review more simulated hands"
+                      : "Simulated Hand Review"}
+                </button>
+              </div>
             )}
           </section>
 
