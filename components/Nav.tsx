@@ -58,7 +58,7 @@ export function Nav() {
       <header className="md:hidden w-full border-b border-line bg-bg px-4 py-3 sticky top-0 z-40">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="mono font-bold tracking-tight">
-            Range<span className="text-accent">Bench</span>
+            Quant<span className="text-accent">Poker</span>
           </Link>
           {cloudMode && (
             <button className="text-xs text-accent" type="button" onClick={signOut}>Sign out</button>
@@ -71,7 +71,7 @@ export function Nav() {
       <aside className="w-56 shrink-0 border-r border-line px-4 py-6 hidden md:flex md:flex-col gap-6 sticky top-0 h-screen">
       <Link href="/" className="block">
         <div className="mono text-lg font-bold tracking-tight">
-          Range<span className="text-accent">Bench</span>
+          Quant<span className="text-accent">Poker</span>
         </div>
         <div className="text-[11px] text-muted mt-0.5">poker strategy backtesting</div>
       </Link>

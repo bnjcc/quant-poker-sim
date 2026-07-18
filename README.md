@@ -1,4 +1,4 @@
-# RangeBench — Poker Strategy Simulation Platform
+# QuantPoker — Poker Strategy Simulation Platform
 
 Play a small calibration sample yourself, let the system learn a behavioral model of *your* strategy, then backtest that model over hundreds of thousands of simulated hands against configurable opponent pools — and analyze the results like a quant.
 

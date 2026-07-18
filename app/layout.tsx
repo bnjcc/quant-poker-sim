@@ -3,7 +3,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 
 export const metadata: Metadata = {
-  title: "RangeBench — Poker Strategy Simulation",
+  title: "QuantPoker — Poker Strategy Simulation",
   description:
     "Play a calibration sample, learn your strategy profile, and backtest it against configurable player pools.",
 };

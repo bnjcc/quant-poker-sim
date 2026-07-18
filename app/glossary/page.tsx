@@ -6,7 +6,7 @@ export default function GlossaryPage() {
     <div>
       <PageHeader
         title="Poker and analytics glossary"
-        sub="A beginner-friendly guide to every important abbreviation and advanced metric used in RangeBench. Start with the plain-English line; the advanced note is there when you want more depth."
+        sub="A beginner-friendly guide to every important abbreviation and advanced metric used in QuantPoker. Start with the plain-English line; the advanced note is there when you want more depth."
       />
 
       <div className="mb-6 max-w-4xl">

@@ -1,4 +1,4 @@
-# RangeBench Project Context
+# QuantPoker Project Context
 
 Last updated: 2026-07-17
 
@@ -22,7 +22,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 
 ## Product summary
 
-RangeBench is a Next.js 15 application for modeling and backtesting a user's 6-max No-Limit Hold'em strategy.
+QuantPoker is a Next.js 15 application for modeling and backtesting a user's 6-max No-Limit Hold'em strategy.
 
 The workflow is:
 
@@ -116,7 +116,7 @@ The current working tree closes the calibration and post-run review gaps identif
 
 ## Beginner analytics education completed
 
-RangeBench now explains its poker acronyms and advanced analytics without removing statistical depth.
+QuantPoker now explains its poker acronyms and advanced analytics without removing statistical depth.
 
 - `/glossary` provides the full beginner-friendly poker and analytics glossary.
 - The main navigation includes a **Stats glossary** link.

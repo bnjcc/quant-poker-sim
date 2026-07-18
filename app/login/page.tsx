@@ -21,9 +21,9 @@ function LoginForm() {
       <div className="panel px-6 py-6 max-w-md mx-auto mt-16">
         <h1 className="text-xl font-bold mb-2">Browser-only mode</h1>
         <p className="text-sm text-muted mb-4">
-          Supabase environment variables are not set, so RangeBench is using local browser storage.
+          Supabase environment variables are not set, so QuantPoker is using local browser storage.
         </p>
-        <Link href="/" className="btn btn-primary">Continue to RangeBench</Link>
+        <Link href="/" className="btn btn-primary">Continue to QuantPoker</Link>
       </div>
     );
   }
@@ -67,7 +67,7 @@ function LoginForm() {
   return (
     <div className="panel px-6 py-6 max-w-md mx-auto mt-16">
       <div className="mono text-lg font-bold tracking-tight mb-1">
-        Range<span className="text-accent">Bench</span>
+        Quant<span className="text-accent">Poker</span>
       </div>
       <h1 className="text-xl font-bold mb-2">{mode === "sign-in" ? "Sign in" : "Create your account"}</h1>
       <p className="text-sm text-muted mb-5">
