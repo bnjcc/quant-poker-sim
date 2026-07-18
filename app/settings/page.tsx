@@ -9,6 +9,7 @@ import {
   type StorageSummary,
 } from "@/lib/storage/store";
 import { PageHeader } from "@/components/ui";
+import { ThemeSelector } from "@/components/ThemeSelector";
 
 export default function SettingsPage() {
   const [cals, setCals] = useState<CalibrationDataset[]>([]);
@@ -89,6 +90,7 @@ export default function SettingsPage() {
       />
       {message && <div className="panel px-4 py-3 text-sm mb-4 max-w-4xl">{message}</div>}
       <div className="grid lg:grid-cols-2 gap-4 max-w-4xl">
+        <ThemeSelector />
         <section className="panel px-5 py-4">
           <h2 className="font-semibold mb-2">{summary?.mode === "supabase" ? "Cloud storage" : "Browser storage"}</h2>
           <div className="text-sm text-muted space-y-1">

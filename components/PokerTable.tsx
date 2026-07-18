@@ -19,12 +19,12 @@ export interface SeatView {
 
 /** Seat placement around the felt for up to 6 seats (user pinned bottom-center). */
 const SPOTS = [
-  { left: "50%", top: "88%" },
-  { left: "9%", top: "68%" },
-  { left: "9%", top: "24%" },
-  { left: "50%", top: "6%" },
-  { left: "91%", top: "24%" },
-  { left: "91%", top: "68%" },
+  { left: "50%", top: "84%" },
+  { left: "12%", top: "68%" },
+  { left: "12%", top: "28%" },
+  { left: "50%", top: "16%" },
+  { left: "88%", top: "28%" },
+  { left: "88%", top: "68%" },
 ];
 
 export function PokerTable({
@@ -32,11 +32,13 @@ export function PokerTable({
   board,
   pot,
   street,
+  fitViewport = false,
 }: {
   seats: SeatView[];
   board: Card[];
   pot: number;
   street: string;
+  fitViewport?: boolean;
 }) {
   // Rotate so the user sits bottom-center.
   const userIdx = Math.max(0, seats.findIndex((s) => s.isUser));
@@ -44,7 +46,7 @@ export function PokerTable({
 
   return (
     <div
-      className="relative w-full rounded-[48%_48%_46%_46%] border border-line"
+      className={`relative w-full rounded-[48%_48%_46%_46%] border border-line ${fitViewport ? "calibration-table" : ""}`}
       style={{
         aspectRatio: "16 / 9",
         background: "radial-gradient(ellipse at 50% 42%, #1d3229 0%, #14231d 62%, #101a16 100%)",
@@ -65,14 +67,15 @@ export function PokerTable({
       {ordered.map((s, i) => (
         <div
           key={s.seat}
-          className="absolute -translate-x-1/2 -translate-y-1/2 w-36"
+          className="absolute -translate-x-1/2 -translate-y-1/2 w-[clamp(5.5rem,13vw,9rem)]"
           style={{ left: SPOTS[i]?.left ?? "50%", top: SPOTS[i]?.top ?? "50%" }}
         >
           <div
-            className={`rounded-lg border px-2.5 py-1.5 text-center transition-all ${
-              s.isActing ? "border-accent shadow-[0_0_0_2px_rgba(226,179,76,0.35)]" : "border-line"
+            className={`rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${
+              s.isActing ? "acting-seat" : "border-line"
             } ${s.folded ? "opacity-40" : ""}`}
             style={{ background: "var(--panel)" }}
+            aria-current={s.isActing ? "true" : undefined}
           >
             <div className="flex items-center justify-center gap-1.5">
               {s.isButton && (

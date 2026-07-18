@@ -401,7 +401,7 @@ export default function RangeCalibratePage() {
         <div className="h-full bg-accent rounded" style={{ width: `${progress * 100}%` }} />
       </div>
 
-      <PokerTable seats={seats} board={engine.board} pot={engine.potSize} street={engine.street} />
+      <PokerTable seats={seats} board={engine.board} pot={engine.potSize} street={engine.street} fitViewport />
 
       <div className="panel mt-5 px-5 py-4">
         {phase === "playing" && ctx && legal ? (

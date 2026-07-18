@@ -10,7 +10,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="purple" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("rangebench-ui-theme");if(["purple","cyan","green","red","gold","blue","orange","pink"].includes(t)){document.documentElement.dataset.theme=t}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="min-h-screen">
         <div className="flex min-h-screen flex-col md:flex-row">
           <Nav />

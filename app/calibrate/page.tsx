@@ -299,6 +299,7 @@ export default function CalibratePage() {
         board={engine.board}
         pot={engine.potSize}
         street={engine.street}
+        fitViewport
       />
 
       <div className="panel mt-5 px-5 py-4">
