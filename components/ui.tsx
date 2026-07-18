@@ -61,16 +61,17 @@ export function Stat({
   );
 }
 
-/** Confidence meter: how much data vs prior drives an estimate. */
-export function ConfidenceBar({ value, label }: { value: number; label?: string }) {
-  const pct = Math.round(value * 100);
-  const tone = value >= 0.7 ? "var(--gain)" : value >= 0.35 ? "var(--accent)" : "var(--loss)";
+/** Percentage meter whose fill and text always describe the same value. */
+export function PercentageBar({ value, label }: { value: number; label?: string }) {
+  const bounded = Math.max(0, Math.min(1, value));
+  const pct = bounded * 100;
+  const display = label ?? `${Math.round(pct)}%`;
   return (
-    <div className="flex items-center gap-2" title={`Confidence: ${pct}% (sample-size based)`}>
+    <div className="flex items-center gap-2" title={`Percentage: ${display}`}>
       <div className="h-1.5 w-16 rounded bg-panel2 overflow-hidden">
-        <div className="h-full rounded" style={{ width: `${pct}%`, background: tone }} />
+        <div className="h-full rounded bg-accent" style={{ width: `${pct}%` }} />
       </div>
-      <span className="text-[11px] text-muted mono">{label ?? `${pct}%`}</span>
+      <span className="text-[11px] text-muted mono">{display}</span>
     </div>
   );
 }

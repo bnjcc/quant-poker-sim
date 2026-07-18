@@ -96,7 +96,6 @@ export default function Dashboard() {
           href="/range-calibrate"
           cta={cals.length ? "Add another session" : "Start playing"}
           done={cals.length > 0}
-          secondary={{ href: "/calibrate", label: "All hands" }}
         />
         <StepCard
           n={2}

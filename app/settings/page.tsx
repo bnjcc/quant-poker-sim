@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import type { CalibrationDataset, Experiment } from "@/types/experiment";
 import {
   getLocalStore,
@@ -44,7 +45,11 @@ export default function SettingsPage() {
   }, [load]);
 
   const deleteCal = async (id: string) => {
-    if (!confirm("Delete this calibration? Experiments keep their results but cannot be re-run without a calibration.")) return;
+    const linkedExperiments = exps.filter((experiment) => experiment.calibrationId === id).length;
+    const impact = linkedExperiments > 0
+      ? ` ${linkedExperiments} linked experiment${linkedExperiments === 1 ? "" : "s"} will keep their results, but cannot be re-run from this saved strategy.`
+      : "";
+    if (!confirm(`Delete this saved strategy?${impact}`)) return;
     try {
       await getStore().deleteCalibration(id);
       await load();
@@ -95,7 +100,7 @@ export default function SettingsPage() {
           <h2 className="font-semibold mb-2">{summary?.mode === "supabase" ? "Cloud storage" : "Browser storage"}</h2>
           <div className="text-sm text-muted space-y-1">
             <div>Storage: <span className="mono text-ink">{summary?.usageLabel ?? "Loading…"}</span></div>
-            <div>Calibrations: <span className="mono text-ink">{summary?.calibrations ?? 0}</span></div>
+            <div>Saved strategies: <span className="mono text-ink">{summary?.calibrations ?? 0}</span></div>
             <div>Experiments: <span className="mono text-ink">{summary?.experiments ?? 0}</span></div>
             <div>Saved hands: <span className="mono text-ink">{summary?.hands ?? 0}</span></div>
             <div>Strategy reviews: <span className="mono text-ink">{summary?.reviews ?? 0}</span></div>
@@ -115,7 +120,7 @@ export default function SettingsPage() {
           <button className="btn btn-danger mt-4" onClick={wipe}>Delete all {summary?.mode === "supabase" ? "cloud" : "browser"} data</button>
         </section>
         <section className="panel px-5 py-4">
-          <h2 className="font-semibold mb-2">Calibration datasets</h2>
+          <h2 className="font-semibold mb-2">Saved strategies</h2>
           {cals.length === 0 ? (
             <div className="text-sm text-muted">None yet.</div>
           ) : (
@@ -128,7 +133,8 @@ export default function SettingsPage() {
                       {calibration.handsPlayed} hands · {calibration.decisions.length} decisions
                     </div>
                   </div>
-                  <button className="btn btn-danger text-xs px-2 py-1 ml-auto" onClick={() => deleteCal(calibration.id)}>Delete</button>
+                  <Link className="btn text-xs px-2 py-1 ml-auto" href={`/profile?strategy=${encodeURIComponent(calibration.id)}`}>View</Link>
+                  <button className="btn btn-danger text-xs px-2 py-1" onClick={() => deleteCal(calibration.id)}>Delete</button>
                 </div>
               ))}
             </div>

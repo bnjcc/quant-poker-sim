@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DecisionContext } from "@/types/decision";
 import { CalibrationDataset } from "@/types/experiment";
@@ -153,6 +154,15 @@ export default function RangeCalibratePage() {
     advanceRef.current(session);
   };
 
+  const checkFold = () => {
+    const session = sessionRef.current;
+    if (!session || !ctx || activeDecisionRef.current !== ctx) return;
+    activeDecisionRef.current = null;
+    session.submitCheckFoldForHand(ctx, Date.now() - decisionStartedAtRef.current);
+    setCtx(null);
+    advanceRef.current(session);
+  };
+
   useEffect(() => {
     if (phase !== "playing" || !ctx) return;
     const deadline = decisionStartedAtRef.current + ACTION_CLOCK_MS;
@@ -262,6 +272,11 @@ export default function RangeCalibratePage() {
       <div>
         <PageHeader
           title="Range-first calibration"
+          right={
+            <Link href="/calibrate" className="btn">
+              Calibrate all hands
+            </Link>
+          }
           sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. The range is exact; actions, sizing, response time, and reactions to opponent timing are learned."
         />
 
@@ -427,6 +442,9 @@ export default function RangeCalibratePage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
+            <button className="btn" type="button" onClick={checkFold}>
+              Check / Fold rest of hand
+            </button>
             {legal.types.includes("fold") && (
               <button className="btn btn-danger" type="button" onClick={() => act("fold")}>
                 Fold

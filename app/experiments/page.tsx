@@ -2,21 +2,29 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Experiment } from "@/types/experiment";
+import { CalibrationDataset, Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
 import { Empty, PageHeader, fmtBB } from "@/components/ui";
 
 export default function ExperimentsPage() {
   const [exps, setExps] = useState<Experiment[] | null>(null);
+  const [strategies, setStrategies] = useState<CalibrationDataset[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setExps(await getStore().listExperiments());
+      const store = getStore();
+      const [savedExperiments, savedStrategies] = await Promise.all([
+        store.listExperiments(),
+        store.listCalibrations(),
+      ]);
+      setExps(savedExperiments);
+      setStrategies(savedStrategies);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load previous experiments.");
       setExps([]);
+      setStrategies([]);
     }
   }, []);
   useEffect(() => {
@@ -33,7 +41,7 @@ export default function ExperimentsPage() {
     }
   };
 
-  if (exps === null) return <div className="text-muted text-sm">Loading…</div>;
+  if (exps === null || strategies === null) return <div className="text-muted text-sm">Loading…</div>;
   if (exps.length === 0) {
     return (
       <div>
@@ -65,6 +73,7 @@ export default function ExperimentsPage() {
             <tr className="text-left border-b border-line">
               <th className="label px-4 py-3 font-normal">Name</th>
               <th className="label px-4 py-3 font-normal">Status</th>
+              <th className="label px-4 py-3 font-normal">Strategy</th>
               <th className="label px-4 py-3 font-normal text-right">Hands</th>
               <th className="label px-4 py-3 font-normal text-right">bb/100</th>
               <th className="label px-4 py-3 font-normal text-right">95% CI</th>
@@ -75,6 +84,8 @@ export default function ExperimentsPage() {
           <tbody>
             {exps.map((e) => {
               const r = e.results;
+              const strategy = strategies.find((candidate) => candidate.id === e.calibrationId);
+              const strategyName = strategy?.name ?? e.strategyName ?? "Deleted strategy";
               return (
                 <tr key={e.id} className="border-b border-line last:border-0 hover:bg-panel2/50">
                   <td className="px-4 py-3">
@@ -93,6 +104,17 @@ export default function ExperimentsPage() {
                     >
                       {e.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs">
+                    {strategy ? (
+                      <Link href={`/profile?strategy=${encodeURIComponent(strategy.id)}`} className="hover:text-accent hover:underline">
+                        {strategyName}
+                      </Link>
+                    ) : (
+                      <span className="text-muted" title="The saved strategy is no longer available, but this run keeps its original strategy name.">
+                        {strategyName}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right mono">{r ? r.totalHands.toLocaleString() : e.config.hands.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right mono font-bold" style={{ color: r ? (r.bb100 >= 0 ? "var(--gain)" : "var(--loss)") : "var(--muted)" }}>

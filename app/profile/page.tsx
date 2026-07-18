@@ -8,7 +8,7 @@ import { rangeComboCount } from "@/lib/poker/range";
 import { RELIABLE_SAMPLE_THRESHOLD } from "@/lib/simulation/defaults";
 import { formatDecisionTime, SNAP_DECISION_MS } from "@/lib/simulation/timing";
 import { getStore } from "@/lib/storage/store";
-import { ConfidenceBar, Empty, PageHeader, Stat, WarningNote, fmtPct } from "@/components/ui";
+import { Empty, PageHeader, PercentageBar, Stat, WarningNote, fmtPct } from "@/components/ui";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 
 function TendencyRow({ label, stat, hint }: { label: string; stat: FreqStat; hint: string }) {
@@ -22,7 +22,7 @@ function TendencyRow({ label, stat, hint }: { label: string; stat: FreqStat; hin
       <div className="text-[11px] text-muted mono w-24">
         {stat.numerator}/{stat.denominator}
       </div>
-      <ConfidenceBar value={stat.confidence} />
+      <PercentageBar value={stat.value} label={fmtPct(stat.value, 1)} />
     </div>
   );
 }
@@ -30,13 +30,21 @@ function TendencyRow({ label, stat, hint }: { label: string; stat: FreqStat; hin
 export default function ProfilePage() {
   const [cals, setCals] = useState<CalibrationDataset[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [savingName, setSavingName] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     getStore()
       .listCalibrations()
       .then((c) => {
         setCals(c);
-        if (c.length) setSelected(c[0].id);
+        if (c.length) {
+          const requested = new URLSearchParams(window.location.search).get("strategy");
+          const initial = c.find((strategy) => strategy.id === requested) ?? c[0];
+          setSelected(initial.id);
+          setDraftName(initial.name);
+        }
       });
   }, []);
 
@@ -46,7 +54,7 @@ export default function ProfilePage() {
       <Empty
         title="No strategy profile yet"
         body="Play a calibration session first. The system records every decision you make and estimates your tendencies with confidence intervals."
-        action={{ href: "/calibrate", label: "Start calibrating" }}
+        action={{ href: "/range-calibrate", label: "Start calibrating" }}
       />
     );
   }
@@ -69,6 +77,34 @@ export default function ProfilePage() {
   const timeoutCount = timedDecisions.filter((decision) => decision.timedOut).length;
   const timingCueCount = timedDecisions.filter((decision) => decision.context.lastOpponentAction).length;
 
+  const selectStrategy = (id: string) => {
+    const next = cals.find((strategy) => strategy.id === id);
+    setSelected(id);
+    setDraftName(next?.name ?? "");
+    setMessage(null);
+  };
+
+  const renameStrategy = async () => {
+    const name = draftName.trim();
+    if (!name || name.length > 120) {
+      setMessage("Strategy names must contain 1–120 characters.");
+      return;
+    }
+    if (name === cal.name) return;
+    setSavingName(true);
+    setMessage(null);
+    try {
+      const updated = { ...cal, name };
+      await getStore().saveCalibration(updated);
+      setCals((current) => current?.map((strategy) => (strategy.id === updated.id ? updated : strategy)) ?? null);
+      setMessage("Strategy name saved.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not rename the strategy.");
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -79,21 +115,48 @@ export default function ProfilePage() {
             : "Estimated from your calibration play. Every figure is a smoothed frequency with a 95% Wilson interval — not a fixed label."
         }
         right={
-          <Link href="/experiments/new" className="btn btn-primary">
+          <Link href={`/experiments/new?strategy=${encodeURIComponent(cal.id)}`} className="btn btn-primary">
             Use in an experiment
           </Link>
         }
       />
 
-      {cals.length > 1 && (
-        <select className="field max-w-md mb-4" value={cal.id} onChange={(e) => setSelected(e.target.value)} aria-label="Calibration dataset">
-          {cals.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.method === "range-first" ? `[Range-first] ${c.name}` : c.name}
-            </option>
-          ))}
-        </select>
-      )}
+      <section className="panel px-5 py-4 mb-4 max-w-3xl">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block min-w-64 flex-1">
+            <span className="label">Saved strategy</span>
+            <select className="field mt-1" value={cal.id} onChange={(event) => selectStrategy(event.target.value)} aria-label="Saved strategy">
+              {cals.map((strategy) => (
+                <option key={strategy.id} value={strategy.id}>
+                  {strategy.method === "range-first" ? `[Range-first] ${strategy.name}` : strategy.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Link href="/range-calibrate" className="btn">Add strategy</Link>
+          <Link href="/settings" className="btn">Manage saved data</Link>
+        </div>
+        <div className="flex flex-wrap items-end gap-2 mt-3 pt-3 border-t border-line">
+          <label className="block min-w-64 flex-1">
+            <span className="label">Strategy name</span>
+            <input
+              className="field mt-1"
+              value={draftName}
+              maxLength={120}
+              onChange={(event) => setDraftName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void renameStrategy();
+              }}
+            />
+          </label>
+          <button className="btn" onClick={renameStrategy} disabled={savingName || draftName.trim() === cal.name}>
+            {savingName ? "Saving…" : "Save name"}
+          </button>
+        </div>
+        <div className="text-xs text-muted mt-2">
+          {message ?? `${cals.length} saved strateg${cals.length === 1 ? "y" : "ies"} in this account.`}
+        </div>
+      </section>
 
       {small && (
         <div className="mb-4">
@@ -213,7 +276,8 @@ export default function ProfilePage() {
       <div className="text-xs text-muted mt-6 max-w-3xl">
         How to read this: the model behind simulation is a bucketed behavioral policy (street × position × situation ×
         hand strength × opponent timing), shrunk toward a strength-aware prior when a bucket has few samples. The
-        confidence bars show how much observed data — versus prior — drives each estimate.
+        percentage bars mirror the displayed tendency. Read them together with the opportunity count and 95% interval
+        to judge how much evidence supports each estimate.
       </div>
     </div>
   );

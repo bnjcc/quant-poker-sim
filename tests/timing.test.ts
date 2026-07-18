@@ -154,6 +154,57 @@ describe("online action timing", () => {
     expect(opponentResponsesToUserBet).toBeGreaterThan(0);
   });
 
+  it("check/folds the rest of one hand, records intentional actions, and resets next hand", () => {
+    const session = new ManualSession({
+      config: { ...DEFAULT_TABLE, rake: { percentage: 0, cap: 0, noFlopNoDrop: true } },
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: "manual-check-fold-one-hand",
+      targetHands: 5,
+      userBuyInBB: 100,
+    });
+
+    let activatedHand = 0;
+    for (let guard = 0; guard < 500 && activatedHand === 0; guard++) {
+      const step = session.step(false);
+      if (step.kind === "awaiting-user") {
+        activatedHand = step.context.handNumber;
+        session.submitCheckFoldForHand(step.context, 1_234);
+      }
+    }
+    expect(activatedHand).toBeGreaterThan(0);
+
+    let completedActivatedHand = false;
+    for (let guard = 0; guard < 500 && !completedActivatedHand; guard++) {
+      const step = session.step(false);
+      expect(step.kind).not.toBe("awaiting-user");
+      if (step.kind === "hand-complete" && step.history.handNumber === activatedHand) {
+        completedActivatedHand = true;
+      }
+    }
+    expect(completedActivatedHand).toBe(true);
+
+    const checkFoldDecisions = session.decisions.filter(
+      (decision) => decision.context.handNumber === activatedHand,
+    );
+    expect(checkFoldDecisions.length).toBeGreaterThan(0);
+    expect(checkFoldDecisions.every((decision) => ["check", "fold"].includes(decision.action.type))).toBe(true);
+    expect(checkFoldDecisions[0]).toMatchObject({ responseTimeMs: 1_234, timedOut: false });
+    for (const automatic of checkFoldDecisions.slice(1)) {
+      expect(automatic.responseTimeMs).toBeUndefined();
+      expect(automatic.timedOut).toBeUndefined();
+    }
+
+    let promptedNextHand = false;
+    for (let guard = 0; guard < 500 && !promptedNextHand; guard++) {
+      const step = session.step(false);
+      if (step.kind === "awaiting-user") {
+        expect(step.context.handNumber).toBeGreaterThan(activatedHand);
+        promptedNextHand = true;
+      }
+    }
+    expect(promptedNextHand).toBe(true);
+  });
+
   it("classifies snaps and tanks and selects the legal timeout default", () => {
     expect(decisionTimingBucket(SNAP_DECISION_MS)).toBe("snap");
     expect(decisionTimingBucket(3_000)).toBe("normal");

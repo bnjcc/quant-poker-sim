@@ -15,12 +15,15 @@ import {
 } from "@/lib/player-model/review";
 import { Rng } from "@/lib/poker/rng";
 
-function context(handNumber: number): DecisionContext {
+function context(
+  handNumber: number,
+  holeCards: DecisionContext["holeCards"] = [{ rank: 7, suit: "c" }, { rank: 2, suit: "d" }],
+): DecisionContext {
   return {
     handNumber,
     street: "preflop",
     position: "BB",
-    holeCards: [{ rank: 7, suit: "c" }, { rank: 2, suit: "d" }],
+    holeCards,
     board: [],
     potSize: 3,
     betFaced: 2,
@@ -61,7 +64,10 @@ function hand(handNumber: number): HandHistory {
   };
 }
 
-function decision(handNumber: number): SimulatedUserDecision {
+function decision(
+  handNumber: number,
+  holeCards?: DecisionContext["holeCards"],
+): SimulatedUserDecision {
   return {
     handNumber,
     street: "preflop",
@@ -69,7 +75,7 @@ function decision(handNumber: number): SimulatedUserDecision {
     confidence: handNumber / 100,
     chosen: "call",
     actionIndex: 0,
-    context: context(handNumber),
+    context: context(handNumber, holeCards),
   };
 }
 
@@ -86,7 +92,10 @@ describe("strategy review sampling", () => {
   });
 
   it("excludes decisions whose hand history was not stored", () => {
-    const sampled = sampleStoredUserDecisions([hand(2), hand(4)], [1, 2, 3, 4].map(decision));
+    const sampled = sampleStoredUserDecisions(
+      [hand(2), hand(4)],
+      [1, 2, 3, 4].map((handNumber) => decision(handNumber)),
+    );
     expect(sampled.map((item) => item.handNumber)).toEqual([2, 4]);
   });
 
@@ -100,6 +109,38 @@ describe("strategy review sampling", () => {
     expect(new Set(selected.map((item) => item.handNumber)).size).toBe(8);
     expect(selected[0].handNumber).toBe(1);
     expect(selected.at(-1)?.handNumber).toBe(20);
+  });
+
+  it("uses the requested review length instead of fixing reviews to eight hands", () => {
+    const hands = Array.from({ length: 20 }, (_, index) => hand(index + 1));
+    const decisions = Array.from({ length: 20 }, (_, index) => decision(index + 1));
+
+    expect(selectReviewDecisions(hands, decisions, 3)).toHaveLength(3);
+    expect(selectReviewDecisions(hands, decisions, 12)).toHaveLength(12);
+    expect(selectReviewDecisions(hands, decisions, 0)).toEqual([]);
+  });
+
+  it("excludes every decision from hands outside an explicit range-first chart", () => {
+    const aceKing = [{ rank: 14, suit: "c" }, { rank: 13, suit: "d" }] as DecisionContext["holeCards"];
+    const decisions = [
+      decision(1, aceKing),
+      decision(2),
+      { ...decision(2), street: "flop" as const, actionIndex: 4, context: { ...context(2), street: "flop" as const } },
+    ];
+
+    const selected = selectReviewDecisions([hand(1), hand(2)], decisions, 8, ["AKo"]);
+
+    expect(selected.map((item) => item.handNumber)).toEqual([1]);
+  });
+
+  it("leaves all-hands review sampling unchanged when no explicit range is supplied", () => {
+    const selected = selectReviewDecisions(
+      [hand(1), hand(2)],
+      [decision(1), decision(2)],
+      8,
+    );
+
+    expect(selected.map((item) => item.handNumber)).toEqual([1, 2]);
   });
 
   it("ignores legacy logs that do not contain decision context", () => {

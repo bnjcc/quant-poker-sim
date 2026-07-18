@@ -110,6 +110,15 @@ export default function CalibratePage() {
     advanceRef.current(ms);
   };
 
+  const checkFold = () => {
+    const ms = sessionRef.current;
+    if (!ms || !ctx || activeDecisionRef.current !== ctx) return;
+    activeDecisionRef.current = null;
+    ms.submitCheckFoldForHand(ctx, Date.now() - decisionStartedAtRef.current);
+    setCtx(null);
+    advanceRef.current(ms);
+  };
+
   useEffect(() => {
     if (phase !== "playing" || !ctx) return;
     const deadline = decisionStartedAtRef.current + ACTION_CLOCK_MS;
@@ -306,6 +315,9 @@ export default function CalibratePage() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
+            <button className="btn" type="button" onClick={checkFold}>
+              Check / Fold rest of hand
+            </button>
             {legal.types.includes("fold") && (
               <button className="btn btn-danger" onClick={() => act("fold")}>
                 Fold

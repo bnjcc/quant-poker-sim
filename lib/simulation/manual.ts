@@ -41,6 +41,7 @@ export class ManualSession {
     timing: DecisionTiming;
     callAmount: number;
   } | null = null;
+  private checkFoldHandNumber: number | null = null;
   handsPlayed = 0;
 
   constructor(opts: {
@@ -101,6 +102,12 @@ export class ManualSession {
       const seat = engine.currentSeat!;
       const ctx = tracker.buildContext(seat);
       if (seat === this.userSeat) {
+        if (this.checkFoldHandNumber === engine.handNumber) {
+          // Automatic pre-actions are intentional, not timeouts. Omit timing so
+          // they do not teach the policy an artificial 0ms timing tell.
+          this.recordUserAction(ctx, timeoutAction(ctx));
+          continue;
+        }
         return { kind: "awaiting-user", context: ctx, engine };
       }
       const agent = this.session.agents.get(seat)!;
@@ -123,6 +130,7 @@ export class ManualSession {
     const history = this.session.finishHand(engine);
     this.histories.push(history);
     this.handsPlayed++;
+    this.checkFoldHandNumber = null;
     this.current = null;
     return { kind: "hand-complete", history, engine };
   }
@@ -137,6 +145,23 @@ export class ManualSession {
 
   /** Apply the user's chosen action, recording full context. */
   submitUserAction(
+    context: DecisionContext,
+    action: ChosenAction,
+    responseTimeMs?: number,
+    timedOut = false,
+  ): void {
+    if (!this.current) throw new Error("No hand in progress");
+    this.recordUserAction(context, action, responseTimeMs, timedOut);
+  }
+
+  /** Check when free and fold to any wager for the rest of this hand. */
+  submitCheckFoldForHand(context: DecisionContext, responseTimeMs?: number): void {
+    if (!this.current) throw new Error("No hand in progress");
+    this.checkFoldHandNumber = this.current.engine.handNumber;
+    this.recordUserAction(context, timeoutAction(context), responseTimeMs, false);
+  }
+
+  private recordUserAction(
     context: DecisionContext,
     action: ChosenAction,
     responseTimeMs?: number,

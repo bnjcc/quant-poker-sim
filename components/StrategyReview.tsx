@@ -9,6 +9,7 @@ import {
 } from "@/types/experiment";
 import { HandHistory, Street } from "@/types/poker";
 import {
+  DEFAULT_REVIEW_HAND_COUNT,
   ReviewableDecision,
   reviewAccuracy,
   selectReviewDecisions,
@@ -73,6 +74,7 @@ export function StrategyReview({
   decisions,
   bigBlind,
   roundNumber,
+  preflopRange,
   disabled = false,
   onComplete,
 }: {
@@ -80,12 +82,21 @@ export function StrategyReview({
   decisions: SimulatedUserDecision[];
   bigBlind: number;
   roundNumber: number;
+  preflopRange?: readonly string[];
   disabled?: boolean;
   onComplete: (answers: StrategyReviewAnswer[]) => void | Promise<void>;
 }) {
+  const eligibleDecisions = useMemo(
+    () => selectReviewDecisions(hands, decisions, Number.MAX_SAFE_INTEGER, preflopRange),
+    [hands, decisions, preflopRange],
+  );
+  const [reviewCount, setReviewCount] = useState(() =>
+    Math.min(DEFAULT_REVIEW_HAND_COUNT, Math.max(1, eligibleDecisions.length)),
+  );
+  const [reviewStarted, setReviewStarted] = useState(false);
   const sample = useMemo(
-    () => selectReviewDecisions(hands, decisions),
-    [hands, decisions],
+    () => selectReviewDecisions(hands, decisions, reviewCount, preflopRange),
+    [hands, decisions, preflopRange, reviewCount],
   );
   const handByNumber = useMemo(
     () => new Map(hands.map((hand) => [hand.handNumber, hand])),
@@ -114,10 +125,47 @@ export function StrategyReview({
     setAlternativeSizeBB(defaultSizeBB(current, alternative, bigBlind));
   }, [current, bigBlind]);
 
-  if (sample.length === 0) {
+  if (eligibleDecisions.length === 0) {
     return (
       <div className="text-sm text-muted">
-        This run does not contain review-ready decision context. Run the experiment again with engine v1.3 or newer.
+        {preflopRange
+          ? "This run does not contain review-ready decisions from starting hands in your selected range."
+          : "This run does not contain review-ready decision context. Run the experiment again with engine v1.3 or newer."}
+      </div>
+    );
+  }
+
+  if (!reviewStarted) {
+    return (
+      <div className="rounded-md border border-line bg-panel2 px-4 py-4 max-w-xl">
+        <div className="font-semibold">Choose your review length</div>
+        <p className="text-xs text-muted mt-1">
+          {eligibleDecisions.length.toLocaleString()} review-ready {eligibleDecisions.length === 1 ? "hand is" : "hands are"} available.
+          {preflopRange ? " Hands outside your selected starting range are excluded." : ""}
+        </p>
+        <label className="block mt-3 max-w-48">
+          <span className="label">Hands to review</span>
+          <input
+            type="number"
+            className="field mt-1"
+            min={1}
+            max={eligibleDecisions.length}
+            step={1}
+            value={reviewCount}
+            onChange={(event) => {
+              const requested = Number(event.target.value);
+              if (!Number.isFinite(requested)) return;
+              setReviewCount(Math.min(eligibleDecisions.length, Math.max(1, Math.floor(requested))));
+            }}
+          />
+        </label>
+        <button
+          className="btn btn-primary mt-3"
+          onClick={() => setReviewStarted(true)}
+          disabled={disabled}
+        >
+          Begin {reviewCount}-hand review
+        </button>
       </div>
     );
   }

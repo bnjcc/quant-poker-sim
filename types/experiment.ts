@@ -126,6 +126,10 @@ export interface Experiment {
   id: string;
   createdAt: string;
   config: ExperimentConfig;
+  /** Point-in-time label for the strategy used to create this run. */
+  strategyName?: string;
+  /** Point-in-time calibration method, retained if the strategy is later deleted. */
+  strategyMethod?: CalibrationDataset["method"];
   /** Null when the source calibration was deleted after results were saved. */
   calibrationId: string | null;
   simulationVersion: string;

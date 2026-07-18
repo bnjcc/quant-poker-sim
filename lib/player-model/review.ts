@@ -6,10 +6,13 @@ import {
 } from "@/types/experiment";
 import { HandHistory } from "@/types/poker";
 import { holeNotation } from "@/lib/poker/deck";
+import { handIsInRange } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 import { BehavioralPolicy, SerializedPolicy } from "./policy";
 
-export const REVIEW_HAND_COUNT = 8;
+export const DEFAULT_REVIEW_HAND_COUNT = 8;
+/** @deprecated Use DEFAULT_REVIEW_HAND_COUNT. Retained for external callers. */
+export const REVIEW_HAND_COUNT = DEFAULT_REVIEW_HAND_COUNT;
 export const REVIEW_FEEDBACK_WEIGHT = 6;
 
 export interface ReviewableDecision extends SimulatedUserDecision {
@@ -53,15 +56,24 @@ export function simulatedAction(decision: SimulatedUserDecision): ChosenAction {
 export function selectReviewDecisions(
   hands: HandHistory[],
   decisions: SimulatedUserDecision[],
-  limit = REVIEW_HAND_COUNT,
+  limit = DEFAULT_REVIEW_HAND_COUNT,
+  preflopRange?: readonly string[],
 ): ReviewableDecision[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+
   const storedHands = new Set(hands.map((hand) => hand.handNumber));
+  const explicitRange = preflopRange ? new Set(preflopRange) : null;
   const bestByHand = new Map<number, ReviewableDecision>();
   for (const decision of decisions) {
     if (
       !storedHands.has(decision.handNumber) ||
       decision.actionIndex === undefined ||
-      !decision.context
+      !decision.context ||
+      // An explicit first-in chart defines which dealt starting hands are
+      // useful to review. Apply it to the whole hand, not only its first
+      // preflop decision, so an out-of-range BB check cannot leak a later-
+      // street decision into the review sample.
+      (explicitRange !== null && !handIsInRange(decision.context.holeCards, explicitRange))
     ) {
       continue;
     }
@@ -73,13 +85,15 @@ export function selectReviewDecisions(
   }
 
   const candidates = [...bestByHand.values()].sort((a, b) => a.handNumber - b.handNumber);
-  if (candidates.length <= limit) return candidates;
-  if (limit <= 1) return [candidates[0]];
+  const boundedLimit = Math.min(candidates.length, Math.floor(limit));
+  if (boundedLimit === 0) return [];
+  if (candidates.length <= boundedLimit) return candidates;
+  if (boundedLimit === 1) return [candidates[0]];
 
   const selected: ReviewableDecision[] = [];
   const used = new Set<number>();
-  for (let index = 0; index < limit; index++) {
-    const candidateIndex = Math.round((index * (candidates.length - 1)) / (limit - 1));
+  for (let index = 0; index < boundedLimit; index++) {
+    const candidateIndex = Math.round((index * (candidates.length - 1)) / (boundedLimit - 1));
     const candidate = candidates[candidateIndex];
     if (!used.has(candidate.handNumber)) {
       selected.push(candidate);

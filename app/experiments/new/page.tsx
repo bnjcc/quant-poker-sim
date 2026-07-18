@@ -52,16 +52,27 @@ function NewExperimentInner() {
       const store = getStore();
       const c = await store.listCalibrations();
       setCals(c);
-      if (c.length) setCalId(c[0].id);
+      let selectedId = c[0]?.id ?? "";
+      const requestedStrategyId = params.get("strategy");
+      if (requestedStrategyId && c.some((strategy) => strategy.id === requestedStrategyId)) {
+        selectedId = requestedStrategyId;
+      }
       // Duplicate an existing experiment (optionally to change one variable).
       const dup = params.get("duplicate");
       if (dup) {
         const e = await store.getExperiment(dup);
         if (e) {
           setCfg({ ...e.config, name: `${e.config.name} (copy)` });
-          if (e.calibrationId) setCalId(e.calibrationId);
+          if (e.calibrationId && c.some((strategy) => strategy.id === e.calibrationId)) {
+            selectedId = e.calibrationId;
+          } else if (e.strategyName || e.calibrationId) {
+            setError(
+              `The original strategy${e.strategyName ? ` “${e.strategyName}”` : ""} is no longer available. Choose a saved strategy for this copy.`,
+            );
+          }
         }
       }
+      setCalId(selectedId);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -72,7 +83,7 @@ function NewExperimentInner() {
       <Empty
         title="You need a calibration first"
         body="Experiments simulate a model learned from your manual play. Play a calibration session to create one."
-        action={{ href: "/calibrate", label: "Start calibrating" }}
+        action={{ href: "/range-calibrate", label: "Start calibrating" }}
       />
     );
   }
@@ -82,6 +93,11 @@ function NewExperimentInner() {
 
   const create = async () => {
     setError(null);
+    const strategy = cals.find((calibration) => calibration.id === calId);
+    if (!strategy) {
+      setError("Choose a saved strategy before creating the experiment.");
+      return;
+    }
     const candidate = {
       ...cfg,
       name: cfg.name || `Experiment ${new Date().toLocaleString()}`,
@@ -96,7 +112,9 @@ function NewExperimentInner() {
       id: newId("exp"),
       createdAt: new Date().toISOString(),
       config: parsed.data,
-      calibrationId: calId,
+      calibrationId: strategy.id,
+      strategyName: strategy.name,
+      strategyMethod: strategy.method,
       simulationVersion: SIMULATION_VERSION,
       status: "pending",
       results: null,
@@ -125,7 +143,7 @@ function NewExperimentInner() {
             <textarea className="field mt-1" rows={2} value={cfg.description} onChange={(e) => setCfg({ ...cfg, description: e.target.value })} placeholder="What are you testing?" />
           </label>
           <label className="block">
-            <span className="label">Strategy model (calibration dataset)</span>
+            <span className="label">Saved strategy</span>
             <select className="field mt-1" value={calId} onChange={(e) => setCalId(e.target.value)}>
               {cals.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -133,6 +151,9 @@ function NewExperimentInner() {
                 </option>
               ))}
             </select>
+            <span className="block text-[11px] text-muted mt-1">
+              This strategy stays attached to the experiment and is recorded in its history.
+            </span>
           </label>
           <div className="grid grid-cols-2 gap-3">
             <Num label="Hands" value={cfg.hands} min={10} max={500000} step={100} onChange={(v) => setCfg({ ...cfg, hands: v })} />

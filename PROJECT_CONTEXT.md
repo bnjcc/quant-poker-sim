@@ -103,11 +103,12 @@ The current working tree closes the calibration and post-run review gaps identif
 - The poker-table felt defaults to red and derives its color from the selected interface theme.
 - The user's hole cards render at the large card size in both calibration flows while opponent cards and other compact card displays remain unchanged.
 - Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 15-second decision window. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
+- Both calibration flows expose **Check / Fold rest of hand**. The initial intentional action retains the user's real response time; later actions check when free or fold to a wager automatically and omit timing so they do not create an artificial 0ms timing tell. The mode resets after the hand.
 
 ### Calibration entry and range-selection usability
 
 - Dashboard calibration calls to action and the main navigation now present **Range-first calibration** as the primary/default path.
-- Unrestricted calibration remains at `/calibrate` and is labeled **All hands** in the dashboard and navigation.
+- Unrestricted calibration remains at `/calibrate`, but it is reached through the **Calibrate all hands** button inside range-first calibration instead of occupying dashboard or navigation space.
 - Range shortcuts include **+ Aces**, which adds all 25 Ace-containing starting-hand classes including `AA`, and **+ Face cards**, which adds the nine J/Q/K-only pair, suited, and offsuit classes.
 - The 169-hand grid supports primary-mouse drag painting. Starting on an unselected cell selects every visited cell; starting on a selected cell erases every visited cell.
 - Each cell is applied at most once per drag. Ordinary single clicks, keyboard activation, ARIA pressed state, secondary mouse buttons, and touch horizontal scrolling retain their previous behavior.
@@ -122,12 +123,21 @@ The current working tree closes the calibration and post-run review gaps identif
 ### In-browser Simulated Hand Review
 
 - Every completed experiment presents an explicit **Simulated Hand Review** button instead of opening the review automatically.
-- The survey replays eight decisions drawn from stored hands spread across the run, reveals no future board cards, and asks the tester either to confirm the simulated action or enter their own legal action and size.
+- Before the survey starts, the user chooses how many eligible hands to review, from one through the available candidate count. Decisions remain spread across stored hands, reveal no future board cards, and ask the tester either to confirm the simulated action or enter their own legal action and size.
+- Range-first surveys exclude every decision from a dealt hand outside the active explicit starting range, including later-street decisions reached after a free big-blind check.
 - The bounded decision log is evenly sampled across the stored run rather than truncating the beginning, so long experiments remain broadly reviewable.
 - Review answers are stored with experiment, seed, engine version, decision context, model probabilities/confidence, agreement, and correction details.
 - Cloud feedback is normalized into `strategy_reviews`, protected by RLS, and available to the project owner for learning-model analysis. Browser fallback retains the same records locally.
 - Corrections rebuild an experiment-specific policy from the immutable base calibration and all review rounds, then rerun the same seed. All-agree rounds are saved without an unnecessary rerun.
 - User-facing JSON/CSV export buttons were removed; review and hand verification stay in the browser.
+
+### Multiple saved strategies per user
+
+- A calibration dataset is a saved strategy, and one local or cloud account can retain any number of them under distinct IDs.
+- The strategy profile always shows the saved-strategy selector, supports renaming, and offers an explicit **Add strategy** action.
+- **Use in an experiment** carries the selected strategy ID into experiment creation instead of silently falling back to the newest strategy.
+- New experiments retain the strategy association plus point-in-time name/method snapshots. Previous experiments and experiment details show the associated strategy even if its source calibration is later deleted.
+- Settings lists saved strategies separately and warns how many experiments will lose rerun capability before a strategy is deleted.
 
 ### Previous experiments
 
@@ -283,6 +293,13 @@ Validation on source commit `e5e7d2f` passed:
 - Secret scan: no Supabase secret/service key or private key was committed
 - Browser smoke check: default felt rendered red, switching to blue changed the felt, the user's two cards rendered at the larger calibration size, and opponent action labels retained their simulated times after the 500ms preview.
 
+Validation of the current workflow-refinement working tree also passed:
+
+- TypeScript: clean (`tsc --noEmit`)
+- ESLint: clean
+- Vitest: 8 test files, 67 tests passed
+- Next.js production build: passed
+
 New application tests include:
 
 - `tests/storage.test.ts`
@@ -299,8 +316,11 @@ New application tests include:
   - Learned user reactions differ after snap and tank timing cues
   - Behavioral policy v1 deserialization remains compatible with the v2 timing model
   - High-speed simulations record bounded virtual action timing without waiting
+  - Per-hand Check/Fold records an intentional first action, omits artificial timing on automatic follow-ups, and resets for the next hand
 - `tests/review.test.ts`
   - Review candidates are spread across stored hands and exclude missing histories
+  - User-selected review counts are honored and safely bounded
+  - Range-first review excludes the entire dealt hand when its starting class is outside the explicit range
   - Bounded decision logs retain coverage from the start through the end of a run
   - Corrections measurably move the experiment-specific learned policy
 

@@ -228,6 +228,7 @@ export default function ExperimentDetailPage() {
     : null;
   const ror = r && r.bb100 !== 0 ? riskOfRuin(r.bb100, r.stdDevBBPerHand, bankroll) : null;
   const manual = cal?.manualAggregates ?? null;
+  const strategyName = cal?.name ?? exp.strategyName ?? "Deleted strategy";
 
   return (
     <div>
@@ -247,7 +248,11 @@ export default function ExperimentDetailPage() {
       />
 
       <div className="mono text-xs text-muted mb-5">
-        seed <span className="text-ink">{exp.config.seed}</span> · engine v{exp.simulationVersion} ·{" "}
+        strategy {cal ? (
+          <Link href={`/profile?strategy=${encodeURIComponent(cal.id)}`} className="text-ink hover:text-accent hover:underline">
+            {strategyName}
+          </Link>
+        ) : <span className="text-ink">{strategyName}</span>} · seed <span className="text-ink">{exp.config.seed}</span> · engine v{exp.simulationVersion} ·{" "}
         {exp.config.hands.toLocaleString()} hands requested · blinds {exp.config.table.smallBlind}/{bb} · rake{" "}
         {(exp.config.table.rake.percentage * 100).toFixed(1)}% cap {exp.config.table.rake.cap} · mode {exp.config.mode}
       </div>
@@ -336,7 +341,7 @@ export default function ExperimentDetailPage() {
               <div>
                 <h2 className="font-semibold">Simulated Hand Review</h2>
                 <p className="text-xs text-muted mt-1 max-w-2xl">
-                  Take a short in-browser survey across eight hands sampled from this run. Confirm the simulated decision or make the decision you would choose. Your answers are saved for model improvement; corrections recalibrate this experiment and trigger a seeded rerun.
+                  Choose how many sampled hands you want to review, then confirm each simulated decision or make the decision you would choose. Range-first reviews skip starting hands outside your selected range. Your answers are saved for model improvement; corrections recalibrate this experiment and trigger a seeded rerun.
                 </p>
               </div>
               <Link href="/accuracy" className="btn text-xs">View saved accuracy data</Link>
@@ -364,6 +369,7 @@ export default function ExperimentDetailPage() {
                 decisions={exp.userDecisionLog}
                 bigBlind={bb}
                 roundNumber={(exp.strategyReview?.rounds.length ?? 0) + 1}
+                preflopRange={(exp.strategyReview?.calibratedPolicy ?? cal?.policy)?.preflopRange}
                 disabled={running}
                 onComplete={submitStrategyReview}
               />
