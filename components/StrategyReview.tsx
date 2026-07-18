@@ -44,7 +44,7 @@ function stateBeforeAction(hand: HandHistory, upto: number) {
     player.committed += action.amount;
     pot += action.amount;
     if (action.allIn) player.allIn = true;
-    player.lastAction = action.amount > 0 ? `${action.type} ${action.amount}` : action.type;
+    player.lastAction = action.amount > 0 ? `${action.type} ${action.amount.toLocaleString()} chips` : action.type;
   }
 
   const next = hand.actions[upto];
@@ -56,20 +56,19 @@ function stateBeforeAction(hand: HandHistory, upto: number) {
   return { players, street, pot, board: hand.board.slice(0, boardCount) };
 }
 
-function formatAction(action: ChosenAction, bigBlind: number): string {
+function formatAction(action: ChosenAction): string {
   if ((action.type === "bet" || action.type === "raise") && action.toAmount !== undefined) {
-    return `${action.type} to ${(action.toAmount / bigBlind).toFixed(1)} bb`;
+    return `${action.type} to ${action.toAmount.toLocaleString()} chips`;
   }
   return action.type;
 }
 
-function defaultSizeBB(decision: ReviewableDecision, type: ChosenAction["type"], bigBlind: number): number {
+function defaultSizeChips(decision: ReviewableDecision, type: ChosenAction["type"]): number {
   if (type === "bet" || type === "raise") {
     const legal = decision.context.legal;
     const minimum = type === "bet" ? legal.minBet : legal.minRaiseTo;
     const suggested = Math.round(decision.context.potSize * 0.66) + (type === "raise" ? legal.callAmount : 0);
-    const chips = Math.min(legal.maxBetTo, Math.max(minimum, suggested));
-    return Number((chips / bigBlind).toFixed(1));
+    return Math.min(legal.maxBetTo, Math.max(minimum, suggested));
   }
   return 0;
 }
@@ -77,7 +76,6 @@ function defaultSizeBB(decision: ReviewableDecision, type: ChosenAction["type"],
 export function StrategyReview({
   hands,
   decisions,
-  bigBlind,
   roundNumber,
   preflopRange,
   disabled = false,
@@ -85,7 +83,6 @@ export function StrategyReview({
 }: {
   hands: HandHistory[];
   decisions: SimulatedUserDecision[];
-  bigBlind: number;
   roundNumber: number;
   preflopRange?: readonly string[];
   disabled?: boolean;
@@ -111,7 +108,7 @@ export function StrategyReview({
   const [answers, setAnswers] = useState<Record<string, StrategyReviewAnswer>>({});
   const [correcting, setCorrecting] = useState(false);
   const [alternativeType, setAlternativeType] = useState<ChosenAction["type"]>("fold");
-  const [alternativeSizeBB, setAlternativeSizeBB] = useState(0);
+  const [alternativeSizeChips, setAlternativeSizeChips] = useState(0);
   const [replayStep, setReplayStep] = useState(0);
 
   useEffect(() => {
@@ -131,8 +128,8 @@ export function StrategyReview({
     const model = simulatedAction(current);
     const alternative = legal.find((type) => type !== model.type) ?? legal[0] ?? "fold";
     setAlternativeType(alternative);
-    setAlternativeSizeBB(defaultSizeBB(current, alternative, bigBlind));
-  }, [current, bigBlind]);
+    setAlternativeSizeChips(defaultSizeChips(current, alternative));
+  }, [current]);
 
   if (eligibleDecisions.length === 0) {
     return (
@@ -227,7 +224,7 @@ export function StrategyReview({
     if (alternativeType === "bet" || alternativeType === "raise") {
       const legal = current.context.legal;
       const minimum = alternativeType === "bet" ? legal.minBet : legal.minRaiseTo;
-      const chips = Math.round(alternativeSizeBB * bigBlind);
+      const chips = Math.round(alternativeSizeChips);
       action = {
         type: alternativeType,
         toAmount: Math.min(legal.maxBetTo, Math.max(minimum, chips)),
@@ -315,9 +312,9 @@ export function StrategyReview({
       <div className="grid lg:grid-cols-[1fr_1.2fr] gap-4 mt-4">
         <div className="rounded-md border border-line bg-panel2 px-4 py-3">
           <div className="label">Simulated decision</div>
-          <div className="mono text-xl font-bold text-accent mt-1">{formatAction(modelAction, bigBlind)}</div>
+          <div className="mono text-xl font-bold text-accent mt-1">{formatAction(modelAction)}</div>
           <div className="text-xs text-muted mt-2">
-            pot {(current.context.potSize / bigBlind).toFixed(1)} bb · call {(current.context.betFaced / bigBlind).toFixed(1)} bb · model confidence {(current.confidence * 100).toFixed(0)}%
+            pot {current.context.potSize.toLocaleString()} chips · call {current.context.betFaced.toLocaleString()} chips · model confidence {(current.confidence * 100).toFixed(0)}%
           </div>
           <div className="flex flex-wrap gap-2 mt-2">
             {sortedProbabilities.map(([action, probability]) => (
@@ -328,7 +325,7 @@ export function StrategyReview({
 
         <div className="rounded-md border border-line px-4 py-3">
           <div className="font-semibold text-sm">Would you make this decision?</div>
-          {answered && <div className="text-xs text-info mt-1">Previously marked: {answered.agreed ? "accurate" : formatAction(answered.reviewedAction, bigBlind)}</div>}
+          {answered && <div className="text-xs text-info mt-1">Previously marked: {answered.agreed ? "accurate" : formatAction(answered.reviewedAction)}</div>}
           {!correcting ? (
             <div className="flex flex-wrap gap-2 mt-3">
               <button className="btn btn-primary" onClick={() => record(modelAction, true)} disabled={disabled}>Yes, I would do this</button>
@@ -344,7 +341,7 @@ export function StrategyReview({
                   onChange={(event) => {
                     const type = event.target.value as ChosenAction["type"];
                     setAlternativeType(type);
-                    setAlternativeSizeBB(defaultSizeBB(current, type, bigBlind));
+                    setAlternativeSizeChips(defaultSizeChips(current, type));
                   }}
                 >
                   {legal.types.map((type) => <option key={type} value={type}>{type}</option>)}
@@ -353,26 +350,26 @@ export function StrategyReview({
               {(alternativeType === "bet" || alternativeType === "raise") && (
                 <div className="mt-2">
                   <label className="block">
-                    <span className="label">{alternativeType === "raise" ? "Raise to" : "Bet"} (bb)</span>
+                    <span className="label">{alternativeType === "raise" ? "Raise to" : "Bet"} (chips)</span>
                     <input
                       type="number"
                       className="field mt-1"
-                      min={sizeMinimum / bigBlind}
-                      max={legal.maxBetTo / bigBlind}
-                      step={0.5}
-                      value={alternativeSizeBB}
-                      onChange={(event) => setAlternativeSizeBB(Number(event.target.value))}
+                      min={sizeMinimum}
+                      max={legal.maxBetTo}
+                      step={1}
+                      value={alternativeSizeChips}
+                      onChange={(event) => setAlternativeSizeChips(Number(event.target.value))}
                     />
                   </label>
                   <input
                     type="range"
                     className="w-full mt-3"
-                    min={sizeMinimum / bigBlind}
-                    max={legal.maxBetTo / bigBlind}
-                    step={0.5}
-                    value={alternativeSizeBB}
-                    onChange={(event) => setAlternativeSizeBB(Number(event.target.value))}
-                    aria-label="Review bet size"
+                    min={sizeMinimum}
+                    max={legal.maxBetTo}
+                    step={1}
+                    value={alternativeSizeChips}
+                    onChange={(event) => setAlternativeSizeChips(Number(event.target.value))}
+                    aria-label="Review bet size in chips"
                   />
                   <div className="flex flex-wrap gap-1 mt-2">
                     {[0.5, 0.66, 1].map((fraction) => (
@@ -389,7 +386,7 @@ export function StrategyReview({
                                 (alternativeType === "raise" ? legal.callAmount : 0),
                             ),
                           );
-                          setAlternativeSizeBB(Number((chips / bigBlind).toFixed(1)));
+                          setAlternativeSizeChips(chips);
                         }}
                       >
                         {fraction === 1 ? "pot" : `${Math.round(fraction * 100)}%`}
@@ -398,7 +395,7 @@ export function StrategyReview({
                     <button
                       type="button"
                       className="btn text-xs px-2 py-1"
-                      onClick={() => setAlternativeSizeBB(Number((legal.maxBetTo / bigBlind).toFixed(1)))}
+                      onClick={() => setAlternativeSizeChips(legal.maxBetTo)}
                     >
                       all-in
                     </button>

@@ -66,7 +66,7 @@ export function PokerTable({
         ) : (
           <div className="text-xs text-muted italic">preflop</div>
         )}
-        <div className="table-pot mono text-sm text-accent font-bold"><span aria-hidden="true" />pot {pot.toLocaleString()}</div>
+        <div className="table-pot mono text-sm text-accent font-bold"><span aria-hidden="true" />pot {pot.toLocaleString()} chips</div>
       </div>
 
       {ordered.map((s, i) => (
@@ -92,7 +92,7 @@ export function PokerTable({
               )}
               <span className={`text-xs font-semibold truncate ${s.isUser ? "text-accent" : ""}`}>{s.name}</span>
             </div>
-            <div className="mono text-[11px] text-muted">{s.stack.toLocaleString()}</div>
+            <div className="mono text-[11px] text-muted">{s.stack.toLocaleString()} chips</div>
             <div className="mt-1 flex justify-center min-h-[1.6rem]">
               {s.folded ? (
                 <span className="text-[11px] text-muted italic">folded</span>
@@ -110,7 +110,7 @@ export function PokerTable({
             {s.lastAction && <div className="text-[10px] text-info mt-0.5 truncate">{s.lastAction}</div>}
           </div>
           {s.committed > 0 && (
-            <div className="mono text-center text-[11px] mt-1 text-accent">{s.committed.toLocaleString()}</div>
+            <div className="mono text-center text-[11px] mt-1 text-accent">{s.committed.toLocaleString()} chips</div>
           )}
         </div>
       ))}

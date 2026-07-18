@@ -263,7 +263,7 @@ export default function RangeCalibratePage() {
     for (const action of visibleActions.values()) {
       lastActionBySeat.set(
         action.seat,
-        `${action.amount > 0 ? `${action.type} ${action.amount}` : action.type}${
+        `${action.amount > 0 ? `${action.type} ${action.amount.toLocaleString()} chips` : action.type}${
           formatDecisionTime(action.decisionTimeMs)
             ? ` · ${action.timedOut ? "timeout" : formatDecisionTime(action.decisionTimeMs)}`
             : ""
@@ -438,7 +438,7 @@ export default function RangeCalibratePage() {
             {sounds.enabled ? "Sound on" : "Sound off"}
           </button>
           <div className="mono text-sm">
-            Stack: <span className="text-accent font-bold">{session.session.userStack.toLocaleString()}</span>
+            Stack: <span className="text-accent font-bold">{session.session.userStack.toLocaleString()} chips</span>
           </div>
         </div>
       </div>
@@ -493,7 +493,7 @@ export default function RangeCalibratePage() {
             )}
             {legal.types.includes("call") && (
               <button className="btn" type="button" onClick={() => act("call")}>
-                Call {legal.callAmount}
+                Call {legal.callAmount.toLocaleString()} chips
               </button>
             )}
             {(legal.types.includes("bet") || legal.types.includes("raise")) && (
@@ -503,7 +503,7 @@ export default function RangeCalibratePage() {
                   type="button"
                   onClick={() => act(legal.types.includes("bet") ? "bet" : "raise")}
                 >
-                  {legal.types.includes("bet") ? "Bet" : "Raise to"} {betTo}
+                  {legal.types.includes("bet") ? "Bet" : "Raise to"} {betTo.toLocaleString()} chips
                 </button>
                 <input
                   type="range"
@@ -512,7 +512,7 @@ export default function RangeCalibratePage() {
                   value={betTo}
                   onChange={(event) => setBetTo(Number(event.target.value))}
                   className="w-48"
-                  aria-label="Bet size"
+                  aria-label="Bet size in chips"
                 />
                 <div className="flex gap-1">
                   {[0.5, 0.66, 1].map((fraction) => (
@@ -543,7 +543,7 @@ export default function RangeCalibratePage() {
               </div>
             )}
             <div className="ml-auto text-xs text-muted mono">
-              pot {ctx.potSize} · to call {legal.callAmount} · SPR (stack/pot) {ctx.stackToPotRatio.toFixed(1)}
+              pot {ctx.potSize.toLocaleString()} chips · to call {legal.callAmount.toLocaleString()} chips · SPR (stack/pot) {ctx.stackToPotRatio.toFixed(1)}
             </div>
             </div>
           </div>
@@ -552,7 +552,7 @@ export default function RangeCalibratePage() {
             <span className="text-sm text-muted">
               {opponentName} is thinking…{" "}
               {opponentCallAmount > 0
-                ? `Facing ${opponentCallAmount} — check is unavailable. Chips move after the decision.`
+                ? `Facing ${opponentCallAmount.toLocaleString()} chips — check is unavailable. Chips move after the decision.`
                 : "No bet to call."}
             </span>
           </div>

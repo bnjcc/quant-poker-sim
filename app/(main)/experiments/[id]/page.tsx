@@ -352,7 +352,6 @@ export default function ExperimentDetailPage() {
                 key={`${exp.id}:${exp.strategyReview?.rounds.length ?? 0}:${exp.userDecisionLog[0]?.handNumber ?? 0}`}
                 hands={hands}
                 decisions={exp.userDecisionLog}
-                bigBlind={bb}
                 roundNumber={(exp.strategyReview?.rounds.length ?? 0) + 1}
                 preflopRange={(exp.strategyReview?.calibratedPolicy ?? cal?.policy)?.preflopRange}
                 disabled={running}

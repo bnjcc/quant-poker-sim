@@ -217,7 +217,7 @@ export default function CalibratePage() {
     for (const a of visibleActions.values()) {
       const elapsed = formatDecisionTime(a.decisionTimeMs);
       const timing = elapsed ? ` · ${a.timedOut ? "timeout" : elapsed}` : "";
-      lastActionBySeat.set(a.seat, `${a.amount > 0 ? `${a.type} ${a.amount}` : a.type}${timing}`);
+      lastActionBySeat.set(a.seat, `${a.amount > 0 ? `${a.type} ${a.amount.toLocaleString()} chips` : a.type}${timing}`);
     }
     return engine.players.map((p) => ({
       seat: p.seat,
@@ -283,8 +283,8 @@ export default function CalibratePage() {
         </div>
         <div className="mt-4 max-w-xl">
           <WarningNote>
-            Table: 6-max, blinds {DEFAULT_TABLE.smallBlind}/{DEFAULT_TABLE.bigBlind}, 100bb buy-in, 5% rake capped at{" "}
-            {DEFAULT_TABLE.rake.cap}. A timeout checks when checking is free and folds when facing a bet.
+            Table: 6-max, blinds {DEFAULT_TABLE.smallBlind}/{DEFAULT_TABLE.bigBlind} chips, {(100 * DEFAULT_TABLE.bigBlind).toLocaleString()}-chip buy-in (100 big blinds), 5% rake capped at{" "}
+            {DEFAULT_TABLE.rake.cap} chips. A timeout checks when checking is free and folds when facing a bet.
           </WarningNote>
         </div>
       </div>
@@ -312,7 +312,7 @@ export default function CalibratePage() {
             {sounds.enabled ? "Sound on" : "Sound off"}
           </button>
           <div className="mono text-sm">
-            Stack: <span className="text-accent font-bold">{ms.session.userStack.toLocaleString()}</span>
+            Stack: <span className="text-accent font-bold">{ms.session.userStack.toLocaleString()} chips</span>
             {ms.session.userBuyIns > 1 && <span className="text-muted text-xs ml-2">({ms.session.userBuyIns} buy-ins)</span>}
           </div>
         </div>
@@ -362,7 +362,7 @@ export default function CalibratePage() {
             )}
             {legal.types.includes("call") && (
               <button className="btn" onClick={() => act("call")}>
-                Call {legal.callAmount}
+                Call {legal.callAmount.toLocaleString()} chips
               </button>
             )}
             {(legal.types.includes("bet") || legal.types.includes("raise")) && (
@@ -371,7 +371,7 @@ export default function CalibratePage() {
                   className="btn btn-primary"
                   onClick={() => act(legal.types.includes("bet") ? "bet" : "raise")}
                 >
-                  {legal.types.includes("bet") ? "Bet" : "Raise to"} {betTo}
+                  {legal.types.includes("bet") ? "Bet" : "Raise to"} {betTo.toLocaleString()} chips
                 </button>
                 <input
                   type="range"
@@ -380,7 +380,7 @@ export default function CalibratePage() {
                   value={betTo}
                   onChange={(e) => setBetTo(Number(e.target.value))}
                   className="w-48"
-                  aria-label="Bet size"
+                  aria-label="Bet size in chips"
                 />
                 <div className="flex gap-1">
                   {[0.5, 0.66, 1].map((f) => (
@@ -409,7 +409,7 @@ export default function CalibratePage() {
               </div>
             )}
             <div className="ml-auto text-xs text-muted mono">
-              pot {ctx.potSize} · to call {legal.callAmount} · SPR (stack/pot) {ctx.stackToPotRatio.toFixed(1)}
+              pot {ctx.potSize.toLocaleString()} chips · to call {legal.callAmount.toLocaleString()} chips · SPR (stack/pot) {ctx.stackToPotRatio.toFixed(1)}
             </div>
             </div>
           </div>
@@ -418,7 +418,7 @@ export default function CalibratePage() {
             <span className="text-sm text-muted">
               {opponentName} is thinking…{" "}
               {opponentCallAmount > 0
-                ? `Facing ${opponentCallAmount} — check is unavailable. Chips move after the decision.`
+                ? `Facing ${opponentCallAmount.toLocaleString()} chips — check is unavailable. Chips move after the decision.`
                 : "No bet to call."}
             </span>
           </div>
