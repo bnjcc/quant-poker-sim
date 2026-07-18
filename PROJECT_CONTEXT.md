@@ -9,7 +9,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
 - Active branch: `agent/strategy-review-calibration`
 - Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest committed implementation: `f4fbfd2 Harden poker review and experiment history`
+- Latest committed implementation: `92cd415 Refine calibration pacing and table visuals`
 - Previous feature commits: `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
@@ -102,6 +102,7 @@ The current working tree closes the calibration and post-run review gaps identif
 
 - The poker-table felt defaults to red and derives its color from the selected interface theme.
 - The user's hole cards render larger in both calibration flows while other compact card displays remain unchanged.
+- Opponent turns use a fixed 500ms live preview in both calibration pages. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
 
 ### In-browser Simulated Hand Review
 
@@ -261,10 +262,11 @@ Validation on the current working-tree implementation passed:
 
 - TypeScript: clean (`tsc --noEmit`)
 - ESLint: clean
-- Vitest: 8 test files, 60 tests passed
+- Vitest: 8 test files, 63 tests passed
 - Next.js production build: passed
 - `git diff --check`: clean apart from expected Windows LF/CRLF notices
 - Secret scan: no Supabase secret/service key or private key was committed
+- Browser smoke check: default felt rendered red, switching to blue changed the felt, the user's two cards rendered at the larger calibration size, and opponent action labels retained their simulated times after the 500ms preview.
 
 New application tests include:
 
@@ -278,6 +280,7 @@ New application tests include:
 - `tests/timing.test.ts`
   - Snap, normal, and tank classification plus legal timeout defaults
   - Timing propagation from actions into subsequent opponent contexts
+  - Fixed 500ms live opponent previews preserve the full simulated decision time on applied actions
   - Learned user reactions differ after snap and tank timing cues
   - Behavioral policy v1 deserialization remains compatible with the v2 timing model
   - High-speed simulations record bounded virtual action timing without waiting
@@ -304,9 +307,9 @@ The production backend and deployment are connected:
 - Email signup is enabled and email confirmation is required.
 - The original TOTP enrollment/verification and 8-digit, one-minute email OTP settings were preserved.
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
-- Production deployment `dpl_EHAfxvN77MRrVENmSvk4N6ZkZgNU` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
+- Production deployment `dpl_8CF2aYjSASLzW8bvVjPLMT8wcavw` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
-- Source commit `f4fbfd2` is pushed to `origin/agent/strategy-review-calibration`. The legality, pacing, review UX, no-export, and experiment-history refinements are published on that branch but have not been independently verified on the production Vercel deployment.
+- Source commit `92cd415` is pushed to `origin/agent/strategy-review-calibration`. The 500ms opponent previews, preserved timing labels, theme-driven felt, and larger calibration hole cards were independently smoke-tested locally and published to the production Vercel deployment.
 
 Remaining external verification:
 
