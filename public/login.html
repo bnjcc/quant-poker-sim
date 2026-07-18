@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en" data-theme="red">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in — QuantPoker</title>
+    <meta name="description" content="Sign in to your QuantPoker strategy simulation workspace." />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="stylesheet" href="/login.css" />
+    <script>
+      (function(){try{var t=localStorage.getItem("quantpoker-ui-theme-v2");document.documentElement.dataset.theme=["purple","cyan","green","red","gold","blue","orange","pink"].includes(t)?t:"red"}catch(e){document.documentElement.dataset.theme="red"}})();
+    </script>
+  </head>
+  <body>
+    <div class="app-atmosphere" aria-hidden="true"></div>
+    <main class="auth-page">
+      <div class="auth-shell">
+        <section class="auth-card">
+          <div class="auth-logo-lockup" aria-label="QuantPoker">
+            <svg class="queen-diamond-logo" viewBox="0 0 36 48" fill="none" aria-hidden="true">
+              <rect class="queen-diamond-frame" x="2.5" y="2.5" width="31" height="43" rx="4.5"></rect>
+              <rect class="queen-diamond-inner" x="5.25" y="5.25" width="25.5" height="37.5" rx="2.5"></rect>
+              <text class="queen-diamond-letter" x="6.2" y="32.2">Q</text>
+              <path class="queen-diamond-pip" d="m27.3 34.3 2 2.15-2 2.15-2-2.15 2-2.15Z"></path>
+            </svg>
+            <span><span>uant</span><strong>Poker</strong></span>
+          </div>
+          <h1 id="auth-title">Sign in</h1>
+          <form action="/auth/password" method="post">
+            <input id="auth-mode" type="hidden" name="mode" value="sign-in" />
+            <input id="auth-next" type="hidden" name="next" value="/" />
+            <label>
+              <span class="label">Email</span>
+              <input class="field" name="email" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              <span class="label">Password</span>
+              <input id="auth-password" class="field" name="password" type="password" autocomplete="current-password" minlength="8" required />
+            </label>
+            <div id="auth-message" class="message" role="status" hidden></div>
+            <button id="auth-submit" class="button" type="submit">Sign in</button>
+          </form>
+          <a id="auth-toggle" href="/login?mode=sign-up">Need an account? Sign up</a>
+        </section>
+      </div>
+    </main>
+    <script>
+      (function(){
+        var params=new URLSearchParams(location.search);
+        var signUp=params.get("mode")==="sign-up";
+        var next=params.get("next")||"/";
+        if(!next.startsWith("/")||next.startsWith("//")||next.includes("\\"))next="/";
+        document.getElementById("auth-mode").value=signUp?"sign-up":"sign-in";
+        document.getElementById("auth-next").value=next;
+        document.getElementById("auth-title").textContent=signUp?"Create account":"Sign in";
+        document.getElementById("auth-password").autocomplete=signUp?"new-password":"current-password";
+        document.getElementById("auth-submit").textContent=signUp?"Create account":"Sign in";
+        var toggleParams=new URLSearchParams({mode:signUp?"sign-in":"sign-up"});
+        if(next!=="/")toggleParams.set("next",next);
+        var toggle=document.getElementById("auth-toggle");
+        toggle.href="/login?"+toggleParams.toString();
+        toggle.textContent=signUp?"Already have an account? Sign in":"Need an account? Sign up";
+        var message=params.get("error")||params.get("message");
+        if(message){var status=document.getElementById("auth-message");status.textContent=message;status.hidden=false}
+      })();
+    </script>
+  </body>
+</html>

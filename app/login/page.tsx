@@ -1,21 +1,18 @@
-"use client";
-
-import { FormEvent, Suspense, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { safeRedirectPath } from "@/lib/auth/redirect";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { QueenDiamondLogo } from "@/components/QueenDiamondLogo";
 
-function LoginForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(searchParams.get("error"));
+type LoginSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function LoginPage({ searchParams }: { searchParams: LoginSearchParams }) {
+  const params = await searchParams;
+  const mode = firstParam(params.mode) === "sign-up" ? "sign-up" : "sign-in";
+  const message = firstParam(params.error) ?? firstParam(params.message);
+  const next = safeRedirectPath(firstParam(params.next));
 
   if (!isSupabaseConfigured()) {
     return (
@@ -28,84 +25,57 @@ function LoginForm() {
         <p className="text-sm text-muted mb-4">
           Supabase environment variables are not set, so QuantPoker is using local browser storage.
         </p>
-        <Link href="/" className="btn btn-primary">Continue to QuantPoker</Link>
+        {/* Keep browser-only mode free of a client navigation runtime. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a href="/" className="btn btn-primary">Continue to QuantPoker</a>
       </div>
     );
   }
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    const supabase = createClient();
-
-    if (mode === "sign-in") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setMessage(error.message);
-        setBusy(false);
-        return;
-      }
-      const next = searchParams.get("next");
-      router.replace(safeRedirectPath(next));
-      router.refresh();
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
-    });
-    if (error) {
-      setMessage(error.message);
-    } else if (data.session) {
-      router.replace("/");
-      router.refresh();
-      return;
-    } else {
-      setMessage("Check your email to confirm your account, then sign in.");
-    }
-    setBusy(false);
-  };
+  const toggleParams = new URLSearchParams({ mode: mode === "sign-in" ? "sign-up" : "sign-in" });
+  if (next !== "/") toggleParams.set("next", next);
 
   return (
-    <div className="auth-shell">
-      <section className="panel auth-card px-7 py-8">
-      <div className="auth-logo-lockup" aria-label="QuantPoker">
-        <QueenDiamondLogo className="auth-logo" />
-        <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span>
+    <main className="auth-page px-5 py-6 sm:px-6 lg:px-10 lg:py-8">
+      <div className="auth-shell">
+        <section className="panel auth-card px-7 py-8">
+          <div className="auth-logo-lockup" aria-label="QuantPoker">
+            <QueenDiamondLogo className="auth-logo" />
+            <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span>
+          </div>
+          <h1 className="text-2xl font-bold mb-6">{mode === "sign-in" ? "Sign in" : "Create account"}</h1>
+          <form action="/auth/password" method="post" className="space-y-5">
+            <input type="hidden" name="mode" value={mode} />
+            <input type="hidden" name="next" value={next} />
+            <label className="block">
+              <span className="label">Email</span>
+              <input className="field mt-1" name="email" type="email" autoComplete="email" required />
+            </label>
+            <label className="block">
+              <span className="label">Password</span>
+              <input
+                className="field mt-1"
+                name="password"
+                type="password"
+                autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+                minLength={8}
+                required
+              />
+            </label>
+            {message && (
+              <div className="text-sm rounded-md border border-line bg-panel2 px-3 py-2" role="status">
+                {message}
+              </div>
+            )}
+            <button className="btn btn-primary w-full justify-center py-3" type="submit">
+              {mode === "sign-in" ? "Sign in" : "Create account"}
+            </button>
+          </form>
+          <a className="inline-block text-sm text-accent mt-4 hover:underline" href={`/login?${toggleParams.toString()}`}>
+            {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+          </a>
+        </section>
       </div>
-      <h1 className="text-2xl font-bold mb-6">{mode === "sign-in" ? "Sign in" : "Create account"}</h1>
-      <form onSubmit={submit} className="space-y-5">
-        <label className="block">
-          <span className="label">Email</span>
-          <input className="field mt-1" type="email" autoComplete="email" value={email}
-            onChange={(event) => setEmail(event.target.value)} required />
-        </label>
-        <label className="block">
-          <span className="label">Password</span>
-          <input className="field mt-1" type="password"
-            autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-            value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
-        </label>
-        {message && <div className="text-sm rounded-md border border-line bg-panel2 px-3 py-2">{message}</div>}
-        <button className="btn btn-primary w-full justify-center py-3" disabled={busy} type="submit">
-          {busy ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
-        </button>
-      </form>
-      <button className="text-sm text-accent mt-4 hover:underline" type="button"
-        onClick={() => {
-          setMode((current) => (current === "sign-in" ? "sign-up" : "sign-in"));
-          setMessage(null);
-        }}>
-        {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-      </button>
-      </section>
-    </div>
+    </main>
   );
-}
-
-export default function LoginPage() {
-  return <Suspense fallback={<div className="text-muted text-sm">Loading…</div>}><LoginForm /></Suspense>;
 }

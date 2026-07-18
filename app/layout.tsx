@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Nav } from "@/components/Nav";
-import { AppEffects } from "@/components/reactbits/AppEffects";
 
 export const metadata: Metadata = {
   title: "QuantPoker — Poker Strategy Simulation",
@@ -20,14 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen">
-        <AppEffects>
-          <div className="app-shell flex min-h-screen flex-col md:flex-row">
-            <div className="ambient-orb ambient-orb-one" aria-hidden="true" />
-            <div className="ambient-orb ambient-orb-two" aria-hidden="true" />
-            <Nav />
-            <main className="app-main flex-1 min-w-0 px-5 py-6 sm:px-6 lg:px-10 lg:py-8 max-w-[1440px]">{children}</main>
-          </div>
-        </AppEffects>
+        <div className="app-atmosphere" aria-hidden="true" />
+        {children}
       </body>
     </html>
   );

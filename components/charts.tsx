@@ -1,41 +1,100 @@
-"use client";
+import type { BreakdownRow } from "@/lib/analytics/aggregate";
 
-import {
-  Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
-import { BreakdownRow } from "@/lib/analytics/aggregate";
+const CHART_WIDTH = 720;
+const CHART_HEIGHT = 240;
+const CHART_PAD = { top: 14, right: 16, bottom: 28, left: 58 };
 
-const AXIS = { stroke: "var(--muted)", fontSize: 11, fontFamily: "var(--font-mono)" };
-const TOOLTIP_STYLE = {
-  background: "var(--panel)",
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  fontSize: 12,
-  color: "var(--ink)",
-};
+function compactNumber(value: number): string {
+  const absolute = Math.abs(value);
+  if (absolute >= 1000) return `${(value / 1000).toFixed(absolute >= 10000 ? 0 : 1)}k`;
+  if (absolute >= 100) return value.toFixed(0);
+  if (absolute >= 10) return value.toFixed(1);
+  return value.toFixed(2);
+}
 
-export function EquityCurve({ points, stride, label = "cumulative bb" }: { points: number[]; stride: number; label?: string }) {
-  const data = points.map((y, i) => ({ x: i * stride, y: Number(y.toFixed(1)) }));
-  const last = points[points.length - 1] ?? 0;
+function samplePoints(points: number[], limit = 320): { index: number; value: number }[] {
+  if (points.length <= limit) return points.map((value, index) => ({ index, value }));
+  return Array.from({ length: limit }, (_, position) => {
+    const index = Math.round((position * (points.length - 1)) / (limit - 1));
+    return { index, value: points[index] };
+  });
+}
+
+export function EquityCurve({
+  points,
+  stride,
+  label = "cumulative bb",
+}: {
+  points: number[];
+  stride: number;
+  label?: string;
+}) {
+  if (points.length === 0) {
+    return <div className="native-line-chart flex items-center justify-center text-sm text-muted">No equity data yet.</div>;
+  }
+
+  const sampled = samplePoints(points);
+  let minimum = Math.min(0, ...sampled.map((point) => point.value));
+  let maximum = Math.max(0, ...sampled.map((point) => point.value));
+  if (minimum === maximum) {
+    minimum -= 1;
+    maximum += 1;
+  }
+
+  const plotWidth = CHART_WIDTH - CHART_PAD.left - CHART_PAD.right;
+  const plotHeight = CHART_HEIGHT - CHART_PAD.top - CHART_PAD.bottom;
+  const xFor = (index: number) => CHART_PAD.left + (index / Math.max(1, points.length - 1)) * plotWidth;
+  const yFor = (value: number) => CHART_PAD.top + ((maximum - value) / (maximum - minimum)) * plotHeight;
+  const path = sampled
+    .map((point, index) => `${index === 0 ? "M" : "L"}${xFor(point.index).toFixed(1)},${yFor(point.value).toFixed(1)}`)
+    .join(" ");
+  const last = points[points.length - 1];
+  const gridValues = Array.from({ length: 5 }, (_, index) => maximum - ((maximum - minimum) * index) / 4);
+  const finalHand = (points.length - 1) * stride;
+
   return (
-    <ResponsiveContainer width="100%" height={240}>
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="var(--line)" strokeDasharray="2 4" />
-        <XAxis dataKey="x" {...AXIS} tickLine={false} />
-        <YAxis {...AXIS} tickLine={false} width={54} />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [`${v} bb`, label]} labelFormatter={(l) => `hand ${l}`} />
-        <ReferenceLine y={0} stroke="var(--muted)" strokeDasharray="4 4" />
-        <Line
-          type="monotone"
-          dataKey="y"
-          stroke={last >= 0 ? "var(--gain)" : "var(--loss)"}
-          strokeWidth={2}
-          dot={false}
-          isAnimationActive={false}
+    <div
+      className="native-line-chart"
+      role="img"
+      aria-label={`${label}: ${compactNumber(last)} after ${finalHand.toLocaleString()} hands`}
+    >
+      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true">
+        {gridValues.map((value) => {
+          const y = yFor(value);
+          return (
+            <g key={value}>
+              <line className="native-chart-grid" x1={CHART_PAD.left} x2={CHART_WIDTH - CHART_PAD.right} y1={y} y2={y} />
+              <text className="native-chart-axis" x={CHART_PAD.left - 8} y={y + 4} textAnchor="end">
+                {compactNumber(value)}
+              </text>
+            </g>
+          );
+        })}
+        <line
+          x1={CHART_PAD.left}
+          x2={CHART_WIDTH - CHART_PAD.right}
+          y1={yFor(0)}
+          y2={yFor(0)}
+          stroke="var(--muted)"
+          strokeDasharray="4 4"
+          vectorEffect="non-scaling-stroke"
         />
-      </LineChart>
-    </ResponsiveContainer>
+        <path
+          d={path}
+          fill="none"
+          stroke={last >= 0 ? "var(--gain)" : "var(--loss)"}
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <div className="native-chart-caption">
+        <span>0 hands</span>
+        <span>{label}: {compactNumber(last)} bb</span>
+        <span>{finalHand.toLocaleString()} hands</span>
+      </div>
+    </div>
   );
 }
 
@@ -48,54 +107,62 @@ export function BreakdownBars({
   metric?: "bb100" | "net";
   order?: string[];
 }) {
-  const keys = order ? order.filter((k) => rows[k]) : Object.keys(rows);
-  const data = keys.map((k) => ({
-    name: k,
-    value: Number((metric === "bb100" ? rows[k].bb100 : rows[k].net).toFixed(1)),
-    hands: rows[k].hands,
+  const keys = order ? order.filter((key) => rows[key]) : Object.keys(rows);
+  const data = keys.map((key) => ({
+    name: key,
+    value: metric === "bb100" ? rows[key].bb100 : rows[key].net,
+    hands: rows[key].hands,
   }));
+  const maximum = Math.max(1, ...data.map((row) => Math.abs(row.value)));
+
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="var(--line)" strokeDasharray="2 4" vertical={false} />
-        <XAxis dataKey="name" {...AXIS} tickLine={false} />
-        <YAxis {...AXIS} tickLine={false} width={54} />
-        <Tooltip
-          contentStyle={TOOLTIP_STYLE}
-          formatter={(v, _n, item) => [`${v}${metric === "bb100" ? "%" : " chips"} · ${item?.payload?.hands} hands`, ""]}
-        />
-        <ReferenceLine y={0} stroke="var(--muted)" />
-        <Bar dataKey="value" isAnimationActive={false} radius={[3, 3, 0, 0]}>
-          {data.map((d, i) => (
-            <Cell key={i} fill={d.value >= 0 ? "var(--gain)" : "var(--loss)"} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="native-bar-chart" role="img" aria-label={`${metric === "bb100" ? "Win rate" : "Net chips"} breakdown`}>
+      {data.map((row) => {
+        const width = (Math.abs(row.value) / maximum) * 50;
+        const left = row.value >= 0 ? 50 : 50 - width;
+        const value = `${row.value.toFixed(1)}${metric === "bb100" ? "%" : " chips"}`;
+        return (
+          <div className="native-bar-row" key={row.name} title={`${row.name}: ${value} over ${row.hands} hands`}>
+            <span className="native-bar-label">{row.name}</span>
+            <span className="native-bar-track native-bar-track-centered">
+              <span
+                className={`native-bar-fill ${row.value >= 0 ? "native-bar-fill-positive" : "native-bar-fill-negative"}`}
+                style={{ left: `${left}%`, width: `${width}%` }}
+              />
+            </span>
+            <span className="native-bar-value">{value}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 export function FrequencyBars({ counts, color = "var(--info)" }: { counts: Record<string, number>; color?: string }) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  const total = Object.values(counts).reduce((sum, value) => sum + value, 0) || 1;
   const data = Object.entries(counts)
-    .filter(([, v]) => v > 0)
-    .map(([name, v]) => ({ name, pct: Number(((v / total) * 100).toFixed(1)), n: v }));
+    .filter(([, value]) => value > 0)
+    .map(([name, value]) => ({ name, percent: (value / total) * 100, count: value }));
+
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke="var(--line)" strokeDasharray="2 4" vertical={false} />
-        <XAxis dataKey="name" {...AXIS} tickLine={false} />
-        <YAxis {...AXIS} tickLine={false} width={40} unit="%" />
-        <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, _n, item) => [`${v}% (${item?.payload?.n})`, ""]} />
-        <Bar dataKey="pct" fill={color} isAnimationActive={false} radius={[3, 3, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="native-bar-chart" role="img" aria-label="Frequency breakdown">
+      {data.map((row) => (
+        <div className="native-bar-row" key={row.name} title={`${row.name}: ${row.percent.toFixed(1)}% (${row.count})`}>
+          <span className="native-bar-label">{row.name}</span>
+          <span className="native-bar-track">
+            <span className="native-bar-fill" style={{ width: `${row.percent}%`, backgroundColor: color }} />
+          </span>
+          <span className="native-bar-value">{row.percent.toFixed(1)}% ({row.count})</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
 const BET_BUCKET_LABELS = ["<⅓ pot", "⅓–½", "½–¾", "¾–1x", "1–1.5x", ">1.5x"];
+
 export function BetSizeChart({ hist }: { hist: number[] }) {
-  const counts = Object.fromEntries(BET_BUCKET_LABELS.map((l, i) => [l, hist[i] ?? 0]));
+  const counts = Object.fromEntries(BET_BUCKET_LABELS.map((label, index) => [label, hist[index] ?? 0]));
   return <FrequencyBars counts={counts} color="var(--accent)" />;
 }
 
@@ -103,27 +170,30 @@ const HM_RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2
 
 /** 13x13 starting-hand grid: suited above the diagonal, offsuit below. */
 export function StartingHandHeatmap({ rows }: { rows: Record<string, BreakdownRow> }) {
-  const max = Math.max(1, ...Object.values(rows).map((r) => Math.abs(r.bb100)));
+  const max = Math.max(1, ...Object.values(rows).map((row) => Math.abs(row.bb100)));
   return (
     <div>
       <div className="grid gap-px" style={{ gridTemplateColumns: "repeat(13, minmax(0,1fr))" }}>
-        {HM_RANKS.map((r1, i) =>
-          HM_RANKS.map((r2, j) => {
-            const key = i === j ? r1 + r2 : i < j ? r1 + r2 + "s" : r2 + r1 + "o";
+        {HM_RANKS.map((rankOne, rowIndex) =>
+          HM_RANKS.map((rankTwo, columnIndex) => {
+            const key = rowIndex === columnIndex
+              ? rankOne + rankTwo
+              : rowIndex < columnIndex
+                ? rankOne + rankTwo + "s"
+                : rankTwo + rankOne + "o";
             const row = rows[key];
-            const v = row ? row.bb100 : null;
-            const alpha = v === null ? 0 : Math.min(0.85, 0.15 + (Math.abs(v) / max) * 0.7);
-            const bg =
-              v === null
-                ? "var(--panel-2)"
-                : v >= 0
-                  ? `rgba(79,195,138,${alpha})`
-                  : `rgba(226,99,91,${alpha})`;
+            const value = row ? row.bb100 : null;
+            const alpha = value === null ? 0 : Math.min(0.85, 0.15 + (Math.abs(value) / max) * 0.7);
+            const background = value === null
+              ? "var(--panel-2)"
+              : value >= 0
+                ? `rgba(79,195,138,${alpha})`
+                : `rgba(226,99,91,${alpha})`;
             return (
               <div
                 key={key}
                 className="mono aspect-square flex items-center justify-center text-[9px] rounded-[2px] cursor-default"
-                style={{ background: bg, color: v === null ? "var(--muted)" : "var(--ink)" }}
+                style={{ background, color: value === null ? "var(--muted)" : "var(--ink)" }}
                 title={row ? `${key}: ${row.bb100.toFixed(1)}% over ${row.hands} hands` : `${key}: not dealt`}
               >
                 {key}
