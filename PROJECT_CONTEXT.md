@@ -34,19 +34,28 @@ The workflow is:
 4. The browser runs a reproducible seeded simulation.
 5. The app stores and displays aggregate analytics, decision confidence, and replayable hand histories.
 
-The poker engine, evaluator, agents, player model, simulator, and analytics remain browser-executed TypeScript. Supabase provides user authentication and persistence; it does not run simulations.
+The poker engine, evaluator, agents, player model, simulator, and analytics remain browser-executed JavaScript. Supabase provides user authentication and persistence; it does not run simulations.
 
 ## Main technology
 
 - Next.js `15.5.20`, App Router, Turbopack
 - React `19.1.0`
-- TypeScript in strict mode
+- JavaScript and JSX
 - Tailwind CSS 4
 - Recharts
 - Zod
 - Vitest
 - Supabase Auth and Postgres
 - `@supabase/supabase-js` and `@supabase/ssr`
+
+## JavaScript migration completed
+
+- All application routes, components, libraries, middleware, configuration, and tests now use `.js` or `.jsx` files.
+- The migration removed compile-time annotations while preserving the same runtime expressions, component tree, styling, routes, storage behavior, seeded simulation behavior, and test coverage.
+- `jsconfig.json` retains the existing `@/*` import alias without enabling JavaScript type checking.
+- TypeScript-only dependencies, generated declarations, compile-only domain files, and the TypeScript check script were removed.
+- Post-migration validation passes all 72 Vitest tests, ESLint, and the full Next.js production build across every existing route.
+- A repository scan confirms no `.ts`, `.tsx`, or `.d.ts` source files remain.
 
 ## Timing-aware calibration and simulation completed
 
@@ -175,12 +184,12 @@ QuantPoker now explains its poker acronyms and advanced analytics without removi
 
 ### Authentication
 
-- Email/password sign-up and sign-in are implemented at `app/login/page.tsx`.
-- Sign-out is available in `components/Nav.tsx`.
-- `app/auth/confirm/route.ts` handles PKCE codes and email OTP confirmation links.
-- `middleware.ts` and `lib/supabase/middleware.ts` refresh the cookie-backed session and redirect unauthenticated cloud-mode users to `/login`.
-- This repository uses Next.js 15, so the entry point is `middleware.ts`, not the Next.js 16 `proxy.ts` convention.
-- Authentication redirects pass through `lib/auth/redirect.ts`. The validator rejects absolute, scheme-relative, and backslash-based external redirect attempts.
+- Email/password sign-up and sign-in are implemented at `app/login/page.jsx`.
+- Sign-out is available in `components/Nav.jsx`.
+- `app/auth/confirm/route.js` handles PKCE codes and email OTP confirmation links.
+- `middleware.js` and `lib/supabase/middleware.js` refresh the cookie-backed session and redirect unauthenticated cloud-mode users to `/login`.
+- This repository uses Next.js 15, so the entry point is `middleware.js`, not the Next.js 16 `proxy.js` convention.
+- Authentication redirects pass through `lib/auth/redirect.js`. The validator rejects absolute, scheme-relative, and backslash-based external redirect attempts.
 - No service-role or Supabase secret key is used by browser code.
 
 ### Environment and mode selection
@@ -241,7 +250,7 @@ Important database behavior:
 
 ### Storage adapter
 
-All persistence remains behind `DataStore` in `lib/storage/store.ts`.
+All persistence remains behind the shared data-store contract in `lib/storage/store.js`.
 
 Implemented operations include:
 
@@ -299,7 +308,7 @@ The resulting persistent run state changes only through the row-locked database 
 
 Validation on deployed feature commit `cecf6ba` passed:
 
-- TypeScript: clean (`tsc --noEmit`)
+- Pre-migration TypeScript check: clean (`tsc --noEmit`)
 - ESLint: clean
 - Vitest: 8 test files, 67 tests passed
 - Next.js production build: passed
@@ -310,14 +319,14 @@ Validation on deployed feature commit `cecf6ba` passed:
 
 New application tests include:
 
-- `tests/storage.test.ts`
+- `tests/storage.test.js`
   - Non-finite JSON values round-trip correctly
   - Normalized database fields override stale JSON payload metadata
   - Calibration deletion maps to a nullable experiment reference
-- `tests/redirect.test.ts`
+- `tests/redirect.test.js`
   - Local redirect paths are retained
   - Absolute, scheme-relative, backslash, and JavaScript redirect attempts are rejected
-- `tests/timing.test.ts`
+- `tests/timing.test.js`
   - Snap, normal, and tank classification plus legal timeout defaults
   - Timing propagation from actions into subsequent opponent contexts
   - Fixed 500ms live opponent previews preserve the full simulated decision time on applied actions
@@ -325,7 +334,7 @@ New application tests include:
   - Behavioral policy v1 deserialization remains compatible with the v2 timing model
   - High-speed simulations record bounded virtual action timing without waiting
   - Per-hand Check/Fold records an intentional first action, omits artificial timing on automatic follow-ups, and resets for the next hand
-- `tests/review.test.ts`
+- `tests/review.test.js`
   - Review candidates are spread across stored hands and exclude missing histories
   - User-selected review counts are honored and safely bounded
   - Range-first review excludes the entire dealt hand when its starting class is outside the explicit range
@@ -365,47 +374,45 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 
 ## Important source map
 
-- `app/page.tsx` — dashboard hero, default calibration entry, workflow, and recent experiment summary
-- `app/calibrate/page.tsx` — creates and saves calibration datasets
-- `app/range-calibrate/page.tsx` — explicit 169-hand range selection plus timed betting calibration
-- `app/glossary/page.tsx` — full beginner-friendly poker and advanced analytics glossary
-- `app/experiments/new/page.tsx` — creates experiments
-- `app/experiments/[id]/page.tsx` — runs simulations and atomically finalizes results/hands
-- `app/experiments/page.tsx` — previous-experiment history and saved-run entry points
-- `app/accuracy/page.tsx` — in-browser review-feedback summary
-- `app/settings/page.tsx` — active storage summary, delete operations, browser import
-- `app/login/page.tsx` — sign-in/sign-up UI
-- `app/auth/confirm/route.ts` — authentication callback
-- `components/Nav.tsx` — navigation, storage/account indicator, glossary link, and sign-out
-- `components/ActionClock.tsx` — reusable online-style decision countdown
-- `components/PokerTable.tsx` — shared table layout, seat/action display, and calibration-specific user card sizing
-- `components/StartingHandGrid.tsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
-- `lib/audio/poker-sounds.ts` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
-- `components/AnalyticsGlossary.tsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
-- `components/HandReplayer.tsx` — hand replay including voluntary-action timing and timeout labels
-- `components/StrategyReview.tsx` — in-browser simulated-decision survey over stored hands
-- `lib/simulation/timing.ts` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
-- `lib/simulation/manual.ts` — manual calibration loop with real user timing and paced opponents
-- `lib/simulation/table.ts` — virtual timing propagation, timing-aware decision contexts, and user decision logs
-- `lib/player-model/policy.ts` — v2 timing-aware behavioral policy with v1 compatibility
-- `lib/player-model/review.ts` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
-- `lib/agents/agent.ts` — heuristic decisions, virtual pacing, and deliberately weak timing reads
-- `lib/poker/engine.ts` — optional timing metadata on voluntary actions
-- `lib/storage/store.ts` — local and Supabase storage implementations
-- `lib/supabase/client.ts` — browser client
-- `lib/supabase/server.ts` — cookie-aware server client
-- `lib/supabase/middleware.ts` — session refresh and route protection
-- `lib/supabase/config.ts` — environment detection
-- `lib/auth/redirect.ts` — safe internal redirect validation
-- `types/database.ts` — database client types
-- `types/decision.ts` — decision context, opponent timing cue, user response timing, and timeout fields
-- `types/experiment.ts` — domain types, nullable calibration reference, timing-aware logs, and simulation version
-- `types/poker.ts` — poker domain models including optional action timing metadata
+- `app/page.jsx` — dashboard hero, default calibration entry, workflow, and recent experiment summary
+- `app/calibrate/page.jsx` — creates and saves calibration datasets
+- `app/range-calibrate/page.jsx` — explicit 169-hand range selection plus timed betting calibration
+- `app/glossary/page.jsx` — full beginner-friendly poker and advanced analytics glossary
+- `app/experiments/new/page.jsx` — creates experiments
+- `app/experiments/[id]/page.jsx` — runs simulations and atomically finalizes results/hands
+- `app/experiments/page.jsx` — previous-experiment history and saved-run entry points
+- `app/accuracy/page.jsx` — in-browser review-feedback summary
+- `app/settings/page.jsx` — active storage summary, delete operations, browser import
+- `app/login/page.jsx` — sign-in/sign-up UI
+- `app/auth/confirm/route.js` — authentication callback
+- `components/Nav.jsx` — navigation, storage/account indicator, glossary link, and sign-out
+- `components/ActionClock.jsx` — reusable online-style decision countdown
+- `components/PokerTable.jsx` — shared table layout, seat/action display, and calibration-specific user card sizing
+- `components/StartingHandGrid.jsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
+- `lib/audio/poker-sounds.js` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
+- `components/AnalyticsGlossary.jsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
+- `components/HandReplayer.jsx` — hand replay including voluntary-action timing and timeout labels
+- `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands
+- `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
+- `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
+- `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, and user decision logs
+- `lib/player-model/policy.js` — v2 timing-aware behavioral policy with v1 compatibility
+- `lib/player-model/review.js` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
+- `lib/agents/agent.js` — heuristic decisions, virtual pacing, and deliberately weak timing reads
+- `lib/poker/engine.js` — optional timing metadata on voluntary actions
+- `lib/storage/store.js` — local and Supabase storage implementations
+- `lib/supabase/client.js` — browser client
+- `lib/supabase/server.js` — cookie-aware server client
+- `lib/supabase/middleware.js` — session refresh and route protection
+- `lib/supabase/config.js` — environment detection
+- `lib/auth/redirect.js` — safe internal redirect validation
+- `types/experiment.js` — runtime validation schemas and simulation version
+- `types/poker.js` — shared poker constants
 - `supabase/migrations/20260717000000_initial_user_data.sql` — schema, RLS, triggers, finalizer
 - `supabase/migrations/20260717010000_strategy_reviews.sql` — normalized review feedback, RLS, and atomic experiment/review save function
 - `supabase/tests/database/schema_and_rls.test.sql` — pgTAP database tests
-- `tests/timing.test.ts` — timing classification, propagation, learning, compatibility, and batch-run coverage
-- `tests/review.test.ts` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage
+- `tests/timing.test.js` — timing classification, propagation, learning, compatibility, and batch-run coverage
+- `tests/review.test.js` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage
 - `README.md` — operator setup
 - `docs/ARCHITECTURE.md` — system design
 - `docs/PLAN.md` — original build and executed Supabase plan

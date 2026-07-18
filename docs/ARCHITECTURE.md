@@ -2,7 +2,7 @@
 
 ## Overview
 
-Everything below `app/` is a pure TypeScript library with no DOM or Next.js dependencies. Pages are thin clients over `lib/`. This split is deliberate: the simulation core can be lifted into a worker service or CLI unchanged.
+Everything below `app/` is a pure JavaScript library with no DOM or Next.js dependencies. Pages are thin clients over `lib/`. This split is deliberate: the simulation core can be lifted into a worker service or CLI unchanged.
 
 ```
 UI (app/, components/)      ← client components, charts, replay
@@ -16,11 +16,11 @@ lib/poker/                  ← engine, evaluator (+ fast path), equity, deck, s
 lib/analytics/  lib/storage/     ← incremental aggregates · DataStore interface
 ```
 
-## Poker engine (`lib/poker/engine.ts`)
+## Poker engine (`lib/poker/engine.js`)
 
 A single `HandEngine` instance owns one hand: blinds, dealing, betting rounds, street progression with burn cards, all-in runouts, side pots, rake, settlement.
 
-Correctness properties enforced by tests (`tests/engine.test.ts`):
+Correctness properties enforced by tests (`tests/engine.test.js`):
 
 - **Chip conservation**: for every hand, Σ net across seats = −rake. Verified on hand-crafted scenarios and a 50-hand randomized fuzz.
 - **Min-raise rules**: raise size must be ≥ the last raise increment; an all-in below the minimum raise does **not** reopen betting sizes.
@@ -37,11 +37,11 @@ Two evaluators, cross-validated against each other in tests over random samples:
 - `evaluate5/evaluate7` — reference implementation, best-of-21 5-card combos, readable and used for showdown categories displayed in the UI.
 - `fastScore7` — allocation-free bitmask evaluator (rank counts, suit masks, straight detection via bit runs) that produces scores on the same total order. Used in the Monte Carlo hot path; ~20–30× faster.
 
-## Equity (`lib/poker/equity.ts`)
+## Equity (`lib/poker/equity.js`)
 
 Monte Carlo: deal random opponent hands and runouts with the seeded RNG, score with `fastScore7`, average win/tie share. Iteration counts scale with agent skill (60–140). All equity figures in the product are labeled estimates.
 
-## Seeded randomness (`lib/poker/rng.ts`)
+## Seeded randomness (`lib/poker/rng.js`)
 
 mulberry32 with a string-hash seed. `getState()/setState()` allow checkpointing (each hand history stores the RNG state before the deal). One RNG instance drives an entire simulation, so a `(seed, config, version)` triple fully determines every card, every agent decision, and every pool event. Reproducibility is covered by tests.
 
@@ -59,8 +59,8 @@ Per-instance jitter means two "TAGs" at the same table play slightly differently
 
 Two layers:
 
-1. **Descriptive tendencies** (`stats.ts`) — classic HUD-style frequencies computed from recorded decisions, each reported as a Laplace-smoothed estimate with a **Wilson 95% interval** and a sample-size-based confidence weight. These power the profile page; nothing here feeds simulation directly.
-2. **Behavioral policy** (`policy.ts`) — the generative model used in simulation. Decisions are bucketed by `street × position-class × facing-situation × hand-strength-quartile × opponent-timing` (strength via MC equity at decision time; timing is none/snap/normal/tank). Each bucket stores action counts, observed bet sizes, and response-time samples by action. At simulation time:
+1. **Descriptive tendencies** (`stats.js`) — classic HUD-style frequencies computed from recorded decisions, each reported as a Laplace-smoothed estimate with a **Wilson 95% interval** and a sample-size-based confidence weight. These power the profile page; nothing here feeds simulation directly.
+2. **Behavioral policy** (`policy.js`) — the generative model used in simulation. Decisions are bucketed by `street × position-class × facing-situation × hand-strength-quartile × opponent-timing` (strength via MC equity at decision time; timing is none/snap/normal/tank). Each bucket stores action counts, observed bet sizes, and response-time samples by action. At simulation time:
    - probabilities = shrinkage blend of bucket counts with a strength-aware prior, `weight = n / (n + K)` with `K = 8`;
    - hierarchical fallback to coarser buckets when the exact one is empty;
    - timing-specific buckets fall back to untimed v1-compatible buckets when samples are sparse;
@@ -70,40 +70,51 @@ Two layers:
 
 Range-first calibrations add an explicit 169-hand first-in range to the serialized policy. Unselected hands fold when voluntarily entering an unraised pot (or check a free big-blind option); selected hands always continue and the learned policy chooses the action and size. The explicit chart is deliberately not applied when facing a raise, where recorded reactions and the normal model prior still govern play.
 
-   Every simulated decision logs its probabilities and its **confidence** (data-vs-prior weight); the experiment page reports the average so users can see how much of "their" play was actually theirs.
+Every simulated decision logs its probabilities and its **confidence** (data-vs-prior weight); the experiment page reports the average so users can see how much of "their" play was actually theirs.
 
-## Table session & turnover (`lib/simulation/table.ts`)
+## Table session & turnover (`lib/simulation/table.js`)
 
 `TableSession` owns seats across hands: geometric session lengths, stop-loss/stop-win departures measured in buy-ins, rebuy probability when felted, random churn, and replacement draws from the weighted pool with pool-level skill/looseness/aggression multipliers. The user auto-rebuys and buy-ins are counted. Button rotation skips empty seats; short-handed play (down to HU) works.
 
 Every voluntary action also carries a seeded virtual decision time. Manual calibration gives the user a real 15-second clock but compresses each opponent turn to a fixed 500ms preview; the opponent's full simulated time remains on the action and is shown at the seat. A per-hand Check/Fold shortcut records the initial intentional response, then automatically checks when free or folds to a wager for the rest of that hand without inventing zero-time timing samples. Batch runs record the same timing metadata without sleeping. `DecisionContext` exposes the most recent opponent action time on the current street. Learned user behavior conditions directly on that cue. Heuristic opponents use only a deliberately capped timing tell (a few equity points at most), because real-world timing signals are noisy.
 
-## Batch runner (`lib/simulation/runner.ts`)
+## Batch runner (`lib/simulation/runner.js`)
 
 `runSimulation` is environment-agnostic: an async chunked loop (default 200 hands/chunk) that yields to the event loop, reports progress, honors a cancel callback, and returns aggregates + stored hands. In the browser it keeps the UI responsive; on a server it can run as-is inside a job worker.
 
-## Post-simulation strategy review (`components/StrategyReview.tsx`, `lib/player-model/review.ts`)
+## Post-simulation strategy review (`components/StrategyReview.jsx`, `lib/player-model/review.js`)
 
 Completed runs retain the full `DecisionContext`, action index, sampled action, sizing, probabilities, and confidence for simulated-user decisions. Before a review starts, the tester chooses any count from one through the available eligible hands. The review UI selects one low-confidence decision from each chosen hand spread across the stored run, reconstructs the table immediately before that action, and reveals no future board cards while the tester judges the decision. For range-first strategies, every decision from a dealt hand outside the active explicit starting range is excluded as a redundant known fold.
 
 Every confirmation or correction becomes a `RecordedDecision`. Direct review feedback is weighted more heavily than an ordinary calibration observation, then replayed from the immutable base calibration to build an experiment-specific serialized policy. Explicit range-first charts are also updated when first-in feedback adds or removes a starting hand. A correction round is persisted before the same seeded experiment reruns; an all-agree round marks the model accepted without another run. Rerun cancellation leaves a durable pending state that can be retried.
 
-## Analytics (`lib/analytics/aggregate.ts`)
+## Analytics (`lib/analytics/aggregate.js`)
 
 `Aggregator` is incremental — O(1) per hand plus a downsampled equity curve (max ~2,000 points, stride doubling) — so 500k-hand runs don't hold 500k objects. Outputs: bb/100, per-hand σ, 95% CI, significance flag, max drawdown, profit factor, showdown/non-showdown split, rake, breakdowns by position/hole cards/stack depth/pot type, action mix, bet-size histogram. `riskOfRuin` uses the classical diffusion approximation `exp(−2·wr·bankroll/σ²)`.
 
-## Storage (`lib/storage/store.ts`)
+## Storage (`lib/storage/store.js`)
 
-All persistence goes through the `DataStore` interface. In addition to calibration, experiment, and hand operations, it exposes strategy-review list/save operations and an atomic experiment-review commit:
+All persistence goes through the shared data-store contract. In addition to calibration, experiment, and hand operations, it exposes strategy-review list/save operations and an atomic experiment-review commit:
 
-```ts
-interface DataStore {
-  listCalibrations(); getCalibration(id); saveCalibration(c); deleteCalibration(id);
-  listExperiments(); getExperiment(id); saveExperiment(e); deleteExperiment(id);
-  saveHands(experimentId, hands); getHands(experimentId); saveExperimentRun(experiment, hands);
-  listStrategyReviews(); saveStrategyReview(review); saveExperimentReview(experiment, review);
-  getStorageSummary(); deleteAll();
-}
+```js
+const dataStore = {
+  listCalibrations() {},
+  getCalibration(id) {},
+  saveCalibration(calibration) {},
+  deleteCalibration(id) {},
+  listExperiments() {},
+  getExperiment(id) {},
+  saveExperiment(experiment) {},
+  deleteExperiment(id) {},
+  saveHands(experimentId, hands) {},
+  getHands(experimentId) {},
+  saveExperimentRun(experiment, hands) {},
+  listStrategyReviews() {},
+  saveStrategyReview(review) {},
+  saveExperimentReview(experiment, review) {},
+  getStorageSummary() {},
+  deleteAll() {},
+};
 ```
 
 Two implementations ship:

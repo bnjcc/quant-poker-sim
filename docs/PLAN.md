@@ -33,7 +33,7 @@ A calibrate → learn → simulate → analyze loop for 6-max NLHE cash games:
 
 ## Build order (executed)
 
-types → RNG/deck/evaluator → engine (+tests) → equity fast path → agents → player model → table session/turnover → runner/manual session → aggregator → storage → tests (simulation/model) → UI (theme, table, calibrate, profile, experiments, results, replay, compare, opponents, settings, dashboard) → docs → build/lint/typecheck → git commit → package.
+domain models → RNG/deck/evaluator → engine (+tests) → equity fast path → agents → player model → table session/turnover → runner/manual session → aggregator → storage → tests (simulation/model) → UI (theme, table, calibrate, profile, experiments, results, replay, compare, opponents, settings, dashboard) → docs → test/lint/build → git commit → package.
 
 ## Supabase incorporation plan (executed)
 

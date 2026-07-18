@@ -2,7 +2,7 @@
 
 Play a small calibration sample yourself, let the system learn a behavioral model of *your* strategy, then backtest that model over hundreds of thousands of simulated hands against configurable opponent pools — and analyze the results like a quant.
 
-6-max No-Limit Hold'em cash games. Next.js 15 · Supabase · TypeScript (strict) · Tailwind v4 · Recharts · Zod · Vitest.
+6-max No-Limit Hold'em cash games. Next.js 15 · Supabase · JavaScript · Tailwind v4 · Recharts · Zod · Vitest.
 
 ## Quick start
 
@@ -13,7 +13,6 @@ npm run dev        # http://localhost:3000
 
 ```bash
 npm test           # unit + integration tests (engine, side pots, seeds, turnover, model)
-npm run typecheck  # tsc --noEmit
 npm run lint
 npm run build      # production build
 ```
