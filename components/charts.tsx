@@ -62,7 +62,7 @@ export function BreakdownBars({
         <YAxis {...AXIS} tickLine={false} width={54} />
         <Tooltip
           contentStyle={TOOLTIP_STYLE}
-          formatter={(v, _n, item) => [`${v} ${metric === "bb100" ? "bb/100" : "chips"} · ${item?.payload?.hands} hands`, ""]}
+          formatter={(v, _n, item) => [`${v}${metric === "bb100" ? "%" : " chips"} · ${item?.payload?.hands} hands`, ""]}
         />
         <ReferenceLine y={0} stroke="var(--muted)" />
         <Bar dataKey="value" isAnimationActive={false} radius={[3, 3, 0, 0]}>
@@ -124,7 +124,7 @@ export function StartingHandHeatmap({ rows }: { rows: Record<string, BreakdownRo
                 key={key}
                 className="mono aspect-square flex items-center justify-center text-[9px] rounded-[2px] cursor-default"
                 style={{ background: bg, color: v === null ? "var(--muted)" : "var(--ink)" }}
-                title={row ? `${key}: ${row.bb100.toFixed(1)} bb/100 over ${row.hands} hands` : `${key}: not dealt`}
+                title={row ? `${key}: ${row.bb100.toFixed(1)}% over ${row.hands} hands` : `${key}: not dealt`}
               >
                 {key}
               </div>
@@ -133,7 +133,7 @@ export function StartingHandHeatmap({ rows }: { rows: Record<string, BreakdownRo
         )}
       </div>
       <div className="text-[11px] text-muted mt-2">
-        Green = won, red = lost (bb/100). Cells without data were never dealt. Per-hand samples are tiny — treat as
+        Green = won, red = lost (win rate %). Cells without data were never dealt. Per-hand samples are tiny — treat as
         descriptive, not predictive.
       </div>
     </div>

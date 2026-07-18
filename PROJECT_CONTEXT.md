@@ -157,6 +157,17 @@ QuantPoker now explains its poker acronyms and advanced analytics without removi
 - Important inline labels now expand unfamiliar terms, for example `PFR — preflop raise`, `C-bet — continuation bet`, `Volatility (std dev)`, and `SPR (stack/pot)`.
 - The glossary explicitly teaches users to interpret a statistic together with its opportunity count, uncertainty interval, and strategic context.
 
+## Beginner-first results, expanded reviews, and calibration feedback completed
+
+- User-facing normalized win-rate analytics now display as percentages instead of `bb/100`. The underlying aggregate field and math remain unchanged for storage and backwards compatibility.
+- Experiment results reveal complexity progressively: a plain-English outcome and four basic result cards appear first; bankroll curves, result sources, and strategic breakdowns follow; confidence ranges, volatility, drawdown, profit factor, model confidence, timing, and bankroll-risk calculations sit in a clearly labeled advanced section farther down.
+- Dashboard, experiment history, comparison tables, chart tooltips, starting-hand heatmaps, manual comparisons, and the glossary use the same percentage presentation.
+- Strategy profiles show their simple overview before the glossary and detailed statistical interpretation.
+- Simulated Hand Review makes review lengths above eight discoverable with 8, 16, 25, 50, and all-available shortcuts while retaining an exact custom count.
+- A corrected review bet or raise automatically starts at the calibration flow's legal two-thirds-pot suggestion. Review corrections also expose the same sizing slider and 50%, 66%, pot, and all-in shortcuts.
+- Both all-hands and range-first calibration synthesize lightweight card-deal and decision sounds without external media files. Sounds default on after a user gesture, persist their mute state locally, and have an in-session toggle.
+- Calibration hole cards and newly revealed board cards turn into view with staggered card animation. Reduced-motion preferences continue to collapse animation duration globally.
+
 ## Supabase work completed
 
 ### Authentication
@@ -371,6 +382,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `components/ActionClock.tsx` — reusable online-style decision countdown
 - `components/PokerTable.tsx` — shared table layout, seat/action display, and calibration-specific user card sizing
 - `components/StartingHandGrid.tsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
+- `lib/audio/poker-sounds.ts` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
 - `components/AnalyticsGlossary.tsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
 - `components/HandReplayer.tsx` — hand replay including voluntary-action timing and timeout labels
 - `components/StrategyReview.tsx` — in-browser simulated-decision survey over stored hands

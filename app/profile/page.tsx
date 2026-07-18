@@ -168,8 +168,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <AnalyticsGlossary groups={["poker", "positions", "model"]} title="What do VPIP, PFR, 3-bet, and confidence mean?" />
-
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Stat label={rangeFirst ? "Betting samples" : "Calibration hands"} value={String(cal.handsPlayed)} sub={`${cal.decisions.length} decisions`} />
         {rangeFirst ? (
@@ -271,6 +269,10 @@ export default function ProfilePage() {
             samples from your observed sizes when enough exist, blended with a ⅔-pot prior.
           </div>
         </section>
+      </div>
+
+      <div className="mt-8">
+        <AnalyticsGlossary groups={["poker", "positions", "model"]} title="Explain the detailed strategy statistics" />
       </div>
 
       <div className="text-xs text-muted mt-6 max-w-3xl">

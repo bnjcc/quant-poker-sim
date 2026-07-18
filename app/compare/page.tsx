@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
-import { Empty, PageHeader, fmtPct } from "@/components/ui";
+import { Empty, PageHeader, fmtPct, fmtWinRatePct } from "@/components/ui";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 
 export default function ComparePage() {
@@ -39,13 +39,13 @@ export default function ComparePage() {
   const metrics: { label: string; get: (e: Experiment) => string; tone?: (e: Experiment) => string }[] = [
     { label: "Hands", get: (e) => e.results!.totalHands.toLocaleString() },
     {
-      label: "bb/100",
-      get: (e) => `${e.results!.bb100 >= 0 ? "+" : ""}${e.results!.bb100.toFixed(1)}`,
+      label: "Win rate",
+      get: (e) => fmtWinRatePct(e.results!.bb100),
       tone: (e) => (e.results!.bb100 >= 0 ? "var(--gain)" : "var(--loss)"),
     },
-    { label: "95% CI", get: (e) => `${e.results!.ciLow.toFixed(1)} … ${e.results!.ciHigh.toFixed(1)}` },
+    { label: "95% CI", get: (e) => `${e.results!.ciLow.toFixed(1)}% … ${e.results!.ciHigh.toFixed(1)}%` },
     { label: "Significant", get: (e) => (e.results!.statisticallySignificant ? "yes" : "no") },
-    { label: "Std dev (bb/100)", get: (e) => e.results!.stdDevBB100.toFixed(0) },
+    { label: "Volatility", get: (e) => `${e.results!.stdDevBB100.toFixed(0)}%` },
     { label: "Max drawdown (bb)", get: (e) => e.results!.maxDrawdownBB.toFixed(0) },
     { label: "Showdown net (bb)", get: (e) => e.results!.showdownNetBB.toFixed(0) },
     { label: "Non-showdown net (bb)", get: (e) => e.results!.nonShowdownNetBB.toFixed(0) },
@@ -59,7 +59,6 @@ export default function ComparePage() {
   return (
     <div>
       <PageHeader title="Compare experiments" sub="Pick up to four completed runs. Differences smaller than the confidence intervals are noise, not signal." />
-      <AnalyticsGlossary groups={["analytics"]} title="How to read the comparison metrics" />
       <div className="flex flex-wrap gap-2 mb-5">
         {exps.map((e) => (
           <button key={e.id} className={`btn text-xs ${picked.includes(e.id) ? "btn-primary" : ""}`} onClick={() => toggle(e.id)}>
@@ -95,6 +94,9 @@ export default function ComparePage() {
           </table>
         </div>
       )}
+      <div className="mt-6">
+        <AnalyticsGlossary groups={["analytics"]} title="Explain the advanced comparison metrics" />
+      </div>
     </div>
   );
 }

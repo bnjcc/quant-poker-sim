@@ -6,7 +6,17 @@ import { cardToString } from "@/lib/poker/deck";
 
 const SUIT_GLYPH: Record<string, string> = { s: "♠", h: "♥", d: "♦", c: "♣" };
 
-export function CardGlyph({ card, size = "md" }: { card: Card; size?: "sm" | "md" | "lg" }) {
+export function CardGlyph({
+  card,
+  size = "md",
+  animated = false,
+  animationDelayMs = 0,
+}: {
+  card: Card;
+  size?: "sm" | "md" | "lg";
+  animated?: boolean;
+  animationDelayMs?: number;
+}) {
   const red = card.suit === "h" || card.suit === "d";
   const cls =
     size === "lg"
@@ -16,8 +26,11 @@ export function CardGlyph({ card, size = "md" }: { card: Card; size?: "sm" | "md
         : "text-sm px-1.5 py-0.5 min-w-[2rem]";
   return (
     <span
-      className={`playing-card mono inline-flex items-center justify-center font-bold ${cls}`}
-      style={{ color: red ? "var(--suit-red)" : "#18212b" }}
+      className={`playing-card mono inline-flex items-center justify-center font-bold ${cls} ${animated ? "card-turn-in" : ""}`}
+      style={{
+        color: red ? "var(--suit-red)" : "#18212b",
+        ...(animated ? { animationDelay: `${animationDelayMs}ms` } : {}),
+      }}
       aria-label={cardToString(card)}
     >
       {cardToString(card)[0]}
@@ -26,11 +39,27 @@ export function CardGlyph({ card, size = "md" }: { card: Card; size?: "sm" | "md
   );
 }
 
-export function CardRow({ cards, size = "md" }: { cards: Card[]; size?: "sm" | "md" | "lg" }) {
+export function CardRow({
+  cards,
+  size = "md",
+  animated = false,
+  animationKey = "cards",
+}: {
+  cards: Card[];
+  size?: "sm" | "md" | "lg";
+  animated?: boolean;
+  animationKey?: string | number;
+}) {
   return (
-    <span className="inline-flex gap-1">
+    <span className={`inline-flex gap-1 ${animated ? "card-row-perspective" : ""}`}>
       {cards.map((c, i) => (
-        <CardGlyph key={i} card={c} size={size} />
+        <CardGlyph
+          key={`${animationKey}:${c.rank}${c.suit}:${i}`}
+          card={c}
+          size={size}
+          animated={animated}
+          animationDelayMs={i * 75}
+        />
       ))}
     </span>
   );
@@ -122,4 +151,9 @@ export function fmtChips(x: number): string {
 
 export function fmtPct(x: number, digits = 0): string {
   return `${(x * 100).toFixed(digits)}%`;
+}
+
+/** bb won per 100 hands, expressed as the equivalent normalized percentage. */
+export function fmtWinRatePct(x: number, digits = 1): string {
+  return `${x >= 0 ? "+" : ""}${x.toFixed(digits)}%`;
 }

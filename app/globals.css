@@ -283,6 +283,8 @@ input[type="range"] { accent-color: var(--accent); }
 .stat-card:hover { border-color: rgba(var(--accent-rgb),.28); transform: translateY(-1px); }
 .stat-value { letter-spacing: -.045em; }
 .playing-card { border: 1px solid rgba(255,255,255,.7); border-radius: .35rem; background: linear-gradient(145deg, #fff, #dfe3e8); box-shadow: 0 4px 10px rgba(0,0,0,.26), inset 0 0 0 1px rgba(0,0,0,.05); text-shadow: 0 1px 0 white; }
+.card-row-perspective { perspective: 520px; }
+.card-turn-in { transform-origin: center bottom; backface-visibility: hidden; animation: cardTurnIn 420ms cubic-bezier(.2,.75,.22,1) both; }
 .poker-table { border: 7px solid color-mix(in srgb, var(--accent) 10%, #272b31); background: radial-gradient(ellipse at 50% 42%, var(--table-felt-inner) 0%, var(--table-felt-middle) 58%, var(--table-felt-edge) 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.04), inset 0 0 70px rgba(0,0,0,.56), 0 25px 60px rgba(0,0,0,.35), 0 0 0 1px #060708, 0 0 32px rgba(var(--accent-rgb), .08); }
 .poker-table::before { content: ""; position: absolute; inset: 4%; border: 1px solid rgba(255,255,255,.045); border-radius: inherit; pointer-events: none; }
 .poker-table::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .18; background-image: radial-gradient(rgba(255,255,255,.12) .6px, transparent .6px); background-size: 5px 5px; mask-image: radial-gradient(ellipse, black, transparent 74%); }
@@ -306,6 +308,7 @@ input[type="range"] { accent-color: var(--accent); }
 @keyframes cardFloat { 0%,100% { transform: translate(-32%,-49%) rotate(8deg); } 50% { transform: translate(-32%,-53%) rotate(7deg); } }
 @keyframes seatPulse { 0%,100% { box-shadow: 0 0 1.2rem rgba(var(--accent-rgb),.36), inset 0 0 1rem rgba(var(--accent-rgb),.04); } 50% { box-shadow: 0 0 1.8rem rgba(var(--accent-rgb),.55), inset 0 0 1rem rgba(var(--accent-rgb),.08); } }
 @keyframes neonQueen { 0%,8%,10%,100% { opacity: 1; } 8.5% { opacity: .72; } 9.2% { opacity: .92; } 61%,63% { filter: drop-shadow(0 0 3px rgba(var(--accent-rgb),.9)) drop-shadow(0 0 11px rgba(var(--accent-rgb),.4)); } 62% { filter: drop-shadow(0 0 1px rgba(var(--accent-rgb),.6)) drop-shadow(0 0 5px rgba(var(--accent-rgb),.28)); } }
+@keyframes cardTurnIn { from { opacity: 0; transform: translateY(-10px) rotateY(92deg) rotateZ(-3deg) scale(.92); } 60% { opacity: 1; transform: translateY(1px) rotateY(-7deg) rotateZ(1deg) scale(1.02); } to { opacity: 1; transform: translateY(0) rotateY(0) rotateZ(0) scale(1); } }
 
 @media (max-width: 900px) {
   .dashboard-hero { grid-template-columns: 1fr; }

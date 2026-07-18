@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalibrationDataset, Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
-import { Empty, PageHeader, fmtBB } from "@/components/ui";
+import { Empty, PageHeader, fmtWinRatePct } from "@/components/ui";
 
 export default function ExperimentsPage() {
   const [exps, setExps] = useState<Experiment[] | null>(null);
@@ -75,7 +75,7 @@ export default function ExperimentsPage() {
               <th className="label px-4 py-3 font-normal">Status</th>
               <th className="label px-4 py-3 font-normal">Strategy</th>
               <th className="label px-4 py-3 font-normal text-right">Hands</th>
-              <th className="label px-4 py-3 font-normal text-right">bb/100</th>
+              <th className="label px-4 py-3 font-normal text-right">Win rate</th>
               <th className="label px-4 py-3 font-normal text-right">95% CI</th>
               <th className="label px-4 py-3 font-normal">Created</th>
               <th className="px-4 py-3" />
@@ -118,10 +118,10 @@ export default function ExperimentsPage() {
                   </td>
                   <td className="px-4 py-3 text-right mono">{r ? r.totalHands.toLocaleString() : e.config.hands.toLocaleString()}</td>
                   <td className="px-4 py-3 text-right mono font-bold" style={{ color: r ? (r.bb100 >= 0 ? "var(--gain)" : "var(--loss)") : "var(--muted)" }}>
-                    {r ? fmtBB(r.bb100) : "—"}
+                    {r ? fmtWinRatePct(r.bb100) : "—"}
                   </td>
                   <td className="px-4 py-3 text-right mono text-xs text-muted">
-                    {r ? `${r.ciLow.toFixed(1)} … ${r.ciHigh.toFixed(1)}` : "—"}
+                    {r ? `${r.ciLow.toFixed(1)}% … ${r.ciHigh.toFixed(1)}%` : "—"}
                   </td>
                   <td className="px-4 py-3 text-xs text-muted">{new Date(e.createdAt).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">

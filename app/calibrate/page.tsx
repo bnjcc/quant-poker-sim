@@ -19,6 +19,7 @@ import { buildPoolConfig, CALIBRATION_SIZES, DEFAULT_POOL_SETTINGS, DEFAULT_TABL
 import { BehavioralPolicy } from "@/lib/player-model/policy";
 import { computeTendencies } from "@/lib/player-model/stats";
 import { Aggregator } from "@/lib/analytics/aggregate";
+import { usePokerSounds } from "@/lib/audio/poker-sounds";
 import { getStore, newId } from "@/lib/storage/store";
 import { PokerTable, SeatView } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
@@ -32,7 +33,9 @@ export default function CalibratePage() {
   const advanceRef = useRef<(session: ManualSession) => void>(() => undefined);
   const opponentTimerRef = useRef<number | null>(null);
   const activeDecisionRef = useRef<DecisionContext | null>(null);
+  const audibleCardsRef = useRef<{ handNumber: number; boardCount: number } | null>(null);
   const decisionStartedAtRef = useRef(0);
+  const sounds = usePokerSounds();
   const [phase, setPhase] = useState<Phase>("setup");
   const [target, setTarget] = useState<number>(50);
   const [customTarget, setCustomTarget] = useState("");
@@ -49,6 +52,8 @@ export default function CalibratePage() {
   const rerender = () => force((x) => x + 1);
 
   const start = useCallback(() => {
+    sounds.unlock();
+    audibleCardsRef.current = null;
     const hands = customTarget ? Math.max(5, Math.min(2000, Number(customTarget) || 50)) : target;
     const ms = new ManualSession({
       config: DEFAULT_TABLE,
@@ -60,10 +65,22 @@ export default function CalibratePage() {
     sessionRef.current = ms;
     setPhase("playing");
     advanceRef.current(ms);
-  }, [target, customTarget]);
+  }, [target, customTarget, sounds]);
 
   const advance = (ms: ManualSession) => {
     const step = ms.step(true);
+    if ("engine" in step) {
+      const previous = audibleCardsRef.current;
+      if (!previous || previous.handNumber !== step.engine.handNumber) {
+        sounds.playDeal(2);
+      } else if (step.engine.board.length > previous.boardCount) {
+        sounds.playDeal(step.engine.board.length - previous.boardCount);
+      }
+      audibleCardsRef.current = {
+        handNumber: step.engine.handNumber,
+        boardCount: step.engine.board.length,
+      };
+    }
     if (step.kind === "awaiting-user") {
       activeDecisionRef.current = step.context;
       decisionStartedAtRef.current = Date.now();
@@ -83,6 +100,10 @@ export default function CalibratePage() {
       opponentTimerRef.current = window.setTimeout(() => {
         opponentTimerRef.current = null;
         ms.completeOpponentAction();
+        const applied = step.engine.actions.at(-1);
+        if (applied && applied.type !== "post-sb" && applied.type !== "post-bb") {
+          sounds.playDecision(applied.type === "all-in" ? "raise" : applied.type);
+        }
         advanceRef.current(ms);
       }, step.liveDelayMs);
     } else if (step.kind === "hand-complete") {
@@ -105,6 +126,7 @@ export default function CalibratePage() {
     if (!ms || !ctx || activeDecisionRef.current !== ctx) return;
     activeDecisionRef.current = null;
     const action = type === "bet" || type === "raise" ? { type, toAmount: betTo } : { type };
+    sounds.playDecision(type);
     ms.submitUserAction(ctx, action, Date.now() - decisionStartedAtRef.current);
     setCtx(null);
     advanceRef.current(ms);
@@ -114,6 +136,7 @@ export default function CalibratePage() {
     const ms = sessionRef.current;
     if (!ms || !ctx || activeDecisionRef.current !== ctx) return;
     activeDecisionRef.current = null;
+    sounds.playDecision(timeoutAction(ctx).type);
     ms.submitCheckFoldForHand(ctx, Date.now() - decisionStartedAtRef.current);
     setCtx(null);
     advanceRef.current(ms);
@@ -129,7 +152,9 @@ export default function CalibratePage() {
       const ms = sessionRef.current;
       if (!ms || activeDecisionRef.current !== ctx) return;
       activeDecisionRef.current = null;
-      ms.submitUserAction(ctx, timeoutAction(ctx), ACTION_CLOCK_MS, true);
+      const action = timeoutAction(ctx);
+      sounds.playDecision(action.type);
+      ms.submitUserAction(ctx, action, ACTION_CLOCK_MS, true);
       setCtx(null);
       advanceRef.current(ms);
     }, Math.max(0, deadline - Date.now()));
@@ -137,7 +162,7 @@ export default function CalibratePage() {
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
-  }, [ctx, phase]);
+  }, [ctx, phase, sounds]);
 
   useEffect(
     () => () => {
@@ -282,9 +307,14 @@ export default function CalibratePage() {
           </span>
           <span className="text-xs text-muted ml-3">{ms.decisions.length} decisions recorded</span>
         </div>
-        <div className="mono text-sm">
-          Stack: <span className="text-accent font-bold">{ms.session.userStack.toLocaleString()}</span>
-          {ms.session.userBuyIns > 1 && <span className="text-muted text-xs ml-2">({ms.session.userBuyIns} buy-ins)</span>}
+        <div className="flex items-center gap-3">
+          <button className="btn text-xs px-2 py-1" type="button" onClick={sounds.toggle} aria-pressed={sounds.enabled}>
+            {sounds.enabled ? "Sound on" : "Sound off"}
+          </button>
+          <div className="mono text-sm">
+            Stack: <span className="text-accent font-bold">{ms.session.userStack.toLocaleString()}</span>
+            {ms.session.userBuyIns > 1 && <span className="text-muted text-xs ml-2">({ms.session.userBuyIns} buy-ins)</span>}
+          </div>
         </div>
       </div>
       <div className="h-1.5 rounded bg-panel2 mb-5 overflow-hidden" role="progressbar" aria-valuenow={Math.round(progress * 100)} aria-valuemin={0} aria-valuemax={100}>
@@ -297,6 +327,8 @@ export default function CalibratePage() {
         pot={engine.potSize}
         street={engine.street}
         fitViewport
+        animateCards
+        cardAnimationKey={engine.handNumber}
       />
 
       <div className="panel mt-5 px-5 py-4">

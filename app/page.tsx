@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalibrationDataset, Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
-import { Stat, fmtBB } from "@/components/ui";
+import { Stat, fmtWinRatePct } from "@/components/ui";
 
 function StepCard({
   n,
@@ -125,14 +125,14 @@ export default function Dashboard() {
               <>
                 <Stat
                   label="Latest win rate"
-                  value={fmtBB(latest.results.bb100) + "/100"}
+                  value={fmtWinRatePct(latest.results.bb100)}
                   tone={latest.results.bb100 >= 0 ? "gain" : "loss"}
                   sub={latest.config.name}
                 />
                 <Stat
                   label="Latest 95% CI"
-                  value={`${latest.results.ciLow.toFixed(1)} … ${latest.results.ciHigh.toFixed(1)}`}
-                  sub="bb/100"
+                  value={`${fmtWinRatePct(latest.results.ciLow)} … ${fmtWinRatePct(latest.results.ciHigh)}`}
+                  sub="win rate range"
                 />
               </>
             )}
@@ -151,7 +151,7 @@ export default function Dashboard() {
                   <span className="text-xs text-muted mono">{e.status}</span>
                   {e.results && (
                     <span className="mono text-sm font-bold ml-auto" style={{ color: e.results.bb100 >= 0 ? "var(--gain)" : "var(--loss)" }}>
-                      {fmtBB(e.results.bb100)}/100
+                      {fmtWinRatePct(e.results.bb100)}
                     </span>
                   )}
                 </Link>

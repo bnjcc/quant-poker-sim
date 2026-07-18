@@ -33,12 +33,16 @@ export function PokerTable({
   pot,
   street,
   fitViewport = false,
+  animateCards = false,
+  cardAnimationKey = "table",
 }: {
   seats: SeatView[];
   board: Card[];
   pot: number;
   street: string;
   fitViewport?: boolean;
+  animateCards?: boolean;
+  cardAnimationKey?: string | number;
 }) {
   // Rotate so the user sits bottom-center.
   const userIdx = Math.max(0, seats.findIndex((s) => s.isUser));
@@ -53,7 +57,12 @@ export function PokerTable({
       <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
         <div className="label">{street}</div>
         {board.length > 0 ? (
-          <CardRow cards={board} size="lg" />
+          <CardRow
+            cards={board}
+            size="lg"
+            animated={animateCards}
+            animationKey={`${cardAnimationKey}:board:${board.length}`}
+          />
         ) : (
           <div className="text-xs text-muted italic">preflop</div>
         )}
@@ -88,7 +97,12 @@ export function PokerTable({
               {s.folded ? (
                 <span className="text-[11px] text-muted italic">folded</span>
               ) : s.holeCards ? (
-                <CardRow cards={s.holeCards} size={fitViewport && s.isUser ? "lg" : "sm"} />
+                <CardRow
+                  cards={s.holeCards}
+                  size={fitViewport && s.isUser ? "lg" : "sm"}
+                  animated={animateCards && s.isUser}
+                  animationKey={`${cardAnimationKey}:seat:${s.seat}`}
+                />
               ) : (
                 <span className="mono text-[13px] tracking-widest text-muted">🂠🂠</span>
               )}

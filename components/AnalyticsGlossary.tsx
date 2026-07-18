@@ -150,10 +150,10 @@ export const GLOSSARY_GROUPS: GlossaryGroup[] = [
     intro: "These measure performance and uncertainty. The uncertainty measures matter as much as the headline win rate.",
     entries: [
       {
-        term: "bb/100",
-        full: "Big blinds won per 100 hands",
-        plain: "The average number of big blinds won or lost for every 100 hands.",
-        example: "+4 bb/100 means an average profit of 4 big blinds per 100 hands in this simulation.",
+        term: "Win rate %",
+        full: "Average return measured in big blinds",
+        plain: "A stake-neutral percentage showing how quickly the strategy won or lost. Positive is winning; negative is losing.",
+        example: "+4% means an average profit of 4 big blinds per 100 hands in this simulation.",
         advanced: "It normalizes both stake size and sample length, but converges slowly because poker variance is large.",
       },
       {
@@ -167,7 +167,7 @@ export const GLOSSARY_GROUPS: GlossaryGroup[] = [
         term: "σ / Std dev",
         full: "Standard deviation",
         plain: "How swingy the results are. Larger values mean outcomes jump around more.",
-        example: "Two strategies can both average +3 bb/100, while one has much larger up-and-down swings.",
+        example: "Two strategies can both average +3%, while one has much larger up-and-down swings.",
         advanced: "Standard deviation drives confidence-interval width and the bankroll risk estimate.",
       },
       {

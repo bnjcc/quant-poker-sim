@@ -64,8 +64,13 @@ function formatAction(action: ChosenAction, bigBlind: number): string {
 }
 
 function defaultSizeBB(decision: ReviewableDecision, type: ChosenAction["type"], bigBlind: number): number {
-  if (type === "bet") return Number((decision.context.legal.minBet / bigBlind).toFixed(1));
-  if (type === "raise") return Number((decision.context.legal.minRaiseTo / bigBlind).toFixed(1));
+  if (type === "bet" || type === "raise") {
+    const legal = decision.context.legal;
+    const minimum = type === "bet" ? legal.minBet : legal.minRaiseTo;
+    const suggested = Math.round(decision.context.potSize * 0.66) + (type === "raise" ? legal.callAmount : 0);
+    const chips = Math.min(legal.maxBetTo, Math.max(minimum, suggested));
+    return Number((chips / bigBlind).toFixed(1));
+  }
   return 0;
 }
 
@@ -109,6 +114,10 @@ export function StrategyReview({
   const [alternativeSizeBB, setAlternativeSizeBB] = useState(0);
   const [replayStep, setReplayStep] = useState(0);
 
+  useEffect(() => {
+    setReviewCount((count) => Math.min(eligibleDecisions.length, Math.max(1, count)));
+  }, [eligibleDecisions.length]);
+
   const current = sample[currentIndex];
   const hand = current ? handByNumber.get(current.handNumber) : undefined;
   const key = current ? `${current.handNumber}:${current.actionIndex}` : "";
@@ -143,8 +152,34 @@ export function StrategyReview({
           {eligibleDecisions.length.toLocaleString()} review-ready {eligibleDecisions.length === 1 ? "hand is" : "hands are"} available.
           {preflopRange ? " Hands outside your selected starting range are excluded." : ""}
         </p>
+        <div className="mt-3">
+          <div className="label mb-2">Quick choices</div>
+          <div className="flex flex-wrap gap-2">
+            {[8, 16, 25, 50]
+              .filter((count) => count <= eligibleDecisions.length)
+              .map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  className={`btn text-xs px-3 py-1 ${reviewCount === count ? "btn-primary" : ""}`}
+                  onClick={() => setReviewCount(count)}
+                >
+                  {count} hands
+                </button>
+              ))}
+            {eligibleDecisions.length > DEFAULT_REVIEW_HAND_COUNT && (
+              <button
+                type="button"
+                className={`btn text-xs px-3 py-1 ${reviewCount === eligibleDecisions.length ? "btn-primary" : ""}`}
+                onClick={() => setReviewCount(eligibleDecisions.length)}
+              >
+                All {eligibleDecisions.length.toLocaleString()}
+              </button>
+            )}
+          </div>
+        </div>
         <label className="block mt-3 max-w-48">
-          <span className="label">Hands to review</span>
+          <span className="label">Or enter any amount</span>
           <input
             type="number"
             className="field mt-1"
@@ -316,18 +351,60 @@ export function StrategyReview({
                 </select>
               </label>
               {(alternativeType === "bet" || alternativeType === "raise") && (
-                <label className="block mt-2">
-                  <span className="label">{alternativeType === "raise" ? "Raise to" : "Bet"} (bb)</span>
+                <div className="mt-2">
+                  <label className="block">
+                    <span className="label">{alternativeType === "raise" ? "Raise to" : "Bet"} (bb)</span>
+                    <input
+                      type="number"
+                      className="field mt-1"
+                      min={sizeMinimum / bigBlind}
+                      max={legal.maxBetTo / bigBlind}
+                      step={0.5}
+                      value={alternativeSizeBB}
+                      onChange={(event) => setAlternativeSizeBB(Number(event.target.value))}
+                    />
+                  </label>
                   <input
-                    type="number"
-                    className="field mt-1"
+                    type="range"
+                    className="w-full mt-3"
                     min={sizeMinimum / bigBlind}
                     max={legal.maxBetTo / bigBlind}
                     step={0.5}
                     value={alternativeSizeBB}
                     onChange={(event) => setAlternativeSizeBB(Number(event.target.value))}
+                    aria-label="Review bet size"
                   />
-                </label>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {[0.5, 0.66, 1].map((fraction) => (
+                      <button
+                        type="button"
+                        key={fraction}
+                        className="btn text-xs px-2 py-1"
+                        onClick={() => {
+                          const chips = Math.min(
+                            legal.maxBetTo,
+                            Math.max(
+                              sizeMinimum,
+                              Math.round(current.context.potSize * fraction) +
+                                (alternativeType === "raise" ? legal.callAmount : 0),
+                            ),
+                          );
+                          setAlternativeSizeBB(Number((chips / bigBlind).toFixed(1)));
+                        }}
+                      >
+                        {fraction === 1 ? "pot" : `${Math.round(fraction * 100)}%`}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn text-xs px-2 py-1"
+                      onClick={() => setAlternativeSizeBB(Number((legal.maxBetTo / bigBlind).toFixed(1)))}
+                    >
+                      all-in
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted mt-2">Starts at 66% of the pot, matching calibration hands.</p>
+                </div>
               )}
               <div className="flex gap-2 mt-3">
                 <button className="btn btn-primary" onClick={saveCorrection} disabled={disabled}>Save my decision</button>

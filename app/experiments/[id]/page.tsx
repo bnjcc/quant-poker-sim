@@ -21,7 +21,7 @@ import { BetSizeChart, BreakdownBars, EquityCurve, FrequencyBars, StartingHandHe
 import { HandReplayer } from "@/components/HandReplayer";
 import { StrategyReview } from "@/components/StrategyReview";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
-import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct } from "@/components/ui";
+import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct, fmtWinRatePct } from "@/components/ui";
 
 const POSITION_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
 
@@ -380,61 +380,34 @@ export default function ExperimentDetailPage() {
             )}
           </section>
 
-          <AnalyticsGlossary groups={["analytics", "model"]} title="How to read these advanced results" />
+          {/* Beginner summary */}
+          <section className="panel px-5 py-4 mb-4">
+            <div className="label">Your result</div>
+            <h2 className="text-xl font-semibold mt-1">
+              {r.bb100 > 0 ? "This strategy won in the simulation." : r.bb100 < 0 ? "This strategy lost in the simulation." : "This strategy finished break-even."}
+            </h2>
+            <p className="text-sm text-muted mt-2 max-w-3xl">
+              {r.statisticallySignificant
+                ? "The result was large enough relative to the swings in this run to stand apart from break-even. It still describes this simulated opponent pool, not guaranteed real-world profit."
+                : "The run was too swingy to confidently separate this result from break-even. More simulated hands will make the estimate clearer."}
+            </p>
+          </section>
 
-          {/* Headline stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mb-4">
-            <Stat
-              label="Win rate"
-              value={fmtBB(r.bb100) + "/100"}
-              tone={r.bb100 >= 0 ? "gain" : "loss"}
-              sub={r.statisticallySignificant ? "statistically significant" : "not significant"}
-              title="Big blinds won per 100 hands"
-            />
-            <Stat label="95% CI" value={`${r.ciLow.toFixed(1)} … ${r.ciHigh.toFixed(1)}`} sub="confidence interval · bb/100" title="If the interval includes 0, the sample can't distinguish winning from losing" />
-            <Stat label="Total" value={fmtBB(r.bbWon, 0)} tone={r.bbWon >= 0 ? "gain" : "loss"} sub={`${r.totalHands.toLocaleString()} hands`} />
-            <Stat label="Volatility (std dev)" value={`${r.stdDevBB100.toFixed(0)}`} sub="bb/100 per 100-hand block" />
-            <Stat label="Max drawdown" value={`${r.maxDrawdownBB.toFixed(0)} bb`} tone="loss" />
-            <Stat label="Rake paid" value={`${(r.rakePaid / bb).toFixed(0)} bb`} sub={fmtPct(r.rakePaid / Math.max(1, Math.abs(r.userNet) + r.rakePaid), 0) + " of gross"} />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <Stat label="Win rate" value={fmtWinRatePct(r.bb100)} tone={r.bb100 >= 0 ? "gain" : "loss"} sub="average normalized result" title="Numerically equivalent to big blinds won per 100 hands" />
+            <Stat label="Total won / lost" value={fmtBB(r.bbWon, 0)} tone={r.bbWon >= 0 ? "gain" : "loss"} sub="in big blinds" />
+            <Stat label="Hands won" value={fmtPct(r.winRate)} sub="share of all hands" />
+            <Stat label="Hands simulated" value={r.totalHands.toLocaleString()} sub="larger samples are clearer" />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+          <div className="mb-3">
+            <h2 className="font-semibold">Where the result came from</h2>
+            <p className="text-xs text-muted mt-1">A simple split between pots that reached a showdown and pots won or lost before cards were revealed.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
             <Stat label="Showdown winnings" value={fmtBB(r.showdownNetBB, 0)} tone={r.showdownNetBB >= 0 ? "gain" : "loss"} />
-            <Stat label="Non-showdown" value={fmtBB(r.nonShowdownNetBB, 0)} tone={r.nonShowdownNetBB >= 0 ? "gain" : "loss"} title="Red-line: chips won without showdown" />
-            <Stat label="Profit factor" value={r.profitFactor === Infinity ? "∞" : r.profitFactor.toFixed(2)} title="Gross winnings / gross losses" />
-            <Stat
-              label="Model confidence"
-              value={avgConfidence !== null ? fmtPct(avgConfidence) : "—"}
-              sub="avg. data-vs-prior weight per decision"
-            />
-            <Stat
-              label="Decision time"
-              value={formatDecisionTime(avgDecisionTime) ?? "—"}
-              sub="simulated model average"
-            />
-            <Stat
-              label="Timeout rate"
-              value={timeoutRate === null ? "—" : fmtPct(timeoutRate, 2)}
-              sub="auto check/fold"
-            />
-          </div>
-
-          {/* Risk of ruin */}
-          <div className="panel px-5 py-4 mb-6 flex flex-wrap items-center gap-4">
-            <div>
-              <div className="label">Risk of ruin</div>
-              <div className="mono text-xl font-bold" style={{ color: ror !== null && ror < 0.05 ? "var(--gain)" : "var(--loss)" }}>
-                {ror === null ? "—" : ror >= 1 ? "certain (losing rate)" : fmtPct(ror, 2)}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-muted">
-              with a bankroll of
-              <input type="number" className="field w-28" value={bankroll} min={100} step={100} onChange={(e) => setBankroll(Number(e.target.value))} />
-              bb
-            </label>
-            <div className="text-xs text-muted max-w-sm">
-              Classical diffusion approximation from this run&apos;s win rate and variance — assumes both stay constant.
-            </div>
+            <Stat label="Non-showdown" value={fmtBB(r.nonShowdownNetBB, 0)} tone={r.nonShowdownNetBB >= 0 ? "gain" : "loss"} title="Pots won or lost before cards were revealed" />
+            <Stat label="Rake paid" value={`${(r.rakePaid / bb).toFixed(0)} bb`} sub="fees removed from pots" />
           </div>
 
           {/* Curves */}
@@ -452,15 +425,15 @@ export default function ExperimentDetailPage() {
           {/* Breakdowns */}
           <div className="grid lg:grid-cols-2 gap-4 mb-6">
             <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Win rate by position (bb/100)</h2>
+              <h2 className="font-semibold mb-2">Win rate by position (%)</h2>
               <BreakdownBars rows={r.byPosition} order={POSITION_ORDER} />
             </section>
             <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">By pot type (bb/100)</h2>
+              <h2 className="font-semibold mb-2">Win rate by pot type (%)</h2>
               <BreakdownBars rows={r.byPotType} />
             </section>
             <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">By your stack depth (bb/100)</h2>
+              <h2 className="font-semibold mb-2">Win rate by your stack depth (%)</h2>
               <BreakdownBars rows={r.byStackDepth} />
             </section>
             <section className="panel px-5 py-4">
@@ -472,7 +445,7 @@ export default function ExperimentDetailPage() {
               <BetSizeChart hist={r.betSizeHistogram} />
             </section>
             <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Starting hands (bb/100)</h2>
+              <h2 className="font-semibold mb-2">Starting-hand win rate (%)</h2>
               <StartingHandHeatmap rows={r.byHoleCards} />
             </section>
           </div>
@@ -496,11 +469,11 @@ export default function ExperimentDetailPage() {
                 <tbody className="mono">
                   {(
                     [
-                      ["bb/100", manual.bb100.toFixed(1), r.bb100.toFixed(1)],
+                      ["Win rate", fmtWinRatePct(manual.bb100), fmtWinRatePct(r.bb100)],
                       ["Showdown net (bb)", manual.showdownNetBB.toFixed(0), r.showdownNetBB.toFixed(0)],
                       ["Non-showdown net (bb)", manual.nonShowdownNetBB.toFixed(0), r.nonShowdownNetBB.toFixed(0)],
                       ["Hands won", fmtPct(manual.winRate), fmtPct(r.winRate)],
-                      ["Std dev (bb/100)", manual.stdDevBB100.toFixed(0), r.stdDevBB100.toFixed(0)],
+                      ["Volatility", `${manual.stdDevBB100.toFixed(0)}%`, `${r.stdDevBB100.toFixed(0)}%`],
                     ] as const
                   ).map(([m, a, b]) => (
                     <tr key={m} className="border-b border-line last:border-0">
@@ -516,6 +489,43 @@ export default function ExperimentDetailPage() {
               </p>
             </section>
           )}
+
+          {/* Advanced analytics */}
+          <div className="mt-8 mb-3">
+            <div className="label">Advanced analytics</div>
+            <h2 className="text-lg font-semibold mt-1">Uncertainty, variance, and model detail</h2>
+            <p className="text-xs text-muted mt-1 max-w-3xl">
+              These numbers help experienced users judge how reliable and risky the headline result is. Open the guide for plain-English definitions.
+            </p>
+          </div>
+          <AnalyticsGlossary groups={["analytics", "model"]} title="Explain the advanced numbers" />
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <Stat label="95% confidence range" value={`${fmtWinRatePct(r.ciLow)} … ${fmtWinRatePct(r.ciHigh)}`} sub="estimated win-rate range" title="If the interval includes 0%, the sample cannot distinguish winning from losing" />
+            <Stat label="Volatility" value={`${r.stdDevBB100.toFixed(0)}%`} sub="size of normal swings" />
+            <Stat label="Max drawdown" value={`${r.maxDrawdownBB.toFixed(0)} bb`} tone="loss" />
+            <Stat label="Profit factor" value={r.profitFactor === Infinity ? "∞" : r.profitFactor.toFixed(2)} title="Gross winnings divided by gross losses" />
+            <Stat label="Model confidence" value={avgConfidence !== null ? fmtPct(avgConfidence) : "—"} sub="personal data vs default model" />
+            <Stat label="Decision time" value={formatDecisionTime(avgDecisionTime) ?? "—"} sub="simulated average" />
+            <Stat label="Timeout rate" value={timeoutRate === null ? "—" : fmtPct(timeoutRate, 2)} sub="auto check/fold" />
+          </div>
+
+          <div className="panel px-5 py-4 mb-6 flex flex-wrap items-center gap-4">
+            <div>
+              <div className="label">Estimated risk of losing the bankroll</div>
+              <div className="mono text-xl font-bold" style={{ color: ror !== null && ror < 0.05 ? "var(--gain)" : "var(--loss)" }}>
+                {ror === null ? "—" : ror >= 1 ? "certain (losing rate)" : fmtPct(ror, 2)}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              with a bankroll of
+              <input type="number" className="field w-28" value={bankroll} min={100} step={100} onChange={(e) => setBankroll(Number(e.target.value))} />
+              bb
+            </label>
+            <div className="text-xs text-muted max-w-sm">
+              A simplified estimate from this run&apos;s win rate and swings. It assumes both stay constant.
+            </div>
+          </div>
 
           {/* Hand explorer */}
           <section className="panel px-5 py-4 mb-6">
