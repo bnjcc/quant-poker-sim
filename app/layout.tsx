@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("rangebench-ui-theme");document.documentElement.dataset.theme=["purple","cyan","green","red","gold","blue","orange","pink"].includes(t)?t:"red"}catch(e){document.documentElement.dataset.theme="red"}})()`,
+            __html: `(function(){try{var t=localStorage.getItem("quantpoker-ui-theme-v2");document.documentElement.dataset.theme=["purple","cyan","green","red","gold","blue","orange","pink"].includes(t)?t:"red"}catch(e){document.documentElement.dataset.theme="red"}})()`,
           }}
         />
       </head>

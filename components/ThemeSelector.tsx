@@ -15,7 +15,7 @@ const THEMES = [
 
 type ThemeId = (typeof THEMES)[number]["id"];
 
-const STORAGE_KEY = "rangebench-ui-theme";
+const STORAGE_KEY = "quantpoker-ui-theme-v2";
 
 export function ThemeSelector() {
   const [theme, setTheme] = useState<ThemeId>("red");

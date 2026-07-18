@@ -11,6 +11,7 @@ export interface FaultyTerminalProps extends React.HTMLAttributes<HTMLDivElement
   gridMul?: Vec2;
   digitSize?: number;
   timeScale?: number;
+  pause?: boolean;
   scanlineIntensity?: number;
   glitchAmount?: number;
   flickerAmount?: number;
@@ -130,6 +131,7 @@ export default function FaultyTerminal({
   gridMul = [2, 1],
   digitSize = 1.5,
   timeScale = 0.3,
+  pause = false,
   scanlineIntensity = 0.3,
   glitchAmount = 1,
   flickerAmount = 1,
@@ -210,7 +212,7 @@ export default function FaultyTerminal({
     container.appendChild(gl.canvas);
 
     const update = (time: number) => {
-      if (!reduceMotion) rafRef.current = requestAnimationFrame(update);
+      if (!reduceMotion && !pause) rafRef.current = requestAnimationFrame(update);
       if (pageLoadAnimation && loadStartRef.current === 0) loadStartRef.current = time;
       program.uniforms.iTime.value = (time * 0.001 + timeOffsetRef.current) * timeScale;
       if (pageLoadAnimation && !reduceMotion) {
@@ -236,7 +238,7 @@ export default function FaultyTerminal({
       if (gl.canvas.parentElement === container) container.removeChild(gl.canvas);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-  }, [brightness, chromaticAberration, curvature, digitSize, ditherValue, dpr, flickerAmount, glitchAmount, gridMul, handleMouseMove, mouseReact, mouseStrength, noiseAmp, pageLoadAnimation, scale, scanlineIntensity, timeScale, tintVec]);
+  }, [brightness, chromaticAberration, curvature, digitSize, ditherValue, dpr, flickerAmount, glitchAmount, gridMul, handleMouseMove, mouseReact, mouseStrength, noiseAmp, pageLoadAnimation, pause, scale, scanlineIntensity, timeScale, tintVec]);
 
   return <div ref={containerRef} className={`faulty-terminal-container ${className}`.trim()} style={style} {...rest} />;
 }

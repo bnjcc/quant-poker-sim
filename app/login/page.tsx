@@ -19,7 +19,11 @@ function LoginForm() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="panel browser-mode-card px-7 py-8 max-w-md mx-auto mt-16">
+      <div className="panel browser-mode-card auth-standalone-card px-7 py-8 max-w-md mx-auto mt-16">
+        <div className="auth-logo-lockup" aria-label="QuantPoker">
+          <QueenDiamondLogo className="auth-logo" />
+          <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span>
+        </div>
         <h1 className="text-xl font-bold mb-2">Browser-only mode</h1>
         <p className="text-sm text-muted mb-4">
           Supabase environment variables are not set, so QuantPoker is using local browser storage.
@@ -67,25 +71,12 @@ function LoginForm() {
 
   return (
     <div className="auth-shell">
-      <section className="auth-story" aria-hidden="true">
-        <div className="auth-brand"><QueenDiamondLogo /> <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span></div>
-        <div className="auth-story-copy">
-          <div className="page-eyebrow"><span /> Strategy intelligence</div>
-          <h2>Find the signal<br />inside your game.</h2>
-          <p>Model your decisions. Test your assumptions. Build an edge you can actually explain.</p>
-        </div>
-        <div className="auth-data-card">
-          <div><span>SIMULATION CONFIDENCE</span><strong>94.2%</strong></div>
-          <div className="auth-chart"><i /><i /><i /><i /><i /><i /><i /><i /></div>
-        </div>
-      </section>
       <section className="panel auth-card px-7 py-8">
-      <div className="auth-mobile-brand brand-lockup mono text-lg font-bold tracking-tight mb-5">
-        <QueenDiamondLogo /><span><span>uant</span><span className="text-accent">Poker</span></span>
+      <div className="auth-logo-lockup" aria-label="QuantPoker">
+        <QueenDiamondLogo className="auth-logo" />
+        <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span>
       </div>
-      <div className="page-eyebrow"><span /> Secure workspace</div>
-      <h1 className="text-3xl font-bold mb-2">{mode === "sign-in" ? "Welcome back" : "Create your account"}</h1>
-      <p className="text-sm text-muted mb-6">Your models, experiments, and hand histories stay private and synchronized.</p>
+      <h1 className="text-2xl font-bold mb-6">{mode === "sign-in" ? "Sign in" : "Create account"}</h1>
       <form onSubmit={submit} className="space-y-5">
         <label className="block">
           <span className="label">Email</span>
@@ -110,7 +101,6 @@ function LoginForm() {
         }}>
         {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
       </button>
-      <div className="auth-trust"><span>Encrypted transport</span><span>Private by default</span></div>
       </section>
     </div>
   );
