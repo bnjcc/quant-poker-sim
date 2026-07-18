@@ -88,7 +88,7 @@ export function PokerTable({
               {s.folded ? (
                 <span className="text-[11px] text-muted italic">folded</span>
               ) : s.holeCards ? (
-                <CardRow cards={s.holeCards} size="sm" />
+                <CardRow cards={s.holeCards} size={fitViewport && s.isUser ? "md" : "sm"} />
               ) : (
                 <span className="mono text-[13px] tracking-widest text-muted">🂠🂠</span>
               )}

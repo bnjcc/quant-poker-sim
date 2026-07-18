@@ -3,6 +3,8 @@ import { Rng } from "@/lib/poker/rng";
 
 /** Online-style per-action clock used during manual calibration. */
 export const ACTION_CLOCK_MS = 15_000;
+/** Brief visible preview used for opponent turns during manual calibration. */
+export const OPPONENT_LIVE_DELAY_MS = 500;
 export const SNAP_DECISION_MS = 1_200;
 export const TANK_DECISION_MS = 7_000;
 

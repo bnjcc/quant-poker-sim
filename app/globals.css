@@ -12,6 +12,9 @@
   --accent: #ff3347;
   --accent-rgb: 255, 51, 71;
   --accent-ink: #190307;
+  --table-felt-inner: color-mix(in srgb, var(--accent) 42%, #241318);
+  --table-felt-middle: color-mix(in srgb, var(--accent) 25%, #171116);
+  --table-felt-edge: color-mix(in srgb, var(--accent) 13%, #0b090c);
   --gain: #4fd19a;        /* P&L only */
   --loss: #f07068;        /* P&L only */
   --suit-red: #e0444f;
@@ -294,7 +297,7 @@ input[type="range"] { accent-color: var(--accent); }
 .stat-card:hover { border-color: rgba(var(--accent-rgb),.28); transform: translateY(-1px); }
 .stat-value { letter-spacing: -.045em; }
 .playing-card { border: 1px solid rgba(255,255,255,.7); border-radius: .35rem; background: linear-gradient(145deg, #fff, #dfe3e8); box-shadow: 0 4px 10px rgba(0,0,0,.26), inset 0 0 0 1px rgba(0,0,0,.05); text-shadow: 0 1px 0 white; }
-.poker-table { border: 7px solid #272b31; background: radial-gradient(ellipse at 50% 42%, #21493b 0%, #153329 58%, #0e241d 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.04), inset 0 0 70px rgba(0,0,0,.56), 0 25px 60px rgba(0,0,0,.35), 0 0 0 1px #060708; }
+.poker-table { border: 7px solid color-mix(in srgb, var(--accent) 10%, #272b31); background: radial-gradient(ellipse at 50% 42%, var(--table-felt-inner) 0%, var(--table-felt-middle) 58%, var(--table-felt-edge) 100%); box-shadow: inset 0 0 0 2px rgba(255,255,255,.04), inset 0 0 70px rgba(0,0,0,.56), 0 25px 60px rgba(0,0,0,.35), 0 0 0 1px #060708, 0 0 32px rgba(var(--accent-rgb), .08); }
 .poker-table::before { content: ""; position: absolute; inset: 4%; border: 1px solid rgba(255,255,255,.045); border-radius: inherit; pointer-events: none; }
 .poker-table::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .18; background-image: radial-gradient(rgba(255,255,255,.12) .6px, transparent .6px); background-size: 5px 5px; mask-image: radial-gradient(ellipse, black, transparent 74%); }
 .table-seat { position: relative; z-index: 2; background: linear-gradient(145deg, rgba(20,23,29,.98), rgba(10,12,16,.98)); box-shadow: 0 8px 22px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04); }

@@ -76,7 +76,7 @@ Range-first calibrations add an explicit 169-hand first-in range to the serializ
 
 `TableSession` owns seats across hands: geometric session lengths, stop-loss/stop-win departures measured in buy-ins, rebuy probability when felted, random churn, and replacement draws from the weighted pool with pool-level skill/looseness/aggression multipliers. The user auto-rebuys and buy-ins are counted. Button rotation skips empty seats; short-handed play (down to HU) works.
 
-Every voluntary action also carries a seeded virtual decision time. Manual calibration waits for those opponent delays and gives the user a real 15-second clock; batch runs record the same timing metadata without sleeping. `DecisionContext` exposes the most recent opponent action time on the current street. Learned user behavior conditions directly on that cue. Heuristic opponents use only a deliberately capped timing tell (a few equity points at most), because real-world timing signals are noisy.
+Every voluntary action also carries a seeded virtual decision time. Manual calibration gives the user a real 15-second clock but compresses each opponent turn to a fixed 500ms preview; the opponent's full simulated time remains on the action and is shown at the seat. Batch runs record the same timing metadata without sleeping. `DecisionContext` exposes the most recent opponent action time on the current street. Learned user behavior conditions directly on that cue. Heuristic opponents use only a deliberately capped timing tell (a few equity points at most), because real-world timing signals are noisy.
 
 ## Batch runner (`lib/simulation/runner.ts`)
 

@@ -55,7 +55,7 @@ The full-session and range-first calibration flows now behave like paced online 
 - Every user decision has a 15-second action clock.
 - A timeout checks when checking is legal and folds otherwise.
 - Opponents have seeded virtual decision times, including snap decisions, normal decisions, occasional tanks, and rare timeouts.
-- Manual calibration visibly waits for opponent decisions so the user can react to their timing.
+- Manual calibration shows each opponent turn for a fixed 500ms preview, while preserving and displaying the full simulated decision time beside the resulting action.
 - Seat action labels show elapsed decision time and timeout state.
 - The action panel identifies the most recent opponent action as `snap`, `normal`, or `tank`.
 - Both calibration pages record the user's real elapsed response time from when an action becomes available.
@@ -95,8 +95,13 @@ The current working tree closes the calibration and post-run review gaps identif
 - Short all-in raises make prior actors answer the extra chips but no longer reopen their raise option; a later full raise still reopens action correctly.
 - `ContextTracker` now normalizes any stale bot or policy proposal into the current legal vocabulary before it reaches the engine. In particular, a passive `check` proposal becomes a `call` when a bet is being faced; a bot can never check behind a live bet.
 - Calibration tables hide a seat's earlier action label while that seat is deciding again. This prevents an earlier check from appearing to be an illegal response to the user's later bet.
-- Visible opponent timings now center on multi-second human decisions, with a smaller set of genuine 0.7-1.2 second snaps, later-street/raised-pot complexity, tanks, and rare timeouts.
+- Stored opponent timings center on multi-second human decisions, with a smaller set of genuine 0.7-1.2 second snaps, later-street/raised-pot complexity, tanks, and rare timeouts. These values are displayed after the fixed 500ms live preview rather than making the user wait for them.
 - Batch simulations still record virtual timing without sleeping.
+
+### Calibration presentation
+
+- The poker-table felt defaults to red and derives its color from the selected interface theme.
+- The user's hole cards render larger in both calibration flows while other compact card displays remain unchanged.
 
 ### In-browser Simulated Hand Review
 

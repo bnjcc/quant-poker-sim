@@ -82,15 +82,15 @@ export default function CalibratePage() {
       setEngine(step.engine);
       setOpponentName(step.engine.players.find((player) => player.seat === step.seat)?.name ?? "Opponent");
       setOpponentCallAmount(step.callAmount);
-      setOpponentTotalMs(Math.max(1, step.decisionTimeMs));
-      setOpponentRemainingMs(step.decisionTimeMs);
-      setOpponentDeadline(Date.now() + step.decisionTimeMs);
+      setOpponentTotalMs(step.liveDelayMs);
+      setOpponentRemainingMs(step.liveDelayMs);
+      setOpponentDeadline(Date.now() + step.liveDelayMs);
       setPhase("opponent-acting");
       opponentTimerRef.current = window.setTimeout(() => {
         opponentTimerRef.current = null;
         ms.completeOpponentAction();
         advanceRef.current(ms);
-      }, step.decisionTimeMs);
+      }, step.liveDelayMs);
     } else if (step.kind === "hand-complete") {
       activeDecisionRef.current = null;
       setEngine(step.engine);

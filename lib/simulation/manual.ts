@@ -5,11 +5,20 @@ import { HandEngine } from "@/lib/poker/engine";
 import { cardsForStartingHand, isStartingHandNotation, startingHandCombos } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
 import { ContextTracker, PoolConfig, TableSession } from "./table";
-import { clampDecisionTime, DecisionTiming, timeoutAction } from "./timing";
+import { clampDecisionTime, DecisionTiming, OPPONENT_LIVE_DELAY_MS, timeoutAction } from "./timing";
 
 export type ManualStep =
   | { kind: "awaiting-user"; context: DecisionContext; engine: HandEngine }
-  | { kind: "opponent-acting"; seat: number; decisionTimeMs: number; callAmount: number; engine: HandEngine }
+  | {
+      kind: "opponent-acting";
+      seat: number;
+      /** The simulated time retained on the action and shown at the seat. */
+      decisionTimeMs: number;
+      /** The short real-time preview before the already-computed action is applied. */
+      liveDelayMs: number;
+      callAmount: number;
+      engine: HandEngine;
+    }
   | { kind: "hand-complete"; history: HandHistory; engine: HandEngine }
   | { kind: "session-complete" };
 
@@ -69,6 +78,7 @@ export class ManualSession {
         kind: "opponent-acting",
         seat: this.pendingOpponent.seat,
         decisionTimeMs: this.pendingOpponent.timing.decisionTimeMs,
+        liveDelayMs: OPPONENT_LIVE_DELAY_MS,
         callAmount: this.pendingOpponent.callAmount,
         engine: this.current.engine,
       };
@@ -103,6 +113,7 @@ export class ManualSession {
           kind: "opponent-acting",
           seat,
           decisionTimeMs: timing.decisionTimeMs,
+          liveDelayMs: OPPONENT_LIVE_DELAY_MS,
           callAmount: ctx.legal.callAmount,
           engine,
         };
@@ -116,7 +127,7 @@ export class ManualSession {
     return { kind: "hand-complete", history, engine };
   }
 
-  /** Complete a paced opponent action after its virtual online delay. */
+  /** Complete a paced opponent action after its brief live preview. */
   completeOpponentAction(): void {
     if (!this.current || !this.pendingOpponent) throw new Error("No opponent action is pending");
     const pending = this.pendingOpponent;

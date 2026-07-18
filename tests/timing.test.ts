@@ -13,6 +13,7 @@ import { ContextTracker, normalizeActionToLegal } from "@/lib/simulation/table";
 import {
   ACTION_CLOCK_MS,
   decisionTimingBucket,
+  OPPONENT_LIVE_DELAY_MS,
   SNAP_DECISION_MS,
   timeoutAction,
 } from "@/lib/simulation/timing";
@@ -173,6 +174,40 @@ describe("online action timing", () => {
     expect(subSecond).toBeLessThan(0.2);
     expect(average).toBeGreaterThan(2_500);
     expect(samples.every((sample) => sample <= ACTION_CLOCK_MS)).toBe(true);
+  });
+
+  it("shows paced opponent turns for 500ms while preserving their simulated timing", () => {
+    const session = new ManualSession({
+      config: DEFAULT_TABLE,
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: "short-live-opponent-preview",
+      targetHands: 5,
+      userBuyInBB: 100,
+    });
+
+    let checkedOpponent = false;
+    for (let guard = 0; guard < 500 && !checkedOpponent; guard++) {
+      const step = session.step(true);
+      if (step.kind === "opponent-acting") {
+        expect(step.liveDelayMs).toBe(OPPONENT_LIVE_DELAY_MS);
+        expect(step.liveDelayMs).toBe(500);
+        session.completeOpponentAction();
+        expect(step.engine.actions.at(-1)?.decisionTimeMs).toBe(step.decisionTimeMs);
+        checkedOpponent = true;
+      } else if (step.kind === "awaiting-user") {
+        const legal = step.context.legal;
+        const action = legal.types.includes("check")
+          ? { type: "check" as const }
+          : legal.types.includes("call")
+            ? { type: "call" as const }
+            : { type: "fold" as const };
+        session.submitUserAction(step.context, action, 500);
+      } else if (step.kind === "session-complete") {
+        break;
+      }
+    }
+
+    expect(checkedOpponent).toBe(true);
   });
 
   it("puts elapsed timing into actions and the next opponent context", () => {
