@@ -2,13 +2,39 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const FaultyTerminal = dynamic(() => import("./FaultyTerminal"), { ssr: false });
 const GRID: [number, number] = [2, 1];
+const THEME_TINTS = {
+  red: "#ff3347",
+  purple: "#a970ff",
+  cyan: "#27d7e8",
+  green: "#4ade80",
+  gold: "#e2b34c",
+  blue: "#60a5fa",
+  orange: "#fb923c",
+  pink: "#f472b6",
+} as const;
+
+type ThemeId = keyof typeof THEME_TINTS;
 
 export function AppEffects({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuth = pathname === "/login" || pathname.startsWith("/auth/");
+  const [theme, setTheme] = useState<ThemeId>("red");
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncTheme = () => {
+      const selected = root.dataset.theme;
+      setTheme(selected && selected in THEME_TINTS ? (selected as ThemeId) : "red");
+    };
+    syncTheme();
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <>
@@ -26,7 +52,7 @@ export function AppEffects({ children }: { children: React.ReactNode }) {
           chromaticAberration={0}
           dither={0}
           curvature={0.1}
-          tint={isAuth ? "#A7EF9E" : "#ff3347"}
+          tint={THEME_TINTS[theme]}
           mouseReact
           mouseStrength={0.5}
           pageLoadAnimation
