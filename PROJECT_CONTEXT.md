@@ -1,6 +1,6 @@
 # QuantPoker Project Context
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
 
 This file is the handoff for future maintainers and LLM conversations. Read it before changing the project, then consult `README.md`, `docs/ARCHITECTURE.md`, and the relevant source files for implementation detail.
 
@@ -9,8 +9,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
 - Active branch: `agent/strategy-review-calibration`
 - Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest committed implementation: `92cd415 Refine calibration pacing and table visuals`
-- Previous feature commits: `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
+- Latest committed implementation: `e5e7d2f Simplify dashboard and accelerate range calibration`
+- Previous calibration/UI commits: `92cd415 Refine calibration pacing and table visuals`, `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
@@ -26,7 +26,7 @@ QuantPoker is a Next.js 15 application for modeling and backtesting a user's 6-m
 
 The workflow is:
 
-1. The user manually plays an online-paced calibration sample, either from unrestricted deals or an explicit first-in range.
+1. The user manually plays an online-paced calibration sample. Range-first calibration is the default path; unrestricted deals remain available as **All hands**.
 2. The app records actions, sizing, response time, timeout behavior, and reactions to opponent timing, then trains a bucketed behavioral policy.
 3. The user configures an experiment against a weighted pool of heuristic opponent profiles.
 4. The browser runs a reproducible seeded simulation.
@@ -55,7 +55,7 @@ The full-session and range-first calibration flows now behave like paced online 
 - Every user decision has a 15-second action clock.
 - A timeout checks when checking is legal and folds otherwise.
 - Opponents have seeded virtual decision times, including snap decisions, normal decisions, occasional tanks, and rare timeouts.
-- Manual calibration shows each opponent turn for a fixed 500ms preview, while preserving and displaying the full simulated decision time beside the resulting action.
+- Manual calibration shows each opponent turn for a fixed 500ms preview without rendering a countdown for that preview. The full simulated decision time is still preserved and displayed beside the resulting action.
 - Seat action labels show elapsed decision time and timeout state.
 - The action panel identifies the most recent opponent action as `snap`, `normal`, or `tank`.
 - Both calibration pages record the user's real elapsed response time from when an action becomes available.
@@ -101,8 +101,23 @@ The current working tree closes the calibration and post-run review gaps identif
 ### Calibration presentation
 
 - The poker-table felt defaults to red and derives its color from the selected interface theme.
-- The user's hole cards render larger in both calibration flows while other compact card displays remain unchanged.
-- Opponent turns use a fixed 500ms live preview in both calibration pages. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
+- The user's hole cards render at the large card size in both calibration flows while opponent cards and other compact card displays remain unchanged.
+- Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 15-second decision window. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
+
+### Calibration entry and range-selection usability
+
+- Dashboard calibration calls to action and the main navigation now present **Range-first calibration** as the primary/default path.
+- Unrestricted calibration remains at `/calibrate` and is labeled **All hands** in the dashboard and navigation.
+- Range shortcuts include **+ Aces**, which adds all 25 Ace-containing starting-hand classes including `AA`, and **+ Face cards**, which adds the nine J/Q/K-only pair, suited, and offsuit classes.
+- The 169-hand grid supports primary-mouse drag painting. Starting on an unselected cell selects every visited cell; starting on a selected cell erases every visited cell.
+- Each cell is applied at most once per drag. Ordinary single clicks, keyboard activation, ARIA pressed state, secondary mouse buttons, and touch horizontal scrolling retain their previous behavior.
+
+### Dashboard and typography refinement
+
+- The dashboard hero headline is now **Computerize Your Poker Playing.**
+- The hero keeps its two queen-card motifs as transparent, accent-outline-only cards; the former white card fill, orbit rings, signal chips, metadata strip, grid texture, and unused animations were removed for a simpler presentation.
+- Core calibration/profile calls to action, workflow cards, recent experiment data, and responsive behavior remain intact.
+- The global interface font stack now prefers rounded system faces and uses `Trebuchet MS` as the dependable softer Windows fallback. Monospaced analytics and playing-card typography remain unchanged.
 
 ### In-browser Simulated Hand Review
 
@@ -258,7 +273,7 @@ The resulting persistent run state changes only through the row-locked database 
 
 ## Validation status
 
-Validation on the current working-tree implementation passed:
+Validation on source commit `e5e7d2f` passed:
 
 - TypeScript: clean (`tsc --noEmit`)
 - ESLint: clean
@@ -307,9 +322,9 @@ The production backend and deployment are connected:
 - Email signup is enabled and email confirmation is required.
 - The original TOTP enrollment/verification and 8-digit, one-minute email OTP settings were preserved.
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
-- Production deployment `dpl_8CF2aYjSASLzW8bvVjPLMT8wcavw` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
+- Production deployment `dpl_2oWgVatr8KYLx1XwQbAJWtUfQx9v` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
-- Source commit `92cd415` is pushed to `origin/agent/strategy-review-calibration`. The 500ms opponent previews, preserved timing labels, theme-driven felt, and larger calibration hole cards were independently smoke-tested locally and published to the production Vercel deployment.
+- Source commit `e5e7d2f` is pushed to `origin/agent/strategy-review-calibration` and published to the production Vercel deployment. It includes range-first defaults, **All hands**, hidden opponent-preview clocks, larger user cards, additive range shortcuts, drag painting, rounded typography, and the simplified dashboard hero.
 
 Remaining external verification:
 
@@ -321,6 +336,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 
 ## Important source map
 
+- `app/page.tsx` — dashboard hero, default calibration entry, workflow, and recent experiment summary
 - `app/calibrate/page.tsx` — creates and saves calibration datasets
 - `app/range-calibrate/page.tsx` — explicit 169-hand range selection plus timed betting calibration
 - `app/glossary/page.tsx` — full beginner-friendly poker and advanced analytics glossary
@@ -333,6 +349,8 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/auth/confirm/route.ts` — authentication callback
 - `components/Nav.tsx` — navigation, storage/account indicator, glossary link, and sign-out
 - `components/ActionClock.tsx` — reusable online-style decision countdown
+- `components/PokerTable.tsx` — shared table layout, seat/action display, and calibration-specific user card sizing
+- `components/StartingHandGrid.tsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
 - `components/AnalyticsGlossary.tsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
 - `components/HandReplayer.tsx` — hand replay including voluntary-action timing and timeout labels
 - `components/StrategyReview.tsx` — in-browser simulated-decision survey over stored hands
@@ -385,5 +403,8 @@ Do not regress these design constraints:
 - Preserve the browser-only fallback unless the product explicitly drops zero-setup mode.
 - Keep timing fields optional when reading legacy calibrations and hand histories.
 - Keep high-speed simulations virtual-time only; never make batch execution sleep for recorded action delays.
+- Keep the opponent preview clock hidden; the visible action clock is for the user's decisions only. Preserve the 500ms preview and stored full opponent timing.
+- Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
+- Preserve both drag-paint selection/erasing and accessible single-cell click/keyboard operation in the starting-hand grid.
 - Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
 - Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.
