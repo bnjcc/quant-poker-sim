@@ -57,6 +57,26 @@ describe("blinds and rotation", () => {
     expect(sb?.seat).toBe(0);
     expect(e.currentSeat).toBe(0);
   });
+
+  it("assigns full-ring positions and starts action UTG at a nine-player table", () => {
+    const fullRingConfig = { ...config, maxSeats: 9 };
+    const e = new HandEngine({
+      players: players(Array(9).fill(200)),
+      buttonSeat: 0,
+      config: fullRingConfig,
+      rng: new Rng("nine-player-positions"),
+      handNumber: 1,
+    });
+
+    expect(e.players.map((player) => e.positionOf(player.seat))).toEqual([
+      "BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO",
+    ]);
+    expect(e.currentSeat).toBe(3);
+    expect(e.actions.slice(0, 2)).toEqual([
+      expect.objectContaining({ seat: 1, type: "post-sb", amount: 1 }),
+      expect.objectContaining({ seat: 2, type: "post-bb", amount: 2 }),
+    ]);
+  });
 });
 
 describe("legal actions and min-raise", () => {

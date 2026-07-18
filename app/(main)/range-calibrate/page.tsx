@@ -30,6 +30,7 @@ import { getStore, newId } from "@/lib/storage/store";
 import { usePokerSounds } from "@/lib/audio/poker-sounds";
 import { PokerTable, SeatView } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
+import { ChipAmountInput } from "@/components/ChipAmountInput";
 import { StartingHandGrid } from "@/components/StartingHandGrid";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 
@@ -513,6 +514,12 @@ export default function RangeCalibratePage() {
                   onChange={(event) => setBetTo(Number(event.target.value))}
                   className="w-48"
                   aria-label="Bet size in chips"
+                />
+                <ChipAmountInput
+                  value={betTo}
+                  min={legal.types.includes("bet") ? legal.minBet : legal.minRaiseTo}
+                  max={legal.maxBetTo}
+                  onChange={setBetTo}
                 />
                 <div className="flex gap-1">
                   {[0.5, 0.66, 1].map((fraction) => (

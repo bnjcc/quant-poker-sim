@@ -5,7 +5,7 @@ import { SerializedPolicy } from "@/lib/player-model/policy";
 import { PlayerTendencies } from "@/lib/player-model/stats";
 import { SimulationAggregates } from "@/lib/analytics/aggregate";
 
-export const SIMULATION_VERSION = "1.4.0";
+export const SIMULATION_VERSION = "1.5.0";
 
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),
@@ -16,7 +16,7 @@ export const rakeSchema = z.object({
 export const tableConfigSchema = z.object({
   smallBlind: z.number().positive(),
   bigBlind: z.number().positive(),
-  maxSeats: z.number().int().min(2).max(6),
+  maxSeats: z.number().int().min(2).max(9),
   rake: rakeSchema,
 });
 

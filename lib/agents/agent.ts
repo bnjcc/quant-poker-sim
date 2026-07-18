@@ -25,7 +25,8 @@ export function freshMemory(): AgentMemory {
 }
 
 const POSITION_LOOSENESS: Record<string, number> = {
-  UTG: -0.06, HJ: -0.02, CO: 0.03, BTN: 0.08, SB: -0.02, BB: 0.02,
+  UTG: -0.08, "UTG+1": -0.065, MP: -0.045, LJ: -0.03,
+  HJ: -0.02, CO: 0.03, BTN: 0.08, SB: -0.02, BB: 0.02,
 };
 
 /**

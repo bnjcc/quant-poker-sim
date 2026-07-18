@@ -92,7 +92,7 @@ export default function Dashboard() {
         <StepCard
           n={1}
           title="Calibrate"
-          body="Play 25–250 hands at a simulated 6-max table. Every decision is recorded with full context: position, stack depth, pot odds, action history."
+          body="Play 25–250 hands at a simulated 6-max table, then test the strategy at tables with up to nine players. Every decision is recorded with full context: position, stack depth, pot odds, and action history."
           href="/range-calibrate"
           cta={cals.length ? "Add another session" : "Start playing"}
           done={cals.length > 0}

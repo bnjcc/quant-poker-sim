@@ -163,6 +163,20 @@ function NewExperimentInner() {
             </label>
             <Num label="Small blind" value={cfg.table.smallBlind} min={0.5} max={1000} step={0.5} onChange={(v) => setCfg({ ...cfg, table: { ...cfg.table, smallBlind: v } })} />
             <Num label="Big blind" value={cfg.table.bigBlind} min={1} max={2000} onChange={(v) => setCfg({ ...cfg, table: { ...cfg.table, bigBlind: v } })} />
+            <label className="block">
+              <span className="label">Players at table</span>
+              <select
+                className="field mt-1"
+                value={cfg.table.maxSeats}
+                onChange={(event) => setCfg({ ...cfg, table: { ...cfg.table, maxSeats: Number(event.target.value) } })}
+              >
+                {Array.from({ length: 8 }, (_, index) => index + 2).map((players) => (
+                  <option key={players} value={players}>
+                    {players === 2 ? "2 players (heads-up)" : players === 6 ? "6 players (6-max)" : players === 9 ? "9 players (full ring)" : `${players} players`}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Num label="Your buy-in (bb)" value={cfg.userBuyInBB} min={20} max={500} onChange={(v) => setCfg({ ...cfg, userBuyInBB: v })} />
             <Num label="Rake % of pot" value={cfg.table.rake.percentage * 100} min={0} max={20} step={0.5} onChange={(v) => setCfg({ ...cfg, table: { ...cfg.table, rake: { ...cfg.table.rake, percentage: v / 100 } } })} />
             <Num label="Rake cap (chips)" value={cfg.table.rake.cap} min={0} max={1000} onChange={(v) => setCfg({ ...cfg, table: { ...cfg.table, rake: { ...cfg.table.rake, cap: v } } })} />

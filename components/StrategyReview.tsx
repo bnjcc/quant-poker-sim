@@ -15,6 +15,8 @@ import {
   selectReviewDecisions,
   simulatedAction,
 } from "@/lib/player-model/review";
+import { buildHandActionLedger } from "@/lib/poker/action-ledger";
+import { formatDecisionTime } from "@/lib/simulation/timing";
 
 function stateBeforeAction(hand: HandHistory, upto: number) {
   const players = hand.players.map((player) => ({
@@ -267,6 +269,7 @@ export function StrategyReview({
 
   if (!current || !hand) return null;
   const tableState = stateBeforeAction(hand, replayStep);
+  const actionLedger = buildHandActionLedger(hand);
   const userSeat = hand.players.find((player) => player.playerId === "user")?.seat;
   const atDecision = replayStep === current.actionIndex;
   const seats: SeatView[] = tableState.players.map((player) => ({
@@ -307,6 +310,35 @@ export function StrategyReview({
         <button className="btn text-xs px-2 py-1" onClick={() => setReplayStep((step) => Math.min(current.actionIndex, step + 1))} disabled={atDecision}>Forward</button>
         <button className="btn text-xs px-2 py-1" onClick={() => setReplayStep(current.actionIndex)} disabled={atDecision}>Decision</button>
         <span className="mono text-xs text-muted ml-auto">action {replayStep}/{current.actionIndex}</span>
+      </div>
+
+      <div className="rounded-md border border-line bg-panel2 px-4 py-3 mt-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="font-semibold text-sm">Complete hand action history</div>
+          <div className="text-[11px] text-muted">All players · chronological order</div>
+        </div>
+        <ol className="mt-2 max-h-64 overflow-y-auto divide-y divide-line" aria-label="Complete hand action history">
+          {actionLedger.map((entry) => {
+            const timing = entry.timedOut ? "timeout" : formatDecisionTime(entry.decisionTimeMs);
+            const isReviewedDecision = entry.index === current.actionIndex;
+            return (
+              <li
+                key={entry.index}
+                className={`grid grid-cols-[2rem_4.25rem_minmax(0,1fr)] sm:grid-cols-[2rem_4.25rem_minmax(7rem,.8fr)_minmax(10rem,1.2fr)_auto] items-center gap-2 py-2 text-xs ${isReviewedDecision ? "text-accent" : ""}`}
+              >
+                <span className="mono text-muted">{entry.index + 1}.</span>
+                <span className="label">{entry.street}</span>
+                <span className="truncate font-medium">
+                  {entry.playerId === "user" ? "You (model)" : entry.playerName} <span className="text-muted mono">({entry.position})</span>
+                </span>
+                <span className="col-start-3 sm:col-start-auto mono">{entry.label}</span>
+                <span className="col-start-3 sm:col-start-auto text-muted mono">
+                  {timing}{isReviewedDecision ? `${timing ? " · " : ""}reviewed decision` : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1.2fr] gap-4 mt-4">

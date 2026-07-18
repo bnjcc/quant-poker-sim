@@ -129,6 +129,27 @@ export const GLOSSARY_GROUPS: GlossaryGroup[] = [
         advanced: "At short-handed tables, position labels compress because some seats do not exist.",
       },
       {
+        term: "UTG+1",
+        full: "Under the Gun plus one",
+        plain: "The player immediately after UTG at an eight- or nine-player table.",
+        example: "UTG+1 can play slightly wider than UTG, but most of the table still acts afterward.",
+        advanced: "This position is omitted at shorter tables.",
+      },
+      {
+        term: "MP",
+        full: "Middle Position",
+        plain: "An early-middle seat used at seven- to nine-player tables.",
+        example: "MP acts after the earliest seats but before LJ, HJ, CO, and BTN at a full table.",
+        advanced: "Opening ranges usually widen gradually as positions move toward the button.",
+      },
+      {
+        term: "LJ",
+        full: "Lojack",
+        plain: "The seat immediately before the hijack at a nine-player table.",
+        example: "LJ has fewer players behind than UTG, but HJ, CO, and BTN can still apply pressure.",
+        advanced: "The lojack is omitted when the table has eight or fewer players.",
+      },
+      {
         term: "HJ",
         full: "Hijack",
         plain: "The seat two places to the right of the button in 6-max poker.",

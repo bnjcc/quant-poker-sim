@@ -102,7 +102,7 @@ const AGENT_NAMES = [
 ];
 
 /**
- * A running 6-max table session: owns seats, the button, turnover, and rebuys.
+ * A running 2-to-9-player table session: owns seats, the button, turnover, and rebuys.
  * Deterministic given the RNG seed.
  */
 export class TableSession {
@@ -130,7 +130,7 @@ export class TableSession {
     this.pool = opts.pool;
     this.rng = opts.rng;
 
-    const seats = [0, 1, 2, 3, 4, 5].slice(0, this.config.maxSeats);
+    const seats = Array.from({ length: this.config.maxSeats }, (_, seat) => seat);
     let seatIdx = 0;
     if (opts.seatUser) {
       this.userSeat = seats[this.rng.int(seats.length)];

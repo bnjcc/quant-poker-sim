@@ -23,6 +23,7 @@ import { usePokerSounds } from "@/lib/audio/poker-sounds";
 import { getStore, newId } from "@/lib/storage/store";
 import { PokerTable, SeatView } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
+import { ChipAmountInput } from "@/components/ChipAmountInput";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 
 type Phase = "setup" | "opponent-acting" | "playing" | "hand-done" | "done";
@@ -381,6 +382,12 @@ export default function CalibratePage() {
                   onChange={(e) => setBetTo(Number(e.target.value))}
                   className="w-48"
                   aria-label="Bet size in chips"
+                />
+                <ChipAmountInput
+                  value={betTo}
+                  min={legal.types.includes("bet") ? legal.minBet : legal.minRaiseTo}
+                  max={legal.maxBetTo}
+                  onChange={setBetTo}
                 />
                 <div className="flex gap-1">
                   {[0.5, 0.66, 1].map((f) => (

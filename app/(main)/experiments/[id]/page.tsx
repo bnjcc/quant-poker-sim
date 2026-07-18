@@ -23,7 +23,7 @@ import { StrategyReview } from "@/components/StrategyReview";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 import { CardRow, Empty, PageHeader, Stat, WarningNote, fmtBB, fmtPct, fmtWinRatePct } from "@/components/ui";
 
-const POSITION_ORDER = ["UTG", "HJ", "CO", "BTN", "SB", "BB"];
+const POSITION_ORDER = ["UTG", "UTG+1", "MP", "LJ", "HJ", "CO", "BTN", "SB", "BB"];
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -253,7 +253,7 @@ export default function ExperimentDetailPage() {
             {strategyName}
           </Link>
         ) : <span className="text-ink">{strategyName}</span>} · seed <span className="text-ink">{exp.config.seed}</span> · engine v{exp.simulationVersion} ·{" "}
-        {exp.config.hands.toLocaleString()} hands requested · blinds {exp.config.table.smallBlind}/{bb} · rake{" "}
+        {exp.config.hands.toLocaleString()} hands requested · {exp.config.table.maxSeats}-player table · blinds {exp.config.table.smallBlind}/{bb} · rake{" "}
         {(exp.config.table.rake.percentage * 100).toFixed(1)}% cap {exp.config.table.rake.cap} · mode {exp.config.mode}
       </div>
 

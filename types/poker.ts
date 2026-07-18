@@ -44,7 +44,7 @@ export interface LegalActions {
   maxBetTo: number; // effective all-in
 }
 
-export type Position = "BTN" | "SB" | "BB" | "UTG" | "HJ" | "CO";
+export type Position = "BTN" | "SB" | "BB" | "UTG" | "UTG+1" | "MP" | "LJ" | "HJ" | "CO";
 /** Seat-count-aware position labels for 2..6 handed. */
 export const POSITIONS_BY_COUNT: Record<number, Position[]> = {
   2: ["BTN", "BB"],
@@ -52,6 +52,9 @@ export const POSITIONS_BY_COUNT: Record<number, Position[]> = {
   4: ["BTN", "SB", "BB", "UTG"],
   5: ["BTN", "SB", "BB", "UTG", "CO"],
   6: ["BTN", "SB", "BB", "UTG", "HJ", "CO"],
+  7: ["BTN", "SB", "BB", "UTG", "MP", "HJ", "CO"],
+  8: ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO"],
+  9: ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO"],
 };
 
 export interface PlayerState {

@@ -53,6 +53,23 @@ describe("player turnover", () => {
     expect(stillHere.length).toBeLessThan(initialIds.size); // churn happened
     expect(session.agents.size).toBe(5); // seats stay filled
   });
+
+  it("fills and plays a nine-player table", () => {
+    const session = new TableSession({
+      config: { ...DEFAULT_TABLE, maxSeats: 9 },
+      pool,
+      rng: new Rng("nine-player-session"),
+      userBuyInBB: 100,
+      seatUser: true,
+    });
+
+    expect(session.agents.size).toBe(8);
+    const hand = session.playHand(policyDecider(new BehavioralPolicy()));
+    expect(hand?.players).toHaveLength(9);
+    expect(new Set(hand?.players.map((player) => player.position))).toEqual(
+      new Set(["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO"]),
+    );
+  });
 });
 
 describe("runner + aggregation", () => {

@@ -17,15 +17,16 @@ export interface SeatView {
   lastAction?: string;
 }
 
-/** Seat placement around the felt for up to 6 seats (user pinned bottom-center). */
-const SPOTS = [
-  { left: "50%", top: "84%" },
-  { left: "12%", top: "68%" },
-  { left: "12%", top: "28%" },
-  { left: "50%", top: "16%" },
-  { left: "88%", top: "28%" },
-  { left: "88%", top: "68%" },
-];
+/** Evenly place 2–9 seats around the felt with the user pinned bottom-center. */
+function seatSpot(index: number, count: number) {
+  const angle = ((90 + (index * 360) / count) * Math.PI) / 180;
+  const horizontalRadius = count > 6 ? 40 : 44;
+  const verticalRadius = count > 6 ? 31 : 34;
+  return {
+    left: `${50 + Math.cos(angle) * horizontalRadius}%`,
+    top: `${50 + Math.sin(angle) * verticalRadius}%`,
+  };
+}
 
 export function PokerTable({
   seats,
@@ -47,6 +48,7 @@ export function PokerTable({
   // Rotate so the user sits bottom-center.
   const userIdx = Math.max(0, seats.findIndex((s) => s.isUser));
   const ordered = [...seats.slice(userIdx), ...seats.slice(0, userIdx)];
+  const seatWidth = seats.length > 6 ? "w-[clamp(4.5rem,10vw,7rem)]" : "w-[clamp(5.5rem,13vw,9rem)]";
 
   return (
     <div
@@ -72,8 +74,8 @@ export function PokerTable({
       {ordered.map((s, i) => (
         <div
           key={s.seat}
-          className="absolute -translate-x-1/2 -translate-y-1/2 w-[clamp(5.5rem,13vw,9rem)]"
-          style={{ left: SPOTS[i]?.left ?? "50%", top: SPOTS[i]?.top ?? "50%" }}
+          className={`absolute -translate-x-1/2 -translate-y-1/2 ${seatWidth}`}
+          style={seatSpot(i, ordered.length)}
         >
           <div
             className={`table-seat rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${

@@ -127,7 +127,9 @@ export class HandEngine {
     const n = this.players.length;
     const order = this.seatOrder(this.buttonSeat);
     const labels = POSITIONS_BY_COUNT[n];
-    return labels[order.indexOf(seat)];
+    const position = labels?.[order.indexOf(seat)];
+    if (!position) throw new Error(`Unsupported table size or seat: ${n} players, seat ${seat}`);
+    return position;
   }
 
   private postBlindsAndDeal(): void {
