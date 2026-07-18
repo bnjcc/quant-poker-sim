@@ -18,7 +18,7 @@ function LoginForm() {
 
   if (!isSupabaseConfigured()) {
     return (
-      <div className="panel px-6 py-6 max-w-md mx-auto mt-16">
+      <div className="panel browser-mode-card px-7 py-8 max-w-md mx-auto mt-16">
         <h1 className="text-xl font-bold mb-2">Browser-only mode</h1>
         <p className="text-sm text-muted mb-4">
           Supabase environment variables are not set, so QuantPoker is using local browser storage.
@@ -65,15 +65,27 @@ function LoginForm() {
   };
 
   return (
-    <div className="panel px-6 py-6 max-w-md mx-auto mt-16">
-      <div className="mono text-lg font-bold tracking-tight mb-1">
+    <div className="auth-shell">
+      <section className="auth-story" aria-hidden="true">
+        <div className="auth-brand"><span className="brand-mark"><span>Q</span></span> Quant<span>Poker</span></div>
+        <div className="auth-story-copy">
+          <div className="page-eyebrow"><span /> Strategy intelligence</div>
+          <h2>Find the signal<br />inside your game.</h2>
+          <p>Model your decisions. Test your assumptions. Build an edge you can actually explain.</p>
+        </div>
+        <div className="auth-data-card">
+          <div><span>SIMULATION CONFIDENCE</span><strong>94.2%</strong></div>
+          <div className="auth-chart"><i /><i /><i /><i /><i /><i /><i /><i /></div>
+        </div>
+      </section>
+      <section className="panel auth-card px-7 py-8">
+      <div className="auth-mobile-brand mono text-lg font-bold tracking-tight mb-5">
         Quant<span className="text-accent">Poker</span>
       </div>
-      <h1 className="text-xl font-bold mb-2">{mode === "sign-in" ? "Sign in" : "Create your account"}</h1>
-      <p className="text-sm text-muted mb-5">
-        Your calibrations, experiments, and hand histories sync privately through Supabase.
-      </p>
-      <form onSubmit={submit} className="space-y-4">
+      <div className="page-eyebrow"><span /> Secure workspace</div>
+      <h1 className="text-3xl font-bold mb-2">{mode === "sign-in" ? "Welcome back" : "Create your account"}</h1>
+      <p className="text-sm text-muted mb-6">Your models, experiments, and hand histories stay private and synchronized.</p>
+      <form onSubmit={submit} className="space-y-5">
         <label className="block">
           <span className="label">Email</span>
           <input className="field mt-1" type="email" autoComplete="email" value={email}
@@ -86,7 +98,7 @@ function LoginForm() {
             value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
         </label>
         {message && <div className="text-sm rounded-md border border-line bg-panel2 px-3 py-2">{message}</div>}
-        <button className="btn btn-primary w-full" disabled={busy} type="submit">
+        <button className="btn btn-primary w-full justify-center py-3" disabled={busy} type="submit">
           {busy ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
         </button>
       </form>
@@ -97,6 +109,8 @@ function LoginForm() {
         }}>
         {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
       </button>
+      <div className="auth-trust"><span>Encrypted transport</span><span>Private by default</span></div>
+      </section>
     </div>
   );
 }

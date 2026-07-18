@@ -46,12 +46,8 @@ export function PokerTable({
 
   return (
     <div
-      className={`relative w-full rounded-[48%_48%_46%_46%] border border-line ${fitViewport ? "calibration-table" : ""}`}
-      style={{
-        aspectRatio: "16 / 9",
-        background: "radial-gradient(ellipse at 50% 42%, #1d3229 0%, #14231d 62%, #101a16 100%)",
-        boxShadow: "inset 0 0 60px rgba(0,0,0,0.5)",
-      }}
+      className={`poker-table relative w-full rounded-[48%_48%_46%_46%] ${fitViewport ? "calibration-table" : ""}`}
+      style={{ aspectRatio: "16 / 9" }}
     >
       {/* Board + pot */}
       <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
@@ -61,7 +57,7 @@ export function PokerTable({
         ) : (
           <div className="text-xs text-muted italic">preflop</div>
         )}
-        <div className="mono text-sm text-accent font-bold">pot {pot.toLocaleString()}</div>
+        <div className="table-pot mono text-sm text-accent font-bold"><span aria-hidden="true" />pot {pot.toLocaleString()}</div>
       </div>
 
       {ordered.map((s, i) => (
@@ -71,10 +67,9 @@ export function PokerTable({
           style={{ left: SPOTS[i]?.left ?? "50%", top: SPOTS[i]?.top ?? "50%" }}
         >
           <div
-            className={`rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${
+            className={`table-seat rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${
               s.isActing ? "acting-seat" : "border-line"
             } ${s.folded ? "opacity-40" : ""}`}
-            style={{ background: "var(--panel)" }}
             aria-current={s.isActing ? "true" : undefined}
           >
             <div className="flex items-center justify-center gap-1.5">

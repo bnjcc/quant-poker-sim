@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalibrationDataset, Experiment } from "@/types/experiment";
 import { getStore } from "@/lib/storage/store";
-import { PageHeader, Stat, fmtBB } from "@/components/ui";
+import { Stat, fmtBB } from "@/components/ui";
 
 function StepCard({
   n,
@@ -24,7 +24,8 @@ function StepCard({
   secondary?: { href: string; label: string };
 }) {
   return (
-    <div className={`panel px-5 py-4 flex flex-col ${done ? "opacity-70" : ""}`}>
+    <div className={`panel journey-card px-5 py-5 flex flex-col ${done ? "journey-card-done" : ""}`}>
+      <span className="step-watermark mono" aria-hidden="true">0{n}</span>
       <div className="flex items-center gap-2">
         <span
           className="mono text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center border"
@@ -67,11 +68,35 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        sub="Play a small sample yourself, let the system learn your strategy, then backtest it over hundreds of thousands of simulated hands against pools you design."
-      />
+      <section className="dashboard-hero mb-7">
+        <div className="hero-copy">
+          <div className="page-eyebrow"><span /> Quantitative poker lab</div>
+          <h1>Turn every decision into<br /><span>strategic signal.</span></h1>
+          <p>Capture how you play, build a behavioral model, then pressure-test it across hundreds of thousands of reproducible hands.</p>
+          <div className="hero-actions">
+            <Link href={cals.length ? "/experiments/new" : "/calibrate"} className="btn btn-primary">
+              {cals.length ? "Run an experiment" : "Start calibration"}
+              <span aria-hidden="true">↗</span>
+            </Link>
+            <Link href="/profile" className="btn">Explore your model</Link>
+          </div>
+          <div className="hero-meta">
+            <span><i className="status-dot" /> Local-first & private</span>
+            <span>Reproducible seeds</span>
+            <span>Honest confidence intervals</span>
+          </div>
+        </div>
+        <div className="hero-visual" aria-hidden="true">
+          <div className="orbit orbit-one" />
+          <div className="orbit orbit-two" />
+          <div className="hero-card hero-card-back">K<span>♠</span></div>
+          <div className="hero-card hero-card-front">A<span>♠</span></div>
+          <div className="signal-chip signal-chip-one"><span>MODEL</span> calibrated</div>
+          <div className="signal-chip signal-chip-two"><span>EV</span> +4.8 bb</div>
+        </div>
+      </section>
 
+      <div className="section-kicker"><span>Your workflow</span><span className="section-rule" /></div>
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <StepCard
           n={1}

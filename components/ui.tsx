@@ -16,8 +16,8 @@ export function CardGlyph({ card, size = "md" }: { card: Card; size?: "sm" | "md
         : "text-sm px-1.5 py-0.5 min-w-[2rem]";
   return (
     <span
-      className={`mono inline-flex items-center justify-center rounded border border-line bg-panel2 font-semibold ${cls}`}
-      style={{ color: red ? "var(--suit-red)" : "var(--ink)" }}
+      className={`playing-card mono inline-flex items-center justify-center font-bold ${cls}`}
+      style={{ color: red ? "var(--suit-red)" : "#18212b" }}
       aria-label={cardToString(card)}
     >
       {cardToString(card)[0]}
@@ -51,9 +51,9 @@ export function Stat({
 }) {
   const color = tone === "gain" ? "var(--gain)" : tone === "loss" ? "var(--loss)" : "var(--ink)";
   return (
-    <div className="panel px-4 py-3" title={title}>
+    <div className="panel stat-card px-4 py-3" title={title}>
       <div className="label">{label}</div>
-      <div className="mono text-xl font-bold mt-1" style={{ color }}>
+      <div className="mono stat-value text-xl font-bold mt-1" style={{ color }}>
         {value}
       </div>
       {sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}
@@ -91,9 +91,10 @@ export function Empty({ title, body, action }: { title: string; body: string; ac
 
 export function PageHeader({ title, sub, right }: { title: string; sub?: string; right?: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+    <div className="page-header flex items-start justify-between gap-4 mb-7">
+      <div className="min-w-0">
+        <div className="page-eyebrow"><span /> QuantPoker workspace</div>
+        <h1 className="page-title text-3xl font-bold tracking-tight">{title}</h1>
         {sub && <p className="text-sm text-muted mt-1 max-w-2xl">{sub}</p>}
       </div>
       {right}
