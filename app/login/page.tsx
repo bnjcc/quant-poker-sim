@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { safeRedirectPath } from "@/lib/auth/redirect";
+import { QueenDiamondLogo } from "@/components/QueenDiamondLogo";
 
 function LoginForm() {
   const router = useRouter();
@@ -67,7 +68,7 @@ function LoginForm() {
   return (
     <div className="auth-shell">
       <section className="auth-story" aria-hidden="true">
-        <div className="auth-brand"><span className="brand-mark"><span>Q</span></span> Quant<span>Poker</span></div>
+        <div className="auth-brand"><QueenDiamondLogo /> <span><span className="auth-brand-quant">uant</span><span className="auth-brand-poker">Poker</span></span></div>
         <div className="auth-story-copy">
           <div className="page-eyebrow"><span /> Strategy intelligence</div>
           <h2>Find the signal<br />inside your game.</h2>
@@ -79,8 +80,8 @@ function LoginForm() {
         </div>
       </section>
       <section className="panel auth-card px-7 py-8">
-      <div className="auth-mobile-brand mono text-lg font-bold tracking-tight mb-5">
-        Quant<span className="text-accent">Poker</span>
+      <div className="auth-mobile-brand brand-lockup mono text-lg font-bold tracking-tight mb-5">
+        <QueenDiamondLogo /><span><span>uant</span><span className="text-accent">Poker</span></span>
       </div>
       <div className="page-eyebrow"><span /> Secure workspace</div>
       <h1 className="text-3xl font-bold mb-2">{mode === "sign-in" ? "Welcome back" : "Create your account"}</h1>

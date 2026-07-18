@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { QueenDiamondLogo } from "@/components/QueenDiamondLogo";
 
 type IconName = "grid" | "cards" | "range" | "profile" | "spark" | "history" | "target" | "compare" | "users" | "book" | "settings";
 
@@ -43,9 +44,9 @@ function NavIcon({ name }: { name: IconName }) {
 function Brand() {
   return (
     <div className="brand-lockup">
-      <span className="brand-mark" aria-hidden="true"><span>Q</span></span>
+      <QueenDiamondLogo />
       <span>
-        <span className="brand-name">Quant<span>Poker</span></span>
+        <span className="brand-name"><span className="brand-quant">uant</span><span className="brand-poker">Poker</span></span>
         <span className="brand-subtitle">Strategy intelligence</span>
       </span>
     </div>

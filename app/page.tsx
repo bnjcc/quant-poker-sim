@@ -89,8 +89,8 @@ export default function Dashboard() {
         <div className="hero-visual" aria-hidden="true">
           <div className="orbit orbit-one" />
           <div className="orbit orbit-two" />
-          <div className="hero-card hero-card-back">K<span>♠</span></div>
-          <div className="hero-card hero-card-front">A<span>♠</span></div>
+          <div className="hero-card hero-card-back">A<span>♠</span></div>
+          <div className="hero-card hero-card-front hero-card-red">Q<span>♦</span></div>
           <div className="signal-chip signal-chip-one"><span>MODEL</span> calibrated</div>
           <div className="signal-chip signal-chip-two"><span>EV</span> +4.8 bb</div>
         </div>

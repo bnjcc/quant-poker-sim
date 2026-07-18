@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 
 const THEMES = [
+  { id: "red", name: "Black & red", color: "#ff3347" },
   { id: "purple", name: "Black & purple", color: "#a970ff" },
   { id: "cyan", name: "Black & cyan", color: "#27d7e8" },
   { id: "green", name: "Black & green", color: "#4ade80" },
-  { id: "red", name: "Black & red", color: "#ff5d68" },
   { id: "gold", name: "Black & gold", color: "#e2b34c" },
   { id: "blue", name: "Black & blue", color: "#60a5fa" },
   { id: "orange", name: "Black & orange", color: "#fb923c" },
@@ -18,11 +18,11 @@ type ThemeId = (typeof THEMES)[number]["id"];
 const STORAGE_KEY = "rangebench-ui-theme";
 
 export function ThemeSelector() {
-  const [theme, setTheme] = useState<ThemeId>("purple");
+  const [theme, setTheme] = useState<ThemeId>("red");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    const selected = THEMES.some((option) => option.id === saved) ? (saved as ThemeId) : "purple";
+    const selected = THEMES.some((option) => option.id === saved) ? (saved as ThemeId) : "red";
     setTheme(selected);
     document.documentElement.dataset.theme = selected;
   }, []);
