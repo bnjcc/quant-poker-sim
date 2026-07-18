@@ -43,9 +43,6 @@ export default function CalibratePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decisionRemainingMs, setDecisionRemainingMs] = useState(ACTION_CLOCK_MS);
-  const [opponentRemainingMs, setOpponentRemainingMs] = useState(0);
-  const [opponentTotalMs, setOpponentTotalMs] = useState(1);
-  const [opponentDeadline, setOpponentDeadline] = useState(0);
   const [opponentName, setOpponentName] = useState("Opponent");
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
   const [, force] = useState(0);
@@ -82,9 +79,6 @@ export default function CalibratePage() {
       setEngine(step.engine);
       setOpponentName(step.engine.players.find((player) => player.seat === step.seat)?.name ?? "Opponent");
       setOpponentCallAmount(step.callAmount);
-      setOpponentTotalMs(step.liveDelayMs);
-      setOpponentRemainingMs(step.liveDelayMs);
-      setOpponentDeadline(Date.now() + step.liveDelayMs);
       setPhase("opponent-acting");
       opponentTimerRef.current = window.setTimeout(() => {
         opponentTimerRef.current = null;
@@ -135,14 +129,6 @@ export default function CalibratePage() {
       window.clearTimeout(timeout);
     };
   }, [ctx, phase]);
-
-  useEffect(() => {
-    if (phase !== "opponent-acting" || opponentDeadline <= 0) return;
-    const update = () => setOpponentRemainingMs(Math.max(0, opponentDeadline - Date.now()));
-    update();
-    const interval = window.setInterval(update, 100);
-    return () => window.clearInterval(interval);
-  }, [opponentDeadline, phase]);
 
   useEffect(
     () => () => {
@@ -385,7 +371,6 @@ export default function CalibratePage() {
           </div>
         ) : phase === "opponent-acting" ? (
           <div className="flex items-center gap-4">
-            <ActionClock remainingMs={opponentRemainingMs} totalMs={opponentTotalMs} label={opponentName} />
             <span className="text-sm text-muted">
               {opponentName} is thinking…{" "}
               {opponentCallAmount > 0

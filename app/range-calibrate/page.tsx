@@ -51,9 +51,6 @@ export default function RangeCalibratePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decisionRemainingMs, setDecisionRemainingMs] = useState(ACTION_CLOCK_MS);
-  const [opponentRemainingMs, setOpponentRemainingMs] = useState(0);
-  const [opponentTotalMs, setOpponentTotalMs] = useState(1);
-  const [opponentDeadline, setOpponentDeadline] = useState(0);
   const [opponentName, setOpponentName] = useState("Opponent");
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
   const [, force] = useState(0);
@@ -64,6 +61,16 @@ export default function RangeCalibratePage() {
       const next = new Set(current);
       if (next.has(notation)) next.delete(notation);
       else next.add(notation);
+      return next;
+    });
+  };
+
+  const setHandSelected = (notation: string, active: boolean) => {
+    setSelected((current) => {
+      if (current.has(notation) === active) return current;
+      const next = new Set(current);
+      if (active) next.add(notation);
+      else next.delete(notation);
       return next;
     });
   };
@@ -97,9 +104,6 @@ export default function RangeCalibratePage() {
       setEngine(step.engine);
       setOpponentName(step.engine.players.find((player) => player.seat === step.seat)?.name ?? "Opponent");
       setOpponentCallAmount(step.callAmount);
-      setOpponentTotalMs(step.liveDelayMs);
-      setOpponentRemainingMs(step.liveDelayMs);
-      setOpponentDeadline(Date.now() + step.liveDelayMs);
       setPhase("opponent-acting");
       opponentTimerRef.current = window.setTimeout(() => {
         opponentTimerRef.current = null;
@@ -168,14 +172,6 @@ export default function RangeCalibratePage() {
       window.clearTimeout(timeout);
     };
   }, [ctx, phase]);
-
-  useEffect(() => {
-    if (phase !== "opponent-acting" || opponentDeadline <= 0) return;
-    const update = () => setOpponentRemainingMs(Math.max(0, opponentDeadline - Date.now()));
-    update();
-    const interval = window.setInterval(update, 100);
-    return () => window.clearInterval(interval);
-  }, [opponentDeadline, phase]);
 
   useEffect(
     () => () => {
@@ -289,6 +285,16 @@ export default function RangeCalibratePage() {
             <button className="btn text-xs" type="button" onClick={() => addGroup((hand) => hand.kind === "pair")}>
               + Pairs
             </button>
+            <button className="btn text-xs" type="button" onClick={() => addGroup((hand) => hand.highRank === 14)}>
+              + Aces
+            </button>
+            <button
+              className="btn text-xs"
+              type="button"
+              onClick={() => addGroup((hand) => hand.highRank >= 11 && hand.highRank <= 13 && hand.lowRank >= 11)}
+            >
+              + Face cards
+            </button>
             <button className="btn text-xs" type="button" onClick={() => addGroup((hand) => hand.kind === "suited")}>
               + Suited
             </button>
@@ -319,7 +325,7 @@ export default function RangeCalibratePage() {
             </button>
           </div>
 
-          <StartingHandGrid selected={selected} onToggle={toggleHand} />
+          <StartingHandGrid selected={selected} onToggle={toggleHand} onSetSelected={setHandSelected} />
         </div>
 
         <div className="panel px-5 py-4 mt-4 max-w-2xl">
@@ -489,7 +495,6 @@ export default function RangeCalibratePage() {
           </div>
         ) : phase === "opponent-acting" ? (
           <div className="flex items-center gap-4">
-            <ActionClock remainingMs={opponentRemainingMs} totalMs={opponentTotalMs} label={opponentName} />
             <span className="text-sm text-muted">
               {opponentName} is thinking…{" "}
               {opponentCallAmount > 0

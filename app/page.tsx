@@ -71,28 +71,19 @@ export default function Dashboard() {
       <section className="dashboard-hero mb-7">
         <div className="hero-copy">
           <div className="page-eyebrow"><span /> Quantitative poker lab</div>
-          <h1>Turn every decision into<br /><span>strategic signal.</span></h1>
+          <h1>Computerize Your Poker Playing.</h1>
           <p>Capture how you play, build a behavioral model, then pressure-test it across hundreds of thousands of reproducible hands.</p>
           <div className="hero-actions">
-            <Link href={cals.length ? "/experiments/new" : "/calibrate"} className="btn btn-primary">
+            <Link href={cals.length ? "/experiments/new" : "/range-calibrate"} className="btn btn-primary">
               {cals.length ? "Run an experiment" : "Start calibration"}
               <span aria-hidden="true">↗</span>
             </Link>
             <Link href="/profile" className="btn">Explore your model</Link>
           </div>
-          <div className="hero-meta">
-            <span><i className="status-dot" /> Local-first & private</span>
-            <span>Reproducible seeds</span>
-            <span>Honest confidence intervals</span>
-          </div>
         </div>
         <div className="hero-visual" aria-hidden="true">
-          <div className="orbit orbit-one" />
-          <div className="orbit orbit-two" />
-          <div className="hero-card hero-card-back hero-card-red">Q<span>♥</span></div>
-          <div className="hero-card hero-card-front hero-card-red">Q<span>♦</span></div>
-          <div className="signal-chip signal-chip-one"><span>MODEL</span> calibrated</div>
-          <div className="signal-chip signal-chip-two"><span>EV</span> +4.8 bb</div>
+          <div className="hero-card hero-card-back">Q<span>♥</span></div>
+          <div className="hero-card hero-card-front">Q<span>♦</span></div>
         </div>
       </section>
 
@@ -102,10 +93,10 @@ export default function Dashboard() {
           n={1}
           title="Calibrate"
           body="Play 25–250 hands at a simulated 6-max table. Every decision is recorded with full context: position, stack depth, pot odds, action history."
-          href="/calibrate"
+          href="/range-calibrate"
           cta={cals.length ? "Add another session" : "Start playing"}
           done={cals.length > 0}
-          secondary={{ href: "/range-calibrate", label: "Choose range first" }}
+          secondary={{ href: "/calibrate", label: "All hands" }}
         />
         <StepCard
           n={2}

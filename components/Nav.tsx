@@ -11,8 +11,8 @@ type IconName = "grid" | "cards" | "range" | "profile" | "spark" | "history" | "
 
 const LINKS: { href: string; label: string; icon: IconName; group: "Model" | "Lab" | "Library" }[] = [
   { href: "/", label: "Dashboard", icon: "grid", group: "Model" },
-  { href: "/calibrate", label: "Calibration session", icon: "cards", group: "Model" },
   { href: "/range-calibrate", label: "Range-first calibration", icon: "range", group: "Model" },
+  { href: "/calibrate", label: "All hands", icon: "cards", group: "Model" },
   { href: "/profile", label: "Strategy profile", icon: "profile", group: "Model" },
   { href: "/experiments/new", label: "New experiment", icon: "spark", group: "Lab" },
   { href: "/experiments", label: "Previous experiments", icon: "history", group: "Lab" },
