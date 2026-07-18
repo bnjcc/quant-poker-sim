@@ -9,12 +9,14 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
 - Active branch: `agent/strategy-review-calibration`
 - Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest committed implementation: `e5e7d2f Simplify dashboard and accelerate range calibration`
-- Previous calibration/UI commits: `92cd415 Refine calibration pacing and table visuals`, `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
+- Latest feature implementation: `cecf6ba Keep simulated hand reviews repeatable`
+- Main beginner-analytics/calibration release: `2511582 Make analytics and calibration more approachable`
+- Previous workflow release: `a55a741 Improve calibration, reviews, and strategy profiles`
+- Earlier calibration/UI commits: `e5e7d2f Simplify dashboard and accelerate range calibration`, `92cd415 Refine calibration pacing and table visuals`, `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- Application commit `91687fe`, including the prior version of this context file, is pushed to the remote default branch. This handoff was refreshed afterward to document that commit accurately.
+- `origin/agent/strategy-review-calibration`, the remote default branch `origin/agent/supabase-backend`, and `origin/HEAD` all point to deployed feature commit `cecf6ba` before this documentation-only update.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -295,22 +297,16 @@ The resulting persistent run state changes only through the row-locked database 
 
 ## Validation status
 
-Validation on source commit `e5e7d2f` passed:
-
-- TypeScript: clean (`tsc --noEmit`)
-- ESLint: clean
-- Vitest: 8 test files, 63 tests passed
-- Next.js production build: passed
-- `git diff --check`: clean apart from expected Windows LF/CRLF notices
-- Secret scan: no Supabase secret/service key or private key was committed
-- Browser smoke check: default felt rendered red, switching to blue changed the felt, the user's two cards rendered at the larger calibration size, and opponent action labels retained their simulated times after the 500ms preview.
-
-Validation of the current workflow-refinement working tree also passed:
+Validation on deployed feature commit `cecf6ba` passed:
 
 - TypeScript: clean (`tsc --noEmit`)
 - ESLint: clean
 - Vitest: 8 test files, 67 tests passed
 - Next.js production build: passed
+- `git diff --check`: clean apart from expected Windows LF/CRLF notices
+- Secret scan: no Supabase secret/service key or private key was committed
+- Browser smoke check: range-first selection loaded in browser-storage mode; starting a selected-hand calibration showed the red felt, large user cards, sound toggle, animated card classes, legal action panel, and 15-second decision clock.
+- Production verification: `/login` returned HTTP 200 from Vercel; the live stylesheet contained `card-turn-in`/`cardTurnIn`, the live calibration bundle contained the persisted audio-preference key, and the final experiment bundle contained **Review more simulated hands**.
 
 New application tests include:
 
@@ -354,9 +350,10 @@ The production backend and deployment are connected:
 - Email signup is enabled and email confirmation is required.
 - The original TOTP enrollment/verification and 8-digit, one-minute email OTP settings were preserved.
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
-- Production deployment `dpl_2oWgVatr8KYLx1XwQbAJWtUfQx9v` is Ready and aliased to `https://poker-sim-iota.vercel.app`.
+- The current production deployment is Ready and aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
-- Source commit `e5e7d2f` is pushed to `origin/agent/strategy-review-calibration` and published to the production Vercel deployment. It includes range-first defaults, **All hands**, hidden opponent-preview clocks, larger user cards, additive range shortcuts, drag painting, rounded typography, and the simplified dashboard hero.
+- Feature commits `2511582` and `cecf6ba` are pushed to both `origin/agent/strategy-review-calibration` and the default production branch `origin/agent/supabase-backend`.
+- Production serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the final branch push.
 
 Remaining external verification:
 
