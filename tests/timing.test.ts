@@ -57,8 +57,11 @@ describe("online action timing", () => {
     tracker.apply(0, { type: "bet", toAmount: 10 });
 
     expect(engine.getLegalActions(1).types).toEqual(["fold", "call", "raise"]);
+    const stackBeforeCall = engine.players.find((player) => player.seat === 1)!.stack;
     tracker.apply(1, { type: "check" });
-    expect(engine.actions.at(-1)?.type).toBe("call");
+    const applied = engine.actions.at(-1)!;
+    expect(applied.type).toBe("call");
+    expect(engine.players.find((player) => player.seat === 1)!.stack).toBe(stackBeforeCall - applied.amount);
   });
 
   it("removes stale check labels from every opponent still facing a bet", () => {

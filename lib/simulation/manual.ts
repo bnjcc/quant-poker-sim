@@ -9,7 +9,7 @@ import { clampDecisionTime, DecisionTiming, timeoutAction } from "./timing";
 
 export type ManualStep =
   | { kind: "awaiting-user"; context: DecisionContext; engine: HandEngine }
-  | { kind: "opponent-acting"; seat: number; decisionTimeMs: number; engine: HandEngine }
+  | { kind: "opponent-acting"; seat: number; decisionTimeMs: number; callAmount: number; engine: HandEngine }
   | { kind: "hand-complete"; history: HandHistory; engine: HandEngine }
   | { kind: "session-complete" };
 
@@ -26,7 +26,12 @@ export class ManualSession {
   readonly userSeatByHand = new Map<number, number>();
   private readonly startingHands: string[] | null;
   private current: { engine: HandEngine; tracker: ContextTracker } | null = null;
-  private pendingOpponent: { seat: number; action: ChosenAction; timing: DecisionTiming } | null = null;
+  private pendingOpponent: {
+    seat: number;
+    action: ChosenAction;
+    timing: DecisionTiming;
+    callAmount: number;
+  } | null = null;
   handsPlayed = 0;
 
   constructor(opts: {
@@ -64,6 +69,7 @@ export class ManualSession {
         kind: "opponent-acting",
         seat: this.pendingOpponent.seat,
         decisionTimeMs: this.pendingOpponent.timing.decisionTimeMs,
+        callAmount: this.pendingOpponent.callAmount,
         engine: this.current.engine,
       };
     }
@@ -92,8 +98,14 @@ export class ManualSession {
       const timing = sampleAgentDecisionTiming(agent.profile, ctx, proposed, this.session.rng);
       const action = timing.timedOut ? timeoutAction(ctx) : proposed;
       if (paceOpponents) {
-        this.pendingOpponent = { seat, action, timing };
-        return { kind: "opponent-acting", seat, decisionTimeMs: timing.decisionTimeMs, engine };
+        this.pendingOpponent = { seat, action, timing, callAmount: ctx.legal.callAmount };
+        return {
+          kind: "opponent-acting",
+          seat,
+          decisionTimeMs: timing.decisionTimeMs,
+          callAmount: ctx.legal.callAmount,
+          engine,
+        };
       }
       tracker.apply(seat, action, timing);
     }

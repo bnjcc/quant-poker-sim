@@ -55,6 +55,7 @@ export default function RangeCalibratePage() {
   const [opponentTotalMs, setOpponentTotalMs] = useState(1);
   const [opponentDeadline, setOpponentDeadline] = useState(0);
   const [opponentName, setOpponentName] = useState("Opponent");
+  const [opponentCallAmount, setOpponentCallAmount] = useState(0);
   const [, force] = useState(0);
   const rerender = () => force((value) => value + 1);
 
@@ -95,6 +96,7 @@ export default function RangeCalibratePage() {
       setCtx(null);
       setEngine(step.engine);
       setOpponentName(step.engine.players.find((player) => player.seat === step.seat)?.name ?? "Opponent");
+      setOpponentCallAmount(step.callAmount);
       setOpponentTotalMs(Math.max(1, step.decisionTimeMs));
       setOpponentRemainingMs(step.decisionTimeMs);
       setOpponentDeadline(Date.now() + step.decisionTimeMs);
@@ -488,7 +490,12 @@ export default function RangeCalibratePage() {
         ) : phase === "opponent-acting" ? (
           <div className="flex items-center gap-4">
             <ActionClock remainingMs={opponentRemainingMs} totalMs={opponentTotalMs} label={opponentName} />
-            <span className="text-sm text-muted">{opponentName} is thinking…</span>
+            <span className="text-sm text-muted">
+              {opponentName} is thinking…{" "}
+              {opponentCallAmount > 0
+                ? `Facing ${opponentCallAmount} — check is unavailable. Chips move after the decision.`
+                : "No bet to call."}
+            </span>
           </div>
         ) : phase === "hand-done" ? (
           <div className="flex items-center gap-4">
