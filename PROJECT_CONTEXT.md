@@ -9,14 +9,15 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
 - Active branch: `agent/strategy-review-calibration`
 - Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest feature implementation: `cecf6ba Keep simulated hand reviews repeatable`
+- Latest implementation: `7a8c247 Convert application to JavaScript`
+- Latest pre-migration feature implementation: `10e698c Improve calibration controls and full-ring review`
 - Main beginner-analytics/calibration release: `2511582 Make analytics and calibration more approachable`
 - Previous workflow release: `a55a741 Improve calibration, reviews, and strategy profiles`
 - Earlier calibration/UI commits: `e5e7d2f Simplify dashboard and accelerate range calibration`, `92cd415 Refine calibration pacing and table visuals`, `91687fe Add timed calibration and analytics glossary`, then `a9200d2 Add range-first betting calibration`
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration`, the remote default branch `origin/agent/supabase-backend`, and `origin/HEAD` all point to deployed feature commit `cecf6ba` before this documentation-only update.
+- `origin/agent/strategy-review-calibration`, the remote default/production branch `origin/agent/supabase-backend`, and `origin/HEAD` all point to JavaScript migration commit `7a8c247` before this documentation-only update.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -56,6 +57,8 @@ The poker engine, evaluator, agents, player model, simulator, and analytics rema
 - TypeScript-only dependencies, generated declarations, compile-only domain files, and the TypeScript check script were removed.
 - Post-migration validation passes all 72 Vitest tests, ESLint, and the full Next.js production build across every existing route.
 - A repository scan confirms no `.ts`, `.tsx`, or `.d.ts` source files remain.
+- Migration commit `7a8c247` is pushed to both the working branch and the default production branch connected to Vercel.
+- No CSS or visual assets changed during the migration; the JSX component structure, class names, routes, and runtime logic were preserved.
 
 ## Timing-aware calibration and simulation completed
 
@@ -306,16 +309,17 @@ The resulting persistent run state changes only through the row-locked database 
 
 ## Validation status
 
-Validation on deployed feature commit `cecf6ba` passed:
+Validation on deployed JavaScript migration commit `7a8c247` passed:
 
-- Pre-migration TypeScript check: clean (`tsc --noEmit`)
+- Pre-migration baseline TypeScript check: clean (`tsc --noEmit`)
 - ESLint: clean
-- Vitest: 8 test files, 67 tests passed
-- Next.js production build: passed
+- Vitest: 10 test files, 72 tests passed
+- Next.js production build: passed for all existing application routes and middleware
+- JavaScript migration scan: no `.ts`, `.tsx`, or `.d.ts` source files remain
 - `git diff --check`: clean apart from expected Windows LF/CRLF notices
 - Secret scan: no Supabase secret/service key or private key was committed
 - Browser smoke check: range-first selection loaded in browser-storage mode; starting a selected-hand calibration showed the red felt, large user cards, sound toggle, animated card classes, legal action panel, and 15-second decision clock.
-- Production verification: `/login` returned HTTP 200 from Vercel; the live stylesheet contained `card-turn-in`/`cardTurnIn`, the live calibration bundle contained the persisted audio-preference key, and the final experiment bundle contained **Review more simulated hands**.
+- Production verification after the JavaScript production-branch push: `/login` returned HTTP 200 from Vercel. Earlier live verification also confirmed the stylesheet contained `card-turn-in`/`cardTurnIn`, the calibration bundle contained the persisted audio-preference key, and the final experiment bundle contained **Review more simulated hands**.
 
 New application tests include:
 
@@ -359,9 +363,9 @@ The production backend and deployment are connected:
 - Email signup is enabled and email confirmation is required.
 - The original TOTP enrollment/verification and 8-digit, one-minute email OTP settings were preserved.
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
-- The current production deployment is Ready and aliased to `https://poker-sim-iota.vercel.app`.
-- The production root redirects signed-out visitors to `/login`; `/login` returns HTTP 200.
-- Feature commits `2511582` and `cecf6ba` are pushed to both `origin/agent/strategy-review-calibration` and the default production branch `origin/agent/supabase-backend`.
+- The production deployment is aliased to `https://poker-sim-iota.vercel.app`.
+- The production root redirects signed-out visitors to `/login`; `/login` returned HTTP 200 after the JavaScript migration was pushed to the production branch.
+- JavaScript migration commit `7a8c247` is pushed to both `origin/agent/strategy-review-calibration` and the default production branch `origin/agent/supabase-backend`.
 - Production serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the final branch push.
 
 Remaining external verification:
