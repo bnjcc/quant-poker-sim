@@ -316,7 +316,10 @@ export default function RangeCalibratePage() {
     };
   }, [ctx, phase, sounds]);
   useEffect(() => {
-    const sessionIsActive = phase !== "setup" && phase !== "done";
+    const sessionIsActive =
+      phase === "playing" ||
+      phase === "opponent-acting" ||
+      phase === "hand-done";
     document.body.classList.toggle(
       "calibration-session-active",
       sessionIsActive,
