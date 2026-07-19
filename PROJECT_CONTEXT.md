@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `37f4bc1 Hide bottom navigation on desktop`
-- Current uncommitted working tree: the calibration body-state marker now activates only for `playing`, `opponent-acting`, and `hand-done`. Range selection is no longer mistaken for an active hand, so `/range-calibrate` can scroll normally while choosing ranges. These changes have not been committed, pushed, or deployed.
+- Latest committed production implementation: `ee9c766 Restore range selection scrolling`
+- Current uncommitted working tree: active calibration keeps the `100dvh` no-scroll grid only below 768px. Desktop calibration uses normal document overflow, an auto-height grid, and the table's natural 16:9 height, so users can scroll after applying a range and starting betting calibration. Phone layout and bottom-tab behavior remain unchanged. These changes have not been committed, pushed, or deployed.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `37f4bc1`, which hides the phone-only bottom navigation on desktop on top of the completed-hand navigation fix, persistent 3× BB shortcut, prominent next-hand controls, compact all-viewport calibration table, no-scroll layout, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `ee9c766`, which restores range-selection scrolling on top of the desktop navigation suppression, completed-hand navigation fix, persistent 3× BB shortcut, prominent next-hand controls, compact mobile calibration table, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -118,7 +118,8 @@ The application now has a dedicated phone experience instead of relying on compr
 
 ### Calibration scroll-position stability
 
-- During an active hand, both `/calibrate` and `/range-calibrate` lock the app shell to `100dvh` and use a four-row grid for session status, progress, a flexible felt, and the action panel. The page itself cannot scroll, while the felt expands or contracts into the space remaining after the controls.
+- During an active hand on screens below 768px, both `/calibrate` and `/range-calibrate` lock the app shell to `100dvh` and use a four-row grid for session status, progress, a flexible felt, and the action panel. The phone page itself cannot scroll, while the felt expands or contracts into the space remaining after the controls.
+- At 768px and wider, active calibration returns to normal document flow: the body, app shell, and main content can overflow vertically; the calibration grid uses auto height; and the felt uses its natural 16:9 height. This allows mouse-wheel scrolling after a selected range starts betting calibration instead of compressing and locking the desktop document to the viewport.
 - The body-level active-session marker is limited to actual hand phases: `playing`, `opponent-acting`, and `hand-done`. The range-selection phase never receives the no-scroll lock, so its game selector, position controls, full 169-hand grid, and setup actions remain vertically scrollable.
 - The prior 22rem mobile action-panel reservation is removed. Phone buttons, chip entry, sizing shortcuts, clock, and pot context use a compact layout; the redundant sizing slider is hidden on narrow or short screens while direct chip entry, increment buttons, 3× BB, percentage, pot, and all-in shortcuts remain available. The 3× BB shortcut stays present on every street when betting controls are available and is disabled only when its fixed chip total is outside the current legal range.
 - Completed-hand controls wrap safely instead of squeezing the primary action. On phones the next-hand button occupies its own full-width, taller row, while wider viewports retain a prominent fixed-width action beside the hand result.
@@ -128,7 +129,8 @@ The application now has a dedicated phone experience instead of relying on compr
 ### Mobile validation
 
 - The current responsive implementation passes ESLint, all 15 Vitest files / 99 tests, and the Next.js production build across all 19 routes.
-- Browser-level phone regression tests are still a sensible follow-up; current verification is source-, lint-, unit/integration-, and production-build based.
+- Headless Chrome verification at 390×844 confirms active betting calibration remains exactly viewport-locked, the fixed bottom tab is hidden, and the controls end at 837.6px inside the 844px viewport.
+- A repeatable browser-level responsive test in the project suite remains a sensible follow-up; the current change received direct headless-Chrome verification in addition to source, lint, unit/integration, and production-build checks.
 
 ## Timing-aware calibration and simulation completed
 
@@ -430,6 +432,7 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
+- Current working-tree validation after restoring desktop active-calibration scrolling: headless Chrome at 1440×900 reports `bodyOverflowY: auto`, a 931px document with the full betting panel visible, and a real mouse-wheel change from `scrollTop: 0` to `31`. At 1366×768 the document is 889px tall and the completed scroll position is 121px, with controls ending at 736.1px inside the viewport. The paired 390×844 phone check retains `overflow-y: hidden`, an 844px document, hidden bottom tabs, and fully visible controls. All 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
 - Current working-tree validation after restoring range-selection scrolling: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Both calibration flows now enumerate the three active-hand phases explicitly instead of treating every non-setup phase as scroll-locked.
 - Current working-tree validation after making the bottom tab bar strictly phone-only: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. The new `min-width: 768px` rule changes only desktop/tablet-width rendering; phone navigation remains unchanged.
 - Current working-tree validation after preventing the fixed bottom tab bar from covering completed-hand controls: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Both calibration pages retain the active-session body marker through `hand-done`, and `app/globals.css` hides the tab bar and removes its reserved bottom padding across the full mobile navigation breakpoint.
@@ -522,8 +525,9 @@ The production backend and deployment are connected:
 - The no-scroll calibration layout and oval opponent seats were committed and pushed through `c9cce87`. Exact live-site verification of that deployment remains pending.
 - The persistent 3× BB shortcut and prominent next-hand controls were committed and pushed through `f4a4a18`. Exact live-site verification of that deployment remains pending.
 - The full-mobile-range bottom-tab visibility fix was committed and pushed through `2b29885`. Exact live-site verification of that deployment remains pending.
-- The desktop bottom-tab suppression was committed and pushed through `37f4bc1`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
-- The range-selection scrolling fix is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- The desktop bottom-tab suppression was committed and pushed through `37f4bc1`. Exact live-site verification of that deployment remains pending.
+- The range-selection scrolling fix was committed and pushed through `ee9c766`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
+- The desktop active-calibration scrolling fix is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -547,7 +551,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/settings/page.jsx` — active storage summary, delete operations, browser import
 - `app/login/page.jsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.js` — authentication callback
-- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, the active-calibration viewport grid/no-scroll behavior, responsive completed-hand controls, full-mobile-range bottom-tab suppression during calibration, and explicit desktop suppression of the phone-only tab bar
+- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, phone-only active-calibration viewport locking, desktop active-calibration document scrolling, responsive completed-hand controls, full-mobile-range bottom-tab suppression during calibration, and explicit desktop suppression of the phone-only tab bar
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
 - `components/CalibrationGameSelector.jsx` — upfront 1/3-or-2/5 and 6-player-or-9-player calibration game selection plus the selected-game summary
@@ -619,7 +623,8 @@ Do not regress these design constraints:
 - Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
 - Keep new games at the 1/3 default with the 2/5 preset available. Calibration amounts remain chip-denominated; small-blind incremental controls and the legal three-big-blind shortcut must remain synchronized with the main bet amount. Keep the 3× BB shortcut visible after preflop, disabling it only when the fixed amount is outside the current legal range.
 - Keep the calibration game selector before range editing, restrict calibration table sizes to 6 or 9 players, show only positions active at the selected size, and keep every calibration hand full at that chosen seat count. Do not disable normal turnover or sit-outs for experiments.
-- Keep active calibration hands within one viewport on phone and desktop. Opponents remain compact ovals, the user seat retains visible large hole cards, and every legal action/sizing control must stay accessible without page scrolling.
+- Keep active calibration hands within one viewport on phones below 768px. Opponents remain compact ovals, the user seat retains visible large hole cards, and every legal action/sizing control must stay onscreen without page scrolling.
+- Keep active calibration vertically scrollable at 768px and wider. Do not apply the phone's `100dvh` body/app-shell overflow lock or fixed-height calibration grid to desktop views.
 - Never apply the calibration no-scroll body state during range selection; it is reserved for `playing`, `opponent-acting`, and `hand-done` only.
 - Keep the fixed bottom mobile tab bar hidden throughout every active calibration phase, including the completed-hand screen, across the full sub-768px navigation breakpoint so it cannot cover the next-hand action.
 - Keep the bottom tab bar phone-only. Its custom `display: grid` styling must be explicitly overridden at 768px and wider so it never appears in the desktop layout.
