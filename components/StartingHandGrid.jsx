@@ -43,7 +43,10 @@ export function StartingHandGrid({ selected, onToggle, onSetSelected }) {
   };
   return (
     <div>
-      <div className="overflow-x-auto pb-2">
+      <p className="range-scroll-hint text-xs text-muted mb-2">
+        Swipe sideways to explore the full 13 by 13 range.
+      </p>
+      <div className="range-grid-scroll overflow-x-auto pb-2">
         <div
           className="grid gap-1 mx-auto select-none"
           style={{ gridTemplateColumns: "repeat(13, 3.25rem)", width: "724px" }}

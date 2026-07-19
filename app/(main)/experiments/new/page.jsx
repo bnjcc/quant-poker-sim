@@ -324,7 +324,7 @@ function NewExperimentInner() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Num
               label="Hands"
               value={cfg.hands}
@@ -475,10 +475,10 @@ function NewExperimentInner() {
             {AGENT_PRESETS.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-3"
+                className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)_1rem] items-center gap-2 sm:flex sm:gap-3"
                 title={p.description}
               >
-                <span className="text-sm w-44 truncate">{p.name}</span>
+                <span className="text-sm min-w-0 truncate sm:w-44">{p.name}</span>
                 <input
                   type="range"
                   min={0}
@@ -495,7 +495,7 @@ function NewExperimentInner() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <Num
               label="Avg session (hands)"
               value={cfg.pool.avgSessionHands}

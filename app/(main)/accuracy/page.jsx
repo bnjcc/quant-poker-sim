@@ -93,7 +93,57 @@ export default function AccuracyPage() {
             />
           </div>
 
-          <section className="panel px-5 py-4 mb-5 overflow-x-auto">
+          <section className="grid gap-3 mb-5 md:hidden">
+            {reviews.map((review) => {
+              const experiment = experimentById.get(review.experimentId);
+              return (
+                <article key={review.id} className="panel px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="label">Experiment</div>
+                      <Link
+                        className="block text-accent hover:underline font-semibold mt-1 truncate"
+                        href={`/experiments/${review.experimentId}`}
+                      >
+                        {experiment?.config.name ?? review.experimentId}
+                      </Link>
+                    </div>
+                    <span className="text-xs text-muted mono shrink-0">
+                      Round {review.roundNumber}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-line">
+                    <div>
+                      <div className="label">Decisions</div>
+                      <div className="mono mt-1">{review.answers.length}</div>
+                    </div>
+                    <div>
+                      <div className="label">Accuracy</div>
+                      <div className="mono mt-1 text-gain">
+                        {fmtPct(review.accuracy, 1)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="label">Corrections</div>
+                      <div className="mono mt-1">{review.correctedCount}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-end justify-between gap-3 mt-4 text-xs text-muted">
+                    <span>{new Date(review.createdAt).toLocaleDateString()}</span>
+                    <span className="text-right">
+                      {review.accepted
+                        ? "accepted"
+                        : review.rerunCompletedAt
+                          ? "recalibrated + rerun"
+                          : "rerun pending"}
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+
+          <section className="panel hidden md:block px-5 py-4 mb-5 overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
                 <tr className="text-left border-b border-line">

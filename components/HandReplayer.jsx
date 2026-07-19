@@ -84,13 +84,13 @@ export function HandReplayer({ hand, onClose }) {
   }));
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-2 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`Hand ${hand.handNumber} replay`}
     >
-      <div className="panel w-full max-w-3xl p-5 max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-3">
+      <div className="panel w-full max-w-3xl p-3 sm:p-5 max-h-[96dvh] sm:max-h-[92vh] overflow-y-auto">
+        <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <span className="mono font-bold">Hand #{hand.handNumber}</span>
             <span className="text-xs text-muted ml-3">
@@ -109,7 +109,7 @@ export function HandReplayer({ hand, onClose }) {
           street={st.street}
         />
 
-        <div className="flex items-center gap-2 mt-4">
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <button
             className="btn text-xs px-2 py-1"
             onClick={() => setStep(0)}
@@ -138,7 +138,7 @@ export function HandReplayer({ hand, onClose }) {
           >
             end ⏭
           </button>
-          <span className="mono text-xs text-muted ml-auto">
+          <span className="mono text-xs text-muted ml-auto max-sm:w-full max-sm:text-right">
             action {step}/{hand.actions.length}
           </span>
         </div>

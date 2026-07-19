@@ -76,7 +76,105 @@ export default function ExperimentsPage() {
       {error && (
         <div className="panel px-4 py-3 text-sm mb-4 text-loss">{error}</div>
       )}
-      <div className="panel overflow-x-auto">
+      <div className="grid gap-3 md:hidden">
+        {exps.map((e) => {
+          const r = e.results;
+          const strategy = strategies.find(
+            (candidate) => candidate.id === e.calibrationId,
+          );
+          const strategyName =
+            strategy?.name ?? e.strategyName ?? "Deleted strategy";
+          return (
+            <article key={e.id} className="panel px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <Link
+                    href={`/experiments/${e.id}`}
+                    className="font-semibold hover:text-accent"
+                  >
+                    {e.config.name}
+                  </Link>
+                  <div className="text-[11px] text-muted mono mt-0.5">
+                    seed {e.config.seed}
+                    {e.playMode && e.playMode !== "solo"
+                      ? ` Â· ${e.participants?.length ?? 0} real users`
+                      : ""}
+                  </div>
+                </div>
+                <span
+                  className="text-xs rounded-full px-2 py-0.5 border shrink-0"
+                  style={{
+                    borderColor:
+                      e.status === "complete" ? "var(--gain)" : "var(--line)",
+                    color:
+                      e.status === "complete" ? "var(--gain)" : "var(--muted)",
+                  }}
+                >
+                  {e.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-4 pt-3 border-t border-line">
+                <div>
+                  <div className="label">Win rate</div>
+                  <div
+                    className="mono font-bold mt-1"
+                    style={{
+                      color: r
+                        ? r.bb100 >= 0
+                          ? "var(--gain)"
+                          : "var(--loss)"
+                        : "var(--muted)",
+                    }}
+                  >
+                    {r ? fmtWinRatePct(r.bb100) : "â€”"}
+                  </div>
+                </div>
+                <div>
+                  <div className="label">Hands</div>
+                  <div className="mono mt-1">
+                    {(r ? r.totalHands : e.config.hands).toLocaleString()}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <div className="label">Strategy</div>
+                  <div className="text-xs mt-1 truncate">{strategyName}</div>
+                </div>
+                <div className="col-span-2 flex items-center justify-between gap-3 text-xs text-muted">
+                  <span>{new Date(e.createdAt).toLocaleDateString()}</span>
+                  <span className="mono">
+                    {r
+                      ? `${r.ciLow.toFixed(1)}% â€¦ ${r.ciHigh.toFixed(1)}% CI`
+                      : "No results yet"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mobile-action-grid mt-4">
+                <Link
+                  href={`/experiments/${e.id}`}
+                  className="btn btn-primary text-xs"
+                >
+                  View
+                </Link>
+                <Link
+                  href={`/experiments/new?duplicate=${e.id}`}
+                  className="btn text-xs"
+                >
+                  Duplicate
+                </Link>
+                <button
+                  className="btn btn-danger text-xs col-span-2"
+                  onClick={() => remove(e.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="panel hidden md:block overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
             <tr className="text-left border-b border-line">
