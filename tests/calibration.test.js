@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { decideAgentAction, freshMemory } from "@/lib/agents/agent";
 import { getPreset } from "@/lib/agents/profiles";
 import { cardsFromString, holeNotation } from "@/lib/poker/deck";
 import { Rng } from "@/lib/poker/rng";
@@ -8,6 +9,7 @@ import {
   calibrationScenario,
 } from "@/lib/simulation/calibration";
 import {
+  buildCalibrationLineup,
   buildPoolConfig,
   DEFAULT_POOL_SETTINGS,
   DEFAULT_TABLE,
@@ -26,6 +28,7 @@ function playMeasurementSession(targetHands = 24) {
     targetHands,
     userBuyInBB: 100,
     startingHands: ["AKs", "QJs", "76s", "55"],
+    fixedLineup: buildCalibrationLineup(),
   });
   for (let guard = 0; guard < 20_000; guard++) {
     const step = session.step(false);
@@ -52,6 +55,52 @@ function playMeasurementSession(targetHands = 24) {
 }
 
 describe("information-rich calibration", () => {
+  it("seats one selective aggressor at each calibration table", () => {
+    const session = playMeasurementSession(6);
+    const profiles = [...session.session.agents.values()].map(
+      (agent) => agent.profile.id,
+    );
+    expect(profiles.filter((id) => id === "selective-aggressor")).toHaveLength(
+      1,
+    );
+  });
+
+  it("selectively raises playable hands without raising every time", () => {
+    const profile = getPreset("selective-aggressor");
+    const context = {
+      handNumber: 1,
+      street: "preflop",
+      position: "CO",
+      holeCards: cardsFromString("AsKs"),
+      board: [],
+      potSize: 3,
+      betFaced: 2,
+      effectiveStack: 200,
+      stackToPotRatio: 66.7,
+      activePlayers: 6,
+      numRaisesThisStreet: 0,
+      facedRaisePreflop: false,
+      isPreflopAggressor: false,
+      legal: {
+        types: ["fold", "call", "raise"],
+        callAmount: 2,
+        minBet: 0,
+        minRaiseTo: 6,
+        maxBetTo: 200,
+      },
+      bigBlind: 2,
+      lastOpponentAction: null,
+    };
+    const rng = new Rng("selective-preflop-pressure");
+    const actions = Array.from({ length: 200 }, () =>
+      decideAgentAction(profile, context, rng, freshMemory()),
+    );
+    const raises = actions.filter((action) => action.type === "raise").length;
+    expect(raises).toBeGreaterThan(50);
+    expect(raises).toBeLessThan(190);
+    expect(actions.some((action) => action.type !== "raise")).toBe(true);
+  });
+
   it("samples starting hands without replacement in exact combo proportions", () => {
     const sampler = new CalibrationRangeSampler(new Rng("range-bag"));
     const range = ["AKs", "77", "AKo"];

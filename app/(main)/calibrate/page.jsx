@@ -12,6 +12,7 @@ import {
   timeoutAction,
 } from "@/lib/simulation/timing";
 import {
+  buildCalibrationLineup,
   buildPoolConfig,
   CALIBRATION_SIZES,
   DEFAULT_POOL_SETTINGS,
@@ -63,6 +64,7 @@ export default function CalibratePage() {
       seed: `cal-${Date.now()}`,
       targetHands: hands,
       userBuyInBB: 100,
+      fixedLineup: buildCalibrationLineup(),
     });
     sessionRef.current = ms;
     setPhase("playing");
@@ -331,6 +333,8 @@ export default function CalibratePage() {
             Calibration opponents get a hand-strength-weighted chance to defend
             raises and create later streets; calls are never forced. Experiments
             still use the normal configured player pool.
+            One selective aggressor at the calibration table sometimes raises
+            or 3-bets playable hands to create realistic pressure decisions.
           </WarningNote>
         </div>
       </div>

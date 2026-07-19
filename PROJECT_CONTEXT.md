@@ -11,7 +11,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
 - Latest committed production implementation: `ae95054 Add opponent-type strategy analytics`
-- Current uncommitted working tree: information-rich calibration opponents, combo-weighted calibration hand sampling, hand-strength-weighted preflop defense chances with no forced calls, and explicit one-chip bet-size decrement/increment controls.
+- Current uncommitted working tree: information-rich calibration opponents, a new selective-aggressor archetype and fixed calibration lineup, combo-weighted calibration hand sampling, hand-strength-weighted preflop defense chances with no forced calls, and explicit one-chip bet-size decrement/increment controls.
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
 - Previous mobile poker-table implementation: `6efeda4 Fix mobile poker table visibility`
 - Initial phone-layout implementation: `2f1d327 Optimize phone viewing`
@@ -186,6 +186,9 @@ The current working tree closes the calibration and post-run review gaps identif
 
 - Manual calibration now uses a calibration-only information controller in `lib/simulation/calibration.js`; high-speed and detailed experiments continue to use the ordinary configured heuristic opponents without this wrapper.
 - A bot's normal hand-based preflop action remains authoritative. When that normal policy would fold to a normal-sized user raise, the bot receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness. Weak hands usually still fold, stronger hands defend more frequently, large raises and all-ins receive the normal policy, and no preflop call is forced.
+- `selective-aggressor` is the fourteenth heuristic archetype. It plays a moderately loose range, raises playable hands at a mixed hand-gated frequency, and occasionally 3-bets near the top of its normal defending range; it does not raise every hand like the maniac profile.
+- Every new manual calibration table receives one selective aggressor plus TAG, calling-station, recreational, and loose-passive opponents. This guarantees some preflop pressure capability without forcing an aggressive action on any deal; the selective aggressor still checks, calls, or folds when its cards and seeded frequency dictate.
+- The selectable experiment-opponent list includes the new archetype at weight zero by default. Existing experiment defaults do not add it automatically, and the zero-pressure guard avoids consuming extra RNG draws for all pre-existing profiles, so `SIMULATION_VERSION` remains `1.7.0`.
 - The first bot that actually continues can become the hand's postflop measurement opponent. Postflop calibration rotates between passive showdown-oriented lines and pressure lines so the sample observes both checked-to decisions and decisions facing bets while retaining ordinary handling for large commitments.
 - Calibration opponent timing rotates evenly through snap, normal, and tank cues so short samples can observe timing-conditioned user reactions instead of receiving almost exclusively normal cues.
 - Range-first and all-hands calibration starting cards come from shuffled combo-weighted bags. The sampler retains natural suited/pair/offsuit 4/6/12 combination proportions while reducing redundant independent repeats in short sessions. Positional range mode maintains an independent bag for each position.
@@ -409,12 +412,14 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
-- Current working-tree validation after the information-rich calibration and one-chip sizing work: 14 test files and 88 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
+- Current working-tree validation after the selective-aggressor, information-rich calibration, and one-chip sizing work: 14 test files and 90 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
 - `tests/calibration.test.js`
   - Combo-weighted shuffled starting-hand bags retain exact class proportions and selected-range legality
   - Passive/pressure scenarios and snap/normal/tank cues all receive coverage
   - Stronger hands receive a higher calibration defend chance, while worse prices and larger commitments reduce it
   - Scripted user raises produce both defended and uncontested pots and still collect later-street decisions
+  - Every calibration lineup contains exactly one selective aggressor
+  - The selective aggressor raises playable hands at a mixed frequency rather than always raising
 - `tests/chip-amount.test.js`
   - One-chip decrement/increment stepping and legal-bound clamping
 - Current working-tree validation after the opponent-type analytics work: 12 test files and 81 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
@@ -515,7 +520,8 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `lib/analytics/aggregate.js` — incremental overall analytics plus proportional opponent-type matchup attribution and uncertainty ranges
 - `lib/player-model/policy.js` — v3 position- and timing-aware behavioral policy with v1/v2 compatibility
 - `lib/player-model/review.js` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
-- `lib/agents/agent.js` — heuristic decisions, virtual pacing, and deliberately weak timing reads
+- `lib/agents/profiles.js` — fourteen heuristic archetypes including the hand-gated selective aggressor
+- `lib/agents/agent.js` — heuristic decisions, selective preflop pressure, virtual pacing, and deliberately weak timing reads
 - `lib/poker/engine.js` — optional timing metadata on voluntary actions
 - `lib/storage/store.js` — local and Supabase storage implementations
 - `lib/supabase/client.js` — browser client

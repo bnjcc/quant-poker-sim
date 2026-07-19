@@ -14,6 +14,7 @@ import {
   timeoutAction,
 } from "@/lib/simulation/timing";
 import {
+  buildCalibrationLineup,
   buildPoolConfig,
   CALIBRATION_SIZES,
   DEFAULT_POOL_SETTINGS,
@@ -225,6 +226,7 @@ export default function RangeCalibratePage() {
       seed: `range-cal-${Date.now()}`,
       targetHands: hands,
       userBuyInBB: 100,
+      fixedLineup: buildCalibrationLineup(),
       ...(rangeMode === "position"
         ? { startingHandsByPosition: serializedPositionRanges }
         : { startingHands: [...selected] }),
@@ -666,6 +668,8 @@ export default function RangeCalibratePage() {
             raises and create later streets; calls are never forced. Experiments
             use the normal configured player pool. Timeouts check when free and
             fold otherwise.
+            One selective aggressor at the calibration table sometimes raises
+            or 3-bets playable hands to create realistic pressure decisions.
           </WarningNote>
         </div>
       </div>

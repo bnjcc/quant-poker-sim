@@ -49,7 +49,7 @@ mulberry32 with a string-hash seed. `getState()/setState()` allow checkpointing 
 
 Each archetype is a parameter vector (`vpip, pfr, threeBet, aggression, cbet, bluff, callPadding, betSizeMean/Std, positionalAwareness, stackAwareness, skill, adaptive, …`). Decisions:
 
-- **Preflop**: Chen-style hand strength + skill-scaled noise + positional and stack adjustments, mapped through the profile's open/3-bet/call thresholds.
+- **Preflop**: Chen-style hand strength + skill-scaled noise + positional and stack adjustments, mapped through the profile's open/3-bet/call thresholds. The selective-aggressor profile adds a hand-gated pressure frequency that raises playable hands more often and occasionally 3-bets near the top of its defending range.
 - **Postflop**: MC equity vs pot odds with profile-driven value betting, c-betting, bluffing, check-raising, and calling-station padding.
 - **Adaptive** agents track observed fold rates and widen bluffing against tight opposition.
 
@@ -78,7 +78,7 @@ Every simulated decision logs its probabilities and its **confidence** (data-vs-
 
 Every voluntary action also carries a seeded virtual decision time. Manual calibration gives the user a real 15-second clock but compresses each opponent turn to a fixed 500ms preview; the opponent's full simulated time remains on the action and is shown at the seat. A per-hand Check/Fold shortcut records the initial intentional response, then automatically checks when free or folds to a wager for the rest of that hand without inventing zero-time timing samples. Batch runs record the same timing metadata without sleeping. `DecisionContext` exposes the most recent opponent action time on the current street. Learned user behavior conditions directly on that cue. Heuristic opponents use only a deliberately capped timing tell (a few equity points at most), because real-world timing signals are noisy.
 
-Manual calibration wraps those heuristic opponents in an information-directed controller that is not used by batch experiments. Normal preflop decisions remain authoritative. When a bot's normal policy would fold to a user raise, it receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness; no call is forced. Postflop hands rotate between passive showdown lines and pressure, while snap/normal/tank cues are balanced. Starting hands come from a shuffled combo-weighted bag, preserving natural 4/6/12 class frequencies while reducing redundant independent draws. Calibration results are therefore measurement data, not a realistic opponent-pool performance estimate.
+Manual calibration wraps those heuristic opponents in an information-directed controller that is not used by batch experiments. Every calibration table starts with one selective aggressor alongside four contrasting profiles. Normal preflop decisions remain authoritative. When a bot's normal policy would fold to a user raise, it receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness; no call is forced. Postflop hands rotate between passive showdown lines and pressure, while snap/normal/tank cues are balanced. Starting hands come from a shuffled combo-weighted bag, preserving natural 4/6/12 class frequencies while reducing redundant independent draws. Calibration results are therefore measurement data, not a realistic opponent-pool performance estimate.
 
 ## Batch runner (`lib/simulation/runner.js`)
 
