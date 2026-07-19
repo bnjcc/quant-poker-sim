@@ -20,6 +20,7 @@ import { ContextTracker, normalizeActionToLegal } from "@/lib/simulation/table";
 import {
   ACTION_CLOCK_MS,
   decisionTimingBucket,
+  OPPONENT_ACTION_CLOCK_MS,
   OPPONENT_LIVE_DELAY_MS,
   SNAP_DECISION_MS,
   timeoutAction,
@@ -254,6 +255,8 @@ describe("online action timing", () => {
     expect(promptedNextHand).toBe(true);
   });
   it("classifies snaps and tanks and selects the legal timeout default", () => {
+    expect(ACTION_CLOCK_MS).toBe(45_000);
+    expect(OPPONENT_ACTION_CLOCK_MS).toBe(15_000);
     expect(decisionTimingBucket(SNAP_DECISION_MS)).toBe("snap");
     expect(decisionTimingBucket(3_000)).toBe("normal");
     expect(decisionTimingBucket(8_000)).toBe("tank");
@@ -280,7 +283,9 @@ describe("online action timing", () => {
       samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
     expect(subSecond).toBeLessThan(0.2);
     expect(average).toBeGreaterThan(2_500);
-    expect(samples.every((sample) => sample <= ACTION_CLOCK_MS)).toBe(true);
+    expect(samples.every((sample) => sample <= OPPONENT_ACTION_CLOCK_MS)).toBe(
+      true,
+    );
   });
   it("shows paced opponent turns for 500ms while preserving their simulated timing", () => {
     const session = new ManualSession({

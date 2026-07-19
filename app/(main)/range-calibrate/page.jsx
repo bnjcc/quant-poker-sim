@@ -453,7 +453,7 @@ export default function RangeCalibratePage() {
               Calibrate all hands
             </Link>
           }
-          sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. Measurement opponents keep more pots alive and vary pressure and timing so each hand teaches the model more."
+          sub="Choose the starting hands you play, then make decisions with a 45-second clock so you have time to calculate odds. Measurement opponents keep more pots alive and vary pressure and timing so each hand teaches the model more."
         />
 
         <div className="panel px-5 py-5 mb-4 max-w-2xl">

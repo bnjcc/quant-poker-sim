@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `daff32f Add stake presets and PokerStars-style sizing`
-- Current uncommitted working tree: an upfront calibration-game selector with 1/3 or 2/5 stakes and 6-player or 9-player table sizes, seat-count-aware positional range editing, exact blind-post regression coverage, and fixed full calibration lineups without experiment sit-outs or turnover.
+- Latest committed production implementation: `3407cde Add calibration stakes and table-size selection`
+- Current uncommitted working tree: a 45-second user decision clock in both calibration flows, with heuristic-opponent virtual timing and the fixed 500ms opponent preview unchanged.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `daff32f`, which adds 1/3 and 2/5 stake presets plus PokerStars-style calibration sizing on top of the selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `3407cde`, which adds calibration stakes and table-size selection on top of the PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -133,7 +133,7 @@ The full-session and range-first calibration flows now behave like paced online 
 
 ### Manual calibration experience
 
-- Every user decision has a 15-second action clock.
+- Every user decision has a 45-second action clock so users have time to calculate odds.
 - A timeout checks when checking is legal and folds otherwise.
 - Opponents have seeded virtual decision times, including snap decisions, normal decisions, occasional tanks, and rare timeouts.
 - Manual calibration shows each opponent turn for a fixed 500ms preview without rendering a countdown for that preview. The full simulated decision time is still preserved and displayed beside the resulting action.
@@ -183,7 +183,7 @@ The current working tree closes the calibration and post-run review gaps identif
 
 - The poker-table felt defaults to red and derives its color from the selected interface theme.
 - The user's hole cards render at the large card size in both calibration flows while opponent cards and other compact card displays remain unchanged.
-- Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 15-second decision window. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
+- Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 45-second decision window. Heuristic opponents retain a separate 15-second virtual timing ceiling; their seeded timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
 - Both calibration flows expose **Check / Fold rest of hand**. The initial intentional action retains the user's real response time; later actions check when free or fold to a wager automatically and omit timing so they do not create an artificial 0ms timing tell. The mode resets after the hand.
 
 ### Information-rich calibration and precise bet sizing
@@ -422,11 +422,12 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 - JavaScript migration scan: no `.ts`, `.tsx`, or `.d.ts` source files remain
 - `git diff --check`: clean apart from expected Windows LF/CRLF notices
 - Secret scan: no Supabase secret/service key or private key was committed
-- Browser smoke check: range-first selection loaded in browser-storage mode; starting a selected-hand calibration showed the red felt, large user cards, sound toggle, animated card classes, legal action panel, and 15-second decision clock.
+- Browser smoke check: range-first selection loaded in browser-storage mode; starting a selected-hand calibration showed the red felt, large user cards, sound toggle, animated card classes, legal action panel, and visible decision clock.
 - Production verification after the JavaScript production-branch push: `/login` returned HTTP 200 from Vercel. Earlier live verification also confirmed the stylesheet contained `card-turn-in`/`cardTurnIn`, the calibration bundle contained the persisted audio-preference key, and the final experiment bundle contained **Review more simulated hands**.
 
 New application tests include:
 
+- Current working-tree validation after increasing the calibration user clock to 45 seconds: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Timing tests assert the 45-second user clock and unchanged 15-second heuristic-opponent ceiling.
 - Current working-tree validation after the upfront stake/table-size selector and fixed calibration lineup work: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
 - `tests/calibration.test.js`
   - Actual engine actions post exactly 1/3 or 2/5 blinds on both 6-player and 9-player calibration tables.
@@ -507,8 +508,9 @@ The production backend and deployment are connected:
 - Opponent-type analytics commit `ae95054` is pushed to the default production branch, triggering its Vercel production deployment. Exact live-site verification of that deployment remains pending.
 - Information-rich calibration and one-chip sizing commit `cb88e15` is pushed to the default production branch.
 - Selective preflop aggressor commit `441768f` adds the fourteenth bot archetype and guarantees that each new calibration lineup includes one hand-gated selective aggressor without forcing any aggressive action.
-- Stake and sizing commit `daff32f` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut. Exact live-site verification of that deployment remains pending.
-- The upfront 6-player/9-player calibration selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups are local and uncommitted. They have not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- Stake and sizing commit `daff32f` adds the 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut.
+- Calibration game-selection commit `3407cde` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the upfront 6-player/9-player selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups. Exact live-site verification of that deployment remains pending.
+- The 45-second calibration user clock is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -545,7 +547,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `components/OpponentMatchups.jsx` — best/hardest matchup summaries and the ranked opponent-archetype performance table
 - `components/HandReplayer.jsx` — hand replay including voluntary-action timing and timeout labels
 - `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands
-- `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
+- `lib/simulation/timing.js` — separate 45-second calibration-user and 15-second heuristic-opponent clocks, timing buckets, formatting, timeout defaults, and fallback timing samples
 - `lib/simulation/calibration.js` — combo-weighted hand sampler plus calibration-only hand-strength-weighted defense, postflop measurement scenarios, and balanced timing cues
 - `lib/simulation/defaults.js` — shared 1/3 default table, 1/3 and 2/5 stake presets, 6-player and 9-player calibration sizes, distinct seat-count-aware calibration lineups, pool defaults, and three-big-blind chip sizing helper
 - `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
@@ -599,7 +601,7 @@ Do not regress these design constraints:
 - Preserve the browser-only fallback unless the product explicitly drops zero-setup mode.
 - Keep timing fields optional when reading legacy calibrations and hand histories.
 - Keep high-speed simulations virtual-time only; never make batch execution sleep for recorded action delays.
-- Keep the opponent preview clock hidden; the visible action clock is for the user's decisions only. Preserve the 500ms preview and stored full opponent timing.
+- Keep the opponent preview clock hidden; the visible 45-second action clock is for the user's decisions only. Preserve the 500ms preview, the separate 15-second heuristic-opponent virtual ceiling, and stored full opponent timing.
 - Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
 - Keep new games at the 1/3 default with the 2/5 preset available. Calibration amounts remain chip-denominated; small-blind incremental controls and the legal three-big-blind preflop shortcut must remain synchronized with the main bet amount.
 - Keep the calibration game selector before range editing, restrict calibration table sizes to 6 or 9 players, show only positions active at the selected size, and keep every calibration hand full at that chosen seat count. Do not disable normal turnover or sit-outs for experiments.

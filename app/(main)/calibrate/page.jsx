@@ -290,7 +290,7 @@ export default function CalibratePage() {
               Choose my range first
             </Link>
           }
-          sub="Play an online-paced table with a 15-second action clock. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
+          sub="Play an online-paced table with a 45-second action clock so you have time to calculate odds. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
         />
         <div className="panel px-6 py-6 max-w-xl">
           <CalibrationGameSelector
