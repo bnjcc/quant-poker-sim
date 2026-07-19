@@ -323,6 +323,7 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
 .mobile-tab-active .nav-icon { color: var(--accent); }
 .mobile-tab-active::before { background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb),.75); }
 .mobile-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (min-width: 768px) { .mobile-tab-bar { display: none; } }
 .mobile-drawer-layer { position: fixed; z-index: 60; inset: 0; }
 .mobile-drawer-backdrop { position: absolute; inset: 0; width: 100%; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); }
 .mobile-drawer { position: absolute; inset: 0 0 0 auto; display: flex; width: min(88vw, 23rem); flex-direction: column; overflow: hidden; border-left: 1px solid var(--line); background: linear-gradient(165deg, rgba(19,22,29,.995), rgba(8,9,12,.995)); box-shadow: -30px 0 70px rgba(0,0,0,.45); animation: drawerIn 220ms cubic-bezier(.2,.75,.22,1) both; }

@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `f4a4a18 Keep calibration controls visible`
-- Current uncommitted working tree: both calibration pages explicitly mark active sessions on the document body so the fixed bottom tab bar stays hidden through the completed-hand state. The hide and safe-area rules now cover the full mobile navigation range through 767px, preventing the bar from covering the next-hand button. These changes have not been committed, pushed, or deployed.
+- Latest committed production implementation: `2b29885 Keep next hand action above mobile navigation`
+- Current uncommitted working tree: a desktop-only CSS rule suppresses the bottom tab bar at 768px and wider while leaving the phone presentation unchanged, with this handoff updated to match. These changes have not been committed, pushed, or deployed.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `f4a4a18`, which keeps the 3× BB shortcut available after preflop and makes completed-hand actions prominent on top of the compact all-viewport calibration table, no-scroll layout, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `2b29885`, which keeps the fixed mobile tab bar from covering completed-hand actions on top of the persistent 3× BB shortcut, prominent next-hand controls, compact all-viewport calibration table, no-scroll layout, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -96,7 +96,7 @@ The application now has a dedicated phone experience instead of relying on compr
 
 ### Mobile navigation and shared layout
 
-- The former horizontally scrolling mobile navigation was replaced with a compact sticky top bar, a five-item bottom tab bar for the most common destinations, and a full grouped navigation drawer for secondary pages.
+- The former horizontally scrolling mobile navigation was replaced with a compact sticky top bar, a five-item bottom tab bar for the most common destinations, and a full grouped navigation drawer for secondary pages. The bottom tab bar is explicitly phone-only: it is suppressed at 768px and wider so the component's custom grid display cannot override the desktop hide utility.
 - The drawer locks background scrolling while open, closes after route changes or Escape, retains active-route indicators, and includes cloud sign-out when available.
 - Top and bottom navigation account for device safe areas. Main content reserves bottom space so the fixed tab bar never covers page actions.
 - Phone buttons use larger touch targets, form controls use a 16px input size to prevent unwanted mobile zoom, page headers and hero actions stack vertically, and dense two-column forms collapse where needed.
@@ -429,6 +429,7 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
+- Current working-tree validation after making the bottom tab bar strictly phone-only: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. The new `min-width: 768px` rule changes only desktop/tablet-width rendering; phone navigation remains unchanged.
 - Current working-tree validation after preventing the fixed bottom tab bar from covering completed-hand controls: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Both calibration pages retain the active-session body marker through `hand-done`, and `app/globals.css` hides the tab bar and removes its reserved bottom padding across the full mobile navigation breakpoint.
 - Current working-tree validation after the persistent 3× BB shortcut and prominent next-hand controls: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. The behavior is implemented in both unrestricted and range-first calibration flows, with shared responsive styling in `app/globals.css`.
 - Current working-tree validation after the no-scroll calibration layout and oval-opponent-seat work: 15 test files and 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Poker-table rendering tests confirm calibration-only opponent ovals, accessible chip/action labels, and unchanged full opponent-card rendering outside calibration.
@@ -517,8 +518,9 @@ The production backend and deployment are connected:
 - Calibration game-selection commit `3407cde` adds the upfront 6-player/9-player selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups.
 - The 45-second calibration user clock commit `2dc0354` remains in production history. Exact live-site verification of that specific deployment remains pending.
 - The no-scroll calibration layout and oval opponent seats were committed and pushed through `c9cce87`. Exact live-site verification of that deployment remains pending.
-- The persistent 3× BB shortcut and prominent next-hand controls were committed and pushed through `f4a4a18`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
-- The full-mobile-range bottom-tab visibility fix is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- The persistent 3× BB shortcut and prominent next-hand controls were committed and pushed through `f4a4a18`. Exact live-site verification of that deployment remains pending.
+- The full-mobile-range bottom-tab visibility fix was committed and pushed through `2b29885`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
+- The desktop bottom-tab suppression is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -542,7 +544,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/settings/page.jsx` — active storage summary, delete operations, browser import
 - `app/login/page.jsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.js` — authentication callback
-- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, the active-calibration viewport grid/no-scroll behavior, responsive completed-hand controls, and full-mobile-range bottom-tab suppression during calibration
+- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, the active-calibration viewport grid/no-scroll behavior, responsive completed-hand controls, full-mobile-range bottom-tab suppression during calibration, and explicit desktop suppression of the phone-only tab bar
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
 - `components/CalibrationGameSelector.jsx` — upfront 1/3-or-2/5 and 6-player-or-9-player calibration game selection plus the selected-game summary
@@ -616,6 +618,7 @@ Do not regress these design constraints:
 - Keep the calibration game selector before range editing, restrict calibration table sizes to 6 or 9 players, show only positions active at the selected size, and keep every calibration hand full at that chosen seat count. Do not disable normal turnover or sit-outs for experiments.
 - Keep active calibration hands within one viewport on phone and desktop. Opponents remain compact ovals, the user seat retains visible large hole cards, and every legal action/sizing control must stay accessible without page scrolling.
 - Keep the fixed bottom mobile tab bar hidden throughout every active calibration phase, including the completed-hand screen, across the full sub-768px navigation breakpoint so it cannot cover the next-hand action.
+- Keep the bottom tab bar phone-only. Its custom `display: grid` styling must be explicitly overridden at 768px and wider so it never appears in the desktop layout.
 - Preserve both drag-paint selection/erasing and accessible single-cell click/keyboard operation in the starting-hand grid.
 - Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
 - Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.
