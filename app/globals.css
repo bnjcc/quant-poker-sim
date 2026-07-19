@@ -177,6 +177,8 @@ body:has(.calibration-play-layout) .app-main { min-height: 0; overflow: hidden; 
 .calibration-controls .field { min-height: 2.25rem; }
 .calibration-bet-shortcuts .btn { min-height: 2rem; white-space: nowrap; }
 .calibration-pot-context { white-space: nowrap; }
+.calibration-hand-result { flex: 1 1 14rem; min-width: 0; }
+.calibration-next-hand { flex: 0 0 auto; min-width: 10rem; font-weight: 700; }
 
 .acting-seat {
   border-color: var(--accent);
@@ -472,6 +474,8 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   .calibration-bet-shortcuts { grid-column: 1 / -1; flex-wrap: nowrap; gap: .2rem; }
   .calibration-bet-shortcuts .btn { min-width: 0; flex: 1 1 auto; padding-inline: .38rem; font-size: .59rem; }
   .calibration-pot-context { flex: 1 1 100%; margin-left: 0; text-align: center; font-size: .58rem; }
+  .calibration-hand-result { flex-basis: 100%; text-align: center; }
+  .calibration-next-hand { width: 100%; min-height: 2.5rem !important; }
   .poker-table { aspect-ratio: .92 / 1 !important; border-width: 4px; }
   .poker-table::before { inset: 3%; }
   .table-seat-position { left: var(--phone-seat-left); top: var(--phone-seat-top); }

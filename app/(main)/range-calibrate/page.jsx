@@ -734,7 +734,6 @@ export default function RangeCalibratePage() {
     session.session.config.bigBlind,
   );
   const threeBigBlindIsLegal =
-    engine.street === "preflop" &&
     threeBigBlindChips >= minimumBetTo &&
     threeBigBlindChips <= (legal?.maxBetTo ?? 0);
   const userPlayer = engine.players.find(
@@ -891,17 +890,15 @@ export default function RangeCalibratePage() {
                     onChange={setBetTo}
                   />
                   <div className="calibration-bet-shortcuts flex flex-wrap gap-1">
-                    {engine.street === "preflop" && (
-                      <button
-                        className="btn text-xs px-2 py-1"
-                        type="button"
-                        disabled={!threeBigBlindIsLegal}
-                        onClick={() => setBetTo(threeBigBlindChips)}
-                        title="Set the total bet or raise to three times the big blind"
-                      >
-                        {threeBigBlindChips.toLocaleString()} chips (3× BB)
-                      </button>
-                    )}
+                    <button
+                      className="btn text-xs px-2 py-1"
+                      type="button"
+                      disabled={!threeBigBlindIsLegal}
+                      onClick={() => setBetTo(threeBigBlindChips)}
+                      title="Set the total bet or raise to three times the big blind"
+                    >
+                      {threeBigBlindChips.toLocaleString()} chips (3× BB)
+                    </button>
                     {[0.5, 0.66, 1].map((fraction) => (
                       <button
                         type="button"
@@ -957,10 +954,10 @@ export default function RangeCalibratePage() {
             </span>
           </div>
         ) : phase === "hand-done" ? (
-          <div className="flex items-center gap-4">
-            <span className="text-sm">{lastResult}</span>
+          <div className="calibration-hand-done flex flex-wrap items-center justify-between gap-3">
+            <span className="calibration-hand-result text-sm">{lastResult}</span>
             <button
-              className="btn btn-primary"
+              className="btn btn-primary calibration-next-hand"
               type="button"
               onClick={nextHand}
             >
