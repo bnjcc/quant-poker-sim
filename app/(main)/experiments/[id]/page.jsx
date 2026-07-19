@@ -25,6 +25,7 @@ import {
 } from "@/components/charts";
 import { HandReplayer } from "@/components/HandReplayer";
 import { StrategyReview } from "@/components/StrategyReview";
+import { OpponentMatchups } from "@/components/OpponentMatchups";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
 import {
   CardRow,
@@ -664,6 +665,10 @@ export default function ExperimentDetailPage() {
               sub="larger samples are clearer"
             />
           </div>
+
+          {exp.playMode !== "multiplayer-only" && (
+            <OpponentMatchups rows={r.byOpponentType} />
+          )}
 
           <div className="mb-3">
             <h2 className="font-semibold">Where the result came from</h2>

@@ -10,7 +10,7 @@ import {
 } from "@/lib/simulation/defaults";
 import { BehavioralPolicy } from "@/lib/player-model/policy";
 import { computeTendencies, freqStat } from "@/lib/player-model/stats";
-import { riskOfRuin } from "@/lib/analytics/aggregate";
+import { Aggregator, riskOfRuin } from "@/lib/analytics/aggregate";
 const pool = buildPoolConfig(DEFAULT_POOL_SETTINGS);
 function runHands(seed, n) {
   const rng = new Rng(seed);
@@ -78,6 +78,13 @@ describe("player turnover", () => {
     expect(session.agents.size).toBe(8);
     const hand = session.playHand(policyDecider(new BehavioralPolicy()));
     expect(hand?.players).toHaveLength(9);
+    expect(
+      hand?.players
+        .filter((player) => player.seat !== session.userSeat)
+        .every(
+          (player) => player.opponentTypeId && player.opponentTypeName,
+        ),
+    ).toBe(true);
     expect(new Set(hand?.players.map((player) => player.position))).toEqual(
       new Set(["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO"]),
     );
@@ -110,6 +117,12 @@ describe("runner + aggregation", () => {
     expect(out.aggregates.ciLow).toBeLessThanOrEqual(out.aggregates.bb100);
     expect(out.aggregates.ciHigh).toBeGreaterThanOrEqual(out.aggregates.bb100);
     expect(out.aggregates.maxDrawdownBB).toBeGreaterThanOrEqual(0);
+    expect(Object.keys(out.aggregates.byOpponentType).length).toBeGreaterThan(0);
+    expect(
+      Object.values(out.aggregates.byOpponentType).every(
+        (matchup) => matchup.encounters > 0,
+      ),
+    ).toBe(true);
   });
   it("cancellation stops early", async () => {
     let calls = 0;
@@ -130,6 +143,73 @@ describe("runner + aggregation", () => {
     );
     expect(out.cancelled).toBe(true);
     expect(out.aggregates.totalHands).toBeLessThan(5000);
+  });
+});
+describe("opponent-type matchup aggregation", () => {
+  function matchupHand(handNumber, nets) {
+    return {
+      handNumber,
+      players: [
+        {
+          seat: 0,
+          playerId: "user",
+          name: "You",
+          startingStack: 200,
+          position: "BTN",
+        },
+        {
+          seat: 1,
+          playerId: "tag-player",
+          name: "Miko",
+          startingStack: 200,
+          position: "SB",
+          opponentTypeId: "tag",
+          opponentTypeName: "Tight-aggressive",
+        },
+        {
+          seat: 2,
+          playerId: "lag-player",
+          name: "Dana",
+          startingStack: 200,
+          position: "BB",
+          opponentTypeId: "lag",
+          opponentTypeName: "Loose-aggressive",
+        },
+      ],
+      holeCards: { 0: ["As", "Kd"] },
+      actions: [],
+      rakeTaken: 0,
+      results: [
+        { seat: 0, playerId: "user", net: nets.user, showedDown: false },
+        { seat: 1, playerId: "tag-player", net: nets.tag, showedDown: false },
+        { seat: 2, playerId: "lag-player", net: nets.lag, showedDown: false },
+      ],
+    };
+  }
+
+  it("ranks player types using proportional chip-transfer attribution", () => {
+    const aggregator = new Aggregator(2);
+    aggregator.addHand(
+      matchupHand(1, { user: 30, tag: -10, lag: -20 }),
+      0,
+      false,
+    );
+    aggregator.addHand(
+      matchupHand(2, { user: -12, tag: 12, lag: 0 }),
+      0,
+      false,
+    );
+
+    const result = aggregator.snapshot();
+    expect(result.byOpponentType.tag.bb).toBeCloseTo(-1);
+    expect(result.byOpponentType.tag.score).toBeCloseTo(-50);
+    expect(result.byOpponentType.lag.bb).toBeCloseTo(10);
+    expect(result.byOpponentType.lag.score).toBeCloseTo(500);
+    expect(result.byOpponentType.tag.encounters).toBe(2);
+    expect(result.byOpponentType.lag.encounters).toBe(2);
+    expect(
+      result.byOpponentType.tag.bb + result.byOpponentType.lag.bb,
+    ).toBeCloseTo(result.bbWon);
   });
 });
 describe("manual calibration session", () => {
