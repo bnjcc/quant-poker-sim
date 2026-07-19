@@ -31,6 +31,12 @@ const LINKS = [
     icon: "history",
     group: "Lab",
   },
+  {
+    href: "/friends",
+    label: "Friends & multiplayer",
+    icon: "users",
+    group: "Lab",
+  },
   { href: "/accuracy", label: "Model accuracy", icon: "target", group: "Lab" },
   { href: "/compare", label: "Compare", icon: "compare", group: "Lab" },
   {
@@ -150,11 +156,20 @@ export function Nav() {
   const path = usePathname();
   const cloudMode = isSupabaseConfigured();
   const [email, setEmail] = useState(null);
+  const [username, setUsername] = useState(null);
   useEffect(() => {
     if (!cloudMode) return;
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null));
+    const client = createClient();
+    client.auth.getUser().then(async ({ data }) => {
+      setEmail(data.user?.email ?? null);
+      if (!data.user) return;
+      const { data: profile } = await client
+        .from("profiles")
+        .select("username")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+      setUsername(profile?.username ?? null);
+    });
   }, [cloudMode]);
   if (path === "/login" || path.startsWith("/auth/")) return null;
   const signOut = async () => {
@@ -230,10 +245,11 @@ export function Nav() {
                 </div>
                 <div
                   className="text-ink truncate mt-1"
-                  title={email ?? undefined}
+                  title={username ? `@${username} · ${email}` : email ?? undefined}
                 >
-                  {email ?? "Cloud account"}
+                  {username ? `@${username}` : email ?? "Cloud account"}
                 </div>
+                {username && <div className="truncate">{email}</div>}
                 <button
                   className="text-accent hover:underline mt-1"
                   type="button"

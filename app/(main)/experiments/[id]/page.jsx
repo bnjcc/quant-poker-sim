@@ -87,6 +87,11 @@ export default function ExperimentDetailPage() {
           userBuyInBB: source.config.userBuyInBB,
           mode: source.config.mode,
           sampleEvery: source.config.sampleEvery,
+          playMode: source.playMode ?? "solo",
+          participants: (source.participants ?? []).map((participant, index) => ({
+            ...participant,
+            policy: index === 0 ? policy : participant.policy,
+          })),
         },
         policy,
         (p) => setProgress({ ...p }),
@@ -113,6 +118,7 @@ export default function ExperimentDetailPage() {
           simulationVersion: SIMULATION_VERSION,
           status: out.cancelled ? "cancelled" : "complete",
           results: out.aggregates,
+          multiplayerResults: out.participantResults,
           userDecisionLog: sampleStoredUserDecisions(
             out.hands,
             out.userDecisionLog,
@@ -219,8 +225,9 @@ export default function ExperimentDetailPage() {
   const filteredHands = useMemo(() => {
     if (!hands || !exp) return [];
     const bb = exp.config.table.bigBlind;
+    const primaryPlayerId = exp.participants?.[0]?.playerId ?? "user";
     let out = hands.filter((h) => {
-      const r = h.results.find((x) => x.playerId === "user");
+      const r = h.results.find((x) => x.playerId === primaryPlayerId);
       if (!r) return false;
       if (filterShowdown && !r.showedDown) return false;
       if (filterBigPots) {
@@ -231,8 +238,8 @@ export default function ExperimentDetailPage() {
     });
     if (sortByLoss) {
       out = [...out].sort((a, b) => {
-        const na = a.results.find((x) => x.playerId === "user")?.net ?? 0;
-        const nb = b.results.find((x) => x.playerId === "user")?.net ?? 0;
+        const na = a.results.find((x) => x.playerId === primaryPlayerId)?.net ?? 0;
+        const nb = b.results.find((x) => x.playerId === primaryPlayerId)?.net ?? 0;
         return na - nb;
       });
     }
@@ -249,6 +256,12 @@ export default function ExperimentDetailPage() {
       />
     );
   const r = exp.results;
+  const isMultiplayer =
+    exp.playMode === "multiplayer-bots" || exp.playMode === "multiplayer-only";
+  const primaryPlayerId = exp.participants?.[0]?.playerId ?? "user";
+  const rankedPlayers = [...(exp.multiplayerResults ?? [])].sort(
+    (left, right) => right.aggregates.bb100 - left.aggregates.bb100,
+  );
   const bb = exp.config.table.bigBlind;
   const avgConfidence =
     exp.userDecisionLog.length > 0
@@ -311,6 +324,12 @@ export default function ExperimentDetailPage() {
         {exp.config.table.smallBlind}/{bb} · rake{" "}
         {(exp.config.table.rake.percentage * 100).toFixed(1)}% cap{" "}
         {exp.config.table.rake.cap} · mode {exp.config.mode}
+        {isMultiplayer && (
+          <>
+            {" "}· {exp.participants.length} real users ·{" "}
+            {exp.playMode === "multiplayer-only" ? "players only" : "with bots"}
+          </>
+        )}
       </div>
 
       {cal && cal.handsPlayed < RELIABLE_SAMPLE_THRESHOLD && (
@@ -433,6 +452,7 @@ export default function ExperimentDetailPage() {
             </div>
           )}
 
+          {!isMultiplayer && (
           <section className="panel px-5 py-4 mb-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
               <div>
@@ -517,6 +537,86 @@ export default function ExperimentDetailPage() {
               </div>
             )}
           </section>
+          )}
+
+          {isMultiplayer && (
+            <section className="panel px-5 py-4 mb-6">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                  <div className="label">Real-user comparison</div>
+                  <h2 className="text-xl font-semibold mt-1">
+                    {rankedPlayers[0]
+                      ? `@${rankedPlayers[0].username} performed best in this run.`
+                      : "Player comparison unavailable"}
+                  </h2>
+                  <p className="text-xs text-muted mt-1 max-w-3xl">
+                    Ranked by normalized win rate across the same dealt hands.
+                    {exp.playMode === "multiplayer-bots"
+                      ? " Bot results are excluded so the table compares only the real users’ strategy models."
+                      : " This table contained only real users’ strategy models; no bots were seated."}
+                  </p>
+                </div>
+                <span className="rounded-full border border-line bg-panel2 px-3 py-1 text-xs">
+                  {rankedPlayers.length} real users
+                </span>
+              </div>
+              {rankedPlayers.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-left">
+                        <th className="label py-2 pr-3 font-normal">Rank</th>
+                        <th className="label py-2 pr-3 font-normal">Player</th>
+                        <th className="label py-2 pr-3 font-normal">Strategy</th>
+                        <th className="label py-2 px-3 font-normal text-right">Win rate</th>
+                        <th className="label py-2 px-3 font-normal text-right">Total</th>
+                        <th className="label py-2 px-3 font-normal text-right">Hands won</th>
+                        <th className="label py-2 pl-3 font-normal text-right">Max drawdown</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rankedPlayers.map((player, index) => {
+                        const result = player.aggregates;
+                        return (
+                          <tr key={player.participantId} className="border-b border-line last:border-0">
+                            <td className="py-3 pr-3 mono font-bold">#{index + 1}</td>
+                            <td className="py-3 pr-3">
+                              <div className="font-semibold">@{player.username}</div>
+                              <div className="text-[11px] text-muted">
+                                {player.relationshipDegree === 0
+                                  ? "You"
+                                  : player.relationshipDegree === 1
+                                    ? "Direct friend"
+                                    : "Friend of a friend"}
+                              </div>
+                            </td>
+                            <td className="py-3 pr-3 text-xs text-muted">{player.strategyName}</td>
+                            <td
+                              className="py-3 px-3 text-right mono font-bold"
+                              style={{ color: result.bb100 >= 0 ? "var(--gain)" : "var(--loss)" }}
+                            >
+                              {fmtWinRatePct(result.bb100)}
+                            </td>
+                            <td className="py-3 px-3 text-right mono">{fmtBB(result.bbWon, 1)}</td>
+                            <td className="py-3 px-3 text-right mono">{fmtPct(result.winRate)}</td>
+                            <td className="py-3 pl-3 text-right mono">{result.maxDrawdownBB.toFixed(0)} bb</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {rankedPlayers.length > 1 && (
+                <p className="text-xs text-muted mt-3">
+                  The top strategy finished {fmtWinRatePct(
+                    rankedPlayers[0].aggregates.bb100 - rankedPlayers[1].aggregates.bb100,
+                  )} ahead of second place in normalized win rate. This is a
+                  simulation result, not proof of a lasting skill difference.
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Beginner summary */}
           <section className="panel px-5 py-4 mb-4">
@@ -852,7 +952,9 @@ export default function ExperimentDetailPage() {
             ) : (
               <div className="max-h-96 overflow-y-auto divide-y divide-line">
                 {filteredHands.map((h) => {
-                  const res = h.results.find((x) => x.playerId === "user");
+                  const res = h.results.find(
+                    (x) => x.playerId === primaryPlayerId,
+                  );
                   const hole = res?.holeCards ?? null;
                   const pot = h.potsAwarded.reduce((s, p) => s + p.amount, 0);
                   return (

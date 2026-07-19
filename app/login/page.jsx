@@ -53,6 +53,26 @@ export default async function LoginPage({ searchParams }) {
           <form action="/auth/password" method="post" className="space-y-5">
             <input type="hidden" name="mode" value={mode} />
             <input type="hidden" name="next" value={next} />
+            {mode === "sign-up" && (
+              <label className="block">
+                <span className="label">Username</span>
+                <input
+                  className="field mt-1"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  minLength={3}
+                  maxLength={24}
+                  pattern="[a-z0-9_]+"
+                  placeholder="river_reader"
+                  required
+                />
+                <span className="block text-[11px] text-muted mt-1">
+                  3–24 lowercase letters, numbers, or underscores. Friends find
+                  you by this name.
+                </span>
+              </label>
+            )}
             <label className="block">
               <span className="label">Email</span>
               <input

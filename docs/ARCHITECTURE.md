@@ -82,6 +82,14 @@ Every voluntary action also carries a seeded virtual decision time. Manual calib
 
 `runSimulation` is environment-agnostic: an async chunked loop (default 200 hands/chunk) that yields to the event loop, reports progress, honors a cancel callback, and returns aggregates + stored hands. In the browser it keeps the UI responsive; on a server it can run as-is inside a job worker.
 
+For multiplayer runs, `TableSession` owns a fixed map of real-user policy seats in addition to its replaceable heuristic-agent seats. Each real user has an independent learned-policy decider, stack, rebuy count, decision log, and incremental `Aggregator`. A **with bots** run requires two real users and fills the remaining configured seats from the bot pool. A **players only** run requires three real users, sizes the table to the selected participant count, and creates no agent seats. The first participant remains the experiment owner for backwards-compatible headline analytics; `participantResults` contains the complete real-user leaderboard.
+
+## Usernames, friends, and shared strategies
+
+Cloud accounts receive a unique lowercase username in `profiles`. Canonical unordered rows in `friendships` model pending and accepted connections. Security-definer RPCs handle requests and responses so clients cannot forge accepted relationships.
+
+`multiplayer_strategies` contains at most one opt-in policy snapshot per account. It references an owned calibration but stores only the learned policy and presentation metadata—not raw recorded decisions. Its RLS read rule uses `is_multiplayer_connection` to allow the owner, accepted direct friends, and friends exactly one additional hop away. Removing a friendship immediately removes any access that depended on that path. The social-graph RPC returns direct friends, pending requests, and the nearest eligible two-hop players. Experiment creation copies selected policies as point-in-time participant snapshots into the creator's private experiment payload, so later friendship or strategy changes do not mutate a saved run.
+
 ## Post-simulation strategy review (`components/StrategyReview.jsx`, `lib/player-model/review.js`)
 
 Completed runs retain the full `DecisionContext`, action index, sampled action, sizing, probabilities, and confidence for simulated-user decisions. Before a review starts, the tester chooses any count from one through the available eligible hands. The review UI selects one low-confidence decision from each chosen hand spread across the stored run, reconstructs the table immediately before that action, and reveals no future board cards while the tester judges the decision. For range-first strategies, every decision from a dealt hand outside the active explicit starting range is excluded as a redundant known fold.

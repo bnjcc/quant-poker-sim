@@ -29,6 +29,11 @@
           <form action="/auth/password" method="post">
             <input id="auth-mode" type="hidden" name="mode" value="sign-in" />
             <input id="auth-next" type="hidden" name="next" value="/" />
+            <label id="username-field" hidden>
+              <span class="label">Username</span>
+              <input id="auth-username" class="field" name="username" type="text" autocomplete="username" minlength="3" maxlength="24" pattern="[a-z0-9_]+" placeholder="river_reader" />
+              <small>3–24 lowercase letters, numbers, or underscores.</small>
+            </label>
             <label>
               <span class="label">Email</span>
               <input class="field" name="email" type="email" autocomplete="email" required />
@@ -54,6 +59,8 @@
         document.getElementById("auth-next").value=next;
         document.getElementById("auth-title").textContent=signUp?"Create account":"Sign in";
         document.getElementById("auth-password").autocomplete=signUp?"new-password":"current-password";
+        document.getElementById("username-field").hidden=!signUp;
+        document.getElementById("auth-username").required=signUp;
         document.getElementById("auth-submit").textContent=signUp?"Create account":"Sign in";
         var toggleParams=new URLSearchParams({mode:signUp?"sign-in":"sign-up"});
         if(next!=="/")toggleParams.set("next",next);

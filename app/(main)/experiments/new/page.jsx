@@ -1,5 +1,6 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { experimentConfigSchema, SIMULATION_VERSION } from "@/types/experiment";
 import { AGENT_PRESETS } from "@/lib/agents/profiles";
@@ -8,6 +9,11 @@ import {
   DEFAULT_TABLE,
 } from "@/lib/simulation/defaults";
 import { getStore, newId } from "@/lib/storage/store";
+import {
+  multiplayerSetupError,
+  participantPlayerId,
+  PLAY_MODES,
+} from "@/lib/social/multiplayer";
 import { Empty, PageHeader, WarningNote } from "@/components/ui";
 function Num({ label, value, onChange, min, max, step = 1, hint }) {
   return (
@@ -30,6 +36,9 @@ function NewExperimentInner() {
   const params = useSearchParams();
   const [cals, setCals] = useState(null);
   const [calId, setCalId] = useState("");
+  const [socialGraph, setSocialGraph] = useState(undefined);
+  const [playMode, setPlayMode] = useState(PLAY_MODES.SOLO);
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
   const [error, setError] = useState(null);
   const [cfg, setCfg] = useState({
     name: "",
@@ -45,8 +54,12 @@ function NewExperimentInner() {
   useEffect(() => {
     (async () => {
       const store = getStore();
-      const c = await store.listCalibrations();
+      const [c, graph] = await Promise.all([
+        store.listCalibrations(),
+        store.mode === "supabase" ? store.getSocialGraph() : Promise.resolve(null),
+      ]);
       setCals(c);
+      setSocialGraph(graph);
       let selectedId = c[0]?.id ?? "";
       const requestedStrategyId = params.get("strategy");
       if (
@@ -99,10 +112,34 @@ function NewExperimentInner() {
       setError("Choose a saved strategy before creating the experiment.");
       return;
     }
+    const selectedPlayers = (socialGraph?.eligiblePlayers ?? []).filter(
+      (player) => selectedPlayerIds.includes(player.userId) && player.strategy,
+    );
+    const participantCount = 1 + selectedPlayers.length;
+    const setupError = multiplayerSetupError(
+      playMode,
+      participantCount,
+      cfg.table.maxSeats,
+    );
+    if (setupError) {
+      setError(setupError);
+      return;
+    }
+    if (playMode !== PLAY_MODES.SOLO && !socialGraph?.profile) {
+      setError("Multiplayer experiments require a cloud account.");
+      return;
+    }
     const candidate = {
       ...cfg,
       name: cfg.name || `Experiment ${new Date().toLocaleString()}`,
       mode: cfg.hands > 20000 ? "high-speed" : cfg.mode,
+      table: {
+        ...cfg.table,
+        maxSeats:
+          playMode === PLAY_MODES.PLAYERS_ONLY
+            ? participantCount
+            : cfg.table.maxSeats,
+      },
     };
     const parsed = experimentConfigSchema.safeParse(candidate);
     if (!parsed.success) {
@@ -113,6 +150,33 @@ function NewExperimentInner() {
       );
       return;
     }
+    const participants =
+      playMode === PLAY_MODES.SOLO
+        ? []
+        : [
+            {
+              participantId: socialGraph.profile.userId,
+              userId: socialGraph.profile.userId,
+              username: socialGraph.profile.username,
+              playerId: participantPlayerId(socialGraph.profile.userId),
+              relationshipDegree: 0,
+              strategyId: strategy.id,
+              strategyName: strategy.name,
+              strategyMethod: strategy.method,
+              policy: strategy.policy,
+            },
+            ...selectedPlayers.map((player) => ({
+              participantId: player.userId,
+              userId: player.userId,
+              username: player.username,
+              playerId: participantPlayerId(player.userId),
+              relationshipDegree: player.relationshipDegree,
+              strategyId: player.strategy.calibrationId,
+              strategyName: player.strategy.name,
+              strategyMethod: player.strategy.method,
+              policy: player.strategy.policy,
+            })),
+          ];
     const exp = {
       id: newId("exp"),
       createdAt: new Date().toISOString(),
@@ -120,11 +184,14 @@ function NewExperimentInner() {
       calibrationId: strategy.id,
       strategyName: strategy.name,
       strategyMethod: strategy.method,
+      playMode,
+      participants,
       simulationVersion: SIMULATION_VERSION,
       status: "pending",
       results: null,
       handIds: [],
       userDecisionLog: [],
+      multiplayerResults: [],
     };
     await getStore().saveExperiment(exp);
     router.push(`/experiments/${exp.id}`);
@@ -158,7 +225,33 @@ function NewExperimentInner() {
             />
           </label>
           <label className="block">
-            <span className="label">Saved strategy</span>
+            <span className="label">Who plays?</span>
+            <select
+              className="field mt-1"
+              value={playMode}
+              onChange={(event) => {
+                setPlayMode(event.target.value);
+                setError(null);
+              }}
+            >
+              <option value={PLAY_MODES.SOLO}>Your strategy vs bots</option>
+              <option value={PLAY_MODES.WITH_BOTS} disabled={!socialGraph}>
+                Real users with bots (2+ real users)
+              </option>
+              <option value={PLAY_MODES.PLAYERS_ONLY} disabled={!socialGraph}>
+                Players only — no bots (3+ real users)
+              </option>
+            </select>
+            {!socialGraph && (
+              <span className="block text-[11px] text-muted mt-1">
+                Multiplayer requires cloud mode and shared friend strategies.
+              </span>
+            )}
+          </label>
+          <label className="block">
+            <span className="label">
+              {playMode === PLAY_MODES.SOLO ? "Saved strategy" : "Your saved strategy"}
+            </span>
             <select
               className="field mt-1"
               value={calId}
@@ -177,6 +270,60 @@ function NewExperimentInner() {
               its history.
             </span>
           </label>
+          {playMode !== PLAY_MODES.SOLO && socialGraph && (
+            <div className="rounded-md border border-line bg-panel2 px-3 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="label">Add real users</span>
+                <Link href="/friends" className="text-xs text-accent hover:underline">
+                  Manage friends
+                </Link>
+              </div>
+              <p className="text-[11px] text-muted mt-1 mb-2">
+                Direct friends and friends of friends are eligible. Only players
+                who published a multiplayer strategy can be selected.
+              </p>
+              {socialGraph.eligiblePlayers.length === 0 ? (
+                <div className="text-xs text-muted">No players are available yet.</div>
+              ) : (
+                <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                  {socialGraph.eligiblePlayers.map((player) => (
+                    <label
+                      key={player.userId}
+                      className={`flex items-center gap-2 rounded px-2 py-1.5 ${
+                        player.strategy ? "cursor-pointer hover:bg-panel" : "opacity-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        disabled={!player.strategy}
+                        checked={selectedPlayerIds.includes(player.userId)}
+                        onChange={(event) =>
+                          setSelectedPlayerIds((current) =>
+                            event.target.checked
+                              ? [...current, player.userId]
+                              : current.filter((id) => id !== player.userId),
+                          )
+                        }
+                      />
+                      <span className="text-sm font-semibold">@{player.username}</span>
+                      <span className="text-[11px] text-muted">
+                        {player.relationshipDegree === 1 ? "friend" : "friend of friend"}
+                      </span>
+                      <span className="text-[11px] text-muted ml-auto truncate max-w-36">
+                        {player.strategy?.name ?? "no shared strategy"}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="text-xs mt-2">
+                <span className="mono">{1 + selectedPlayerIds.length}</span> real users selected
+                {playMode === PLAY_MODES.PLAYERS_ONLY
+                  ? " · minimum 3"
+                  : " · minimum 2"}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Num
               label="Hands"
@@ -217,7 +364,12 @@ function NewExperimentInner() {
               <span className="label">Players at table</span>
               <select
                 className="field mt-1"
-                value={cfg.table.maxSeats}
+                value={
+                  playMode === PLAY_MODES.PLAYERS_ONLY
+                    ? Math.max(3, 1 + selectedPlayerIds.length)
+                    : cfg.table.maxSeats
+                }
+                disabled={playMode === PLAY_MODES.PLAYERS_ONLY}
                 onChange={(event) =>
                   setCfg({
                     ...cfg,
@@ -242,6 +394,11 @@ function NewExperimentInner() {
                   ),
                 )}
               </select>
+              {playMode === PLAY_MODES.PLAYERS_ONLY && (
+                <span className="block text-[11px] text-muted mt-1">
+                  The table size matches the number of selected real users.
+                </span>
+              )}
             </label>
             <Num
               label="Your buy-in (bb)"
@@ -302,11 +459,18 @@ function NewExperimentInner() {
 
         <section className="panel px-5 py-4">
           <h2 className="font-semibold mb-1">Player pool</h2>
-          <p className="text-xs text-muted mb-3">
-            Relative weights when seating and replacing opponents. Players join,
-            leave, rebuy, and get replaced by new draws from this pool during
-            the run.
-          </p>
+          {playMode === PLAY_MODES.PLAYERS_ONLY ? (
+            <div className="rounded-md border border-line bg-panel2 px-4 py-4 text-sm text-muted">
+              Bot settings are ignored in a players-only experiment. The table
+              contains exactly the selected real-user strategy models, with a
+              minimum of three players.
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-muted mb-3">
+                Relative weights when seating and replacing bot opponents.
+                Bots join, leave, rebuy, and get replaced during the run.
+              </p>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
             {AGENT_PRESETS.map((p) => (
               <div
@@ -406,6 +570,8 @@ function NewExperimentInner() {
               }
             />
           </div>
+            </>
+          )}
         </section>
       </div>
 

@@ -60,6 +60,18 @@ The poker engine, evaluator, agents, player model, simulator, and analytics rema
 - Migration commit `7a8c247` is pushed to both the working branch and the default production branch connected to Vercel.
 - No CSS or visual assets changed during the migration; the JSX component structure, class names, routes, and runtime logic were preserved.
 
+## Usernames, friends, and multiplayer strategy testing
+
+- Cloud accounts have unique lowercase `@usernames`; sign-up checks availability, existing accounts receive a deterministic fallback, and usernames can be changed from `/friends`.
+- Accepted friendships are mutual. Multiplayer discovery includes direct friends and friends of friends, so participants in one experiment do not need to be friends with one another.
+- Users explicitly publish one saved learned policy for their two-hop network. Raw calibration decisions, private experiment history, and account email remain unshared.
+- **Real users with bots** requires at least two real users total (the creator plus one eligible player) and fills the remaining configured seats with heuristic bots.
+- **Players only** requires at least three real users total (the creator plus two eligible players), sizes the table to those users, and seats no bots.
+- Every real-user policy keeps a fixed seat, stack, rebuy count, decision log, and incremental analytics during a run.
+- Completed multiplayer experiments rank the real users by normalized win rate and compare total big blinds, hands won, and maximum drawdown. Bots are explicitly excluded from the leaderboard.
+- `supabase/migrations/20260718000000_social_multiplayer.sql` adds profiles, canonical friend connections, opt-in strategy snapshots, two-hop access checks, social RPCs, triggers, grants, and RLS.
+- Simulation version `1.6.0` covers the multiplayer seat/aggregation behavior.
+
 ## Timing-aware calibration and simulation completed
 
 The full-session and range-first calibration flows now behave like paced online poker tables.
@@ -356,7 +368,7 @@ The pgTAP file contains 28 assertions covering all four tables, RLS, grants, own
 The production backend and deployment are connected:
 
 - The repository is linked to Supabase project `oxrqtwqkzkembnglhbtn`.
-- Migrations `20260717000000_initial_user_data.sql` and `20260717010000_strategy_reviews.sql` are both recorded in remote migration history and applied. A follow-up `supabase db push` reports the remote database is up to date.
+- Migrations `20260717000000_initial_user_data.sql`, `20260717010000_strategy_reviews.sql`, and `20260718000000_social_multiplayer.sql` are recorded in remote migration history and applied. The multiplayer migration was pushed and verified against the linked project on 2026-07-18.
 - The earlier detailed remote verification found the 3 initial application tables, 3 RLS-enabled tables, 12 policies, and `finalize_experiment_run`; the applied follow-up migration adds `strategy_reviews` and `save_experiment_strategy_review`.
 - Supabase Auth Site URL is `https://poker-sim-iota.vercel.app`.
 - Local, production, stable Vercel alias, and `*-optvis.vercel.app` preview confirmation URLs are allowed.

@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const SIMULATION_VERSION = "1.5.0";
+export const SIMULATION_VERSION = "1.6.0";
 export const rakeSchema = z.object({
   percentage: z.number().min(0).max(0.2),
   cap: z.number().min(0),

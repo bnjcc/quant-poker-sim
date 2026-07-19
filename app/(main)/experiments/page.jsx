@@ -114,6 +114,9 @@ export default function ExperimentsPage() {
                     </Link>
                     <div className="text-[11px] text-muted mono">
                       seed {e.config.seed}
+                      {e.playMode && e.playMode !== "solo"
+                        ? ` · ${e.participants?.length ?? 0} real users`
+                        : ""}
                     </div>
                   </td>
                   <td className="px-4 py-3">
