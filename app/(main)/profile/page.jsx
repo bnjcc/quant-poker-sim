@@ -166,7 +166,7 @@ export default function ProfilePage() {
 
       <section className="panel px-5 py-4 mb-4 max-w-3xl">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="block min-w-64 flex-1">
+          <label className="block min-w-0 sm:min-w-64 flex-1">
             <span className="label">Saved strategy</span>
             <select
               className="field mt-1"
@@ -191,7 +191,7 @@ export default function ProfilePage() {
           </Link>
         </div>
         <div className="flex flex-wrap items-end gap-2 mt-3 pt-3 border-t border-line">
-          <label className="block min-w-64 flex-1">
+          <label className="block min-w-0 sm:min-w-64 flex-1">
             <span className="label">Strategy name</span>
             <input
               className="field mt-1"

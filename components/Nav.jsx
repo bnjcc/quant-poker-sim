@@ -157,6 +157,7 @@ export function Nav() {
   const cloudMode = isSupabaseConfigured();
   const [email, setEmail] = useState(null);
   const [username, setUsername] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => {
     if (!cloudMode) return;
     const client = createClient();
@@ -171,15 +172,36 @@ export function Nav() {
       setUsername(profile?.username ?? null);
     });
   }, [cloudMode]);
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [path]);
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
   if (path === "/login" || path.startsWith("/auth/")) return null;
   const signOut = async () => {
     await createClient().auth.signOut({ scope: "local" });
     window.location.assign("/login");
   };
+  const pathMatches = (href) =>
+    href === "/" ? path === "/" : path.startsWith(href);
+  const activeHref = [...LINKS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((link) => pathMatches(link.href))?.href;
+  const isActive = (href) => href === activeHref;
   const navLinks = (links = LINKS, mobile = false) =>
     links.map((link) => {
-      const active =
-        link.href === "/" ? path === "/" : path.startsWith(link.href);
+      const active = isActive(link.href);
       return (
         <Link
           key={link.href}
@@ -193,30 +215,123 @@ export function Nav() {
         </Link>
       );
     });
+  const primaryMobileLinks = [
+    LINKS[0],
+    LINKS[1],
+    LINKS[3],
+    LINKS[4],
+  ];
+  const currentPage =
+    LINKS.find((link) => link.href === activeHref)?.label ?? "Workspace";
+  const moreIsActive = !primaryMobileLinks.some((link) =>
+    isActive(link.href),
+  );
   return (
     <>
-      <header className="mobile-nav md:hidden w-full px-4 py-3 sticky top-0 z-40">
-        <div className="flex items-center justify-between gap-3">
-          <Link href="/" aria-label="QuantPoker dashboard">
+      <header className="mobile-nav md:hidden w-full sticky top-0 z-40">
+        <div className="mobile-nav-bar flex items-center justify-between gap-3">
+          <Link href="/" aria-label="QuantPoker dashboard" className="min-w-0">
             <Brand />
           </Link>
-          {cloudMode && (
-            <button
-              className="text-xs text-accent"
-              type="button"
-              onClick={signOut}
-            >
-              Sign out
-            </button>
-          )}
+          <span className="mobile-page-name truncate">{currentPage}</span>
+          <button
+            className="mobile-menu-button"
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation-drawer"
+            aria-label="Open navigation menu"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
         </div>
-        <nav
-          className="flex gap-1 overflow-x-auto mt-2 pb-1"
-          aria-label="Mobile main navigation"
-        >
-          {navLinks(LINKS, true)}
-        </nav>
       </header>
+
+      <nav className="mobile-tab-bar md:hidden" aria-label="Quick navigation">
+        {primaryMobileLinks.map((link) => {
+          const active = isActive(link.href);
+          const shortLabel =
+            link.href === "/range-calibrate"
+              ? "Calibrate"
+              : link.href === "/experiments/new"
+                ? "New"
+                : link.href === "/experiments"
+                  ? "Runs"
+                  : link.label;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`mobile-tab ${active ? "mobile-tab-active" : ""}`}
+              aria-current={active ? "page" : undefined}
+            >
+              <NavIcon name={link.icon} />
+              <span>{shortLabel}</span>
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          className={`mobile-tab ${moreIsActive || mobileMenuOpen ? "mobile-tab-active" : ""}`}
+          onClick={() => setMobileMenuOpen(true)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-navigation-drawer"
+        >
+          <NavIcon name="grid" />
+          <span>More</span>
+        </button>
+      </nav>
+
+      {mobileMenuOpen && (
+        <div className="mobile-drawer-layer md:hidden">
+          <button
+            type="button"
+            className="mobile-drawer-backdrop"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation menu"
+          />
+          <section
+            id="mobile-navigation-drawer"
+            className="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+          >
+            <div className="mobile-drawer-header">
+              <div>
+                <div className="label">Navigate</div>
+                <div className="font-semibold mt-1">QuantPoker workspace</div>
+              </div>
+              <button
+                className="mobile-drawer-close"
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close navigation menu"
+              >
+                ×
+              </button>
+            </div>
+            <nav className="mobile-drawer-nav" aria-label="Mobile main navigation">
+              {["Model", "Lab", "Library"].map((group) => (
+                <div key={group} className="nav-group">
+                  <div className="nav-group-label">{group}</div>
+                  <div className="mobile-drawer-links">
+                    {navLinks(LINKS.filter((link) => link.group === group), true)}
+                  </div>
+                </div>
+              ))}
+            </nav>
+            {cloudMode && (
+              <button className="btn mobile-sign-out" type="button" onClick={signOut}>
+                Sign out
+              </button>
+            )}
+          </section>
+        </div>
+      )}
+
       <aside className="app-sidebar w-64 shrink-0 px-4 py-5 hidden md:flex md:flex-col sticky top-0 h-screen">
         <Link
           href="/"

@@ -27,15 +27,15 @@ export function PokerTable({
   const ordered = [...seats.slice(userIdx), ...seats.slice(0, userIdx)];
   const seatWidth =
     seats.length > 6
-      ? "w-[clamp(4.5rem,10vw,7rem)]"
-      : "w-[clamp(5.5rem,13vw,9rem)]";
+      ? "table-seat-wrap table-seat-wrap-dense"
+      : "table-seat-wrap";
   return (
     <div
       className={`poker-table relative w-full rounded-[48%_48%_46%_46%] ${fitViewport ? "calibration-table" : ""}`}
       style={{ aspectRatio: "16 / 9" }}
     >
       {/* Board + pot */}
-      <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
+      <div className="table-board absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
         <div className="label">{street}</div>
         {board.length > 0 ? (
           <CardRow
@@ -73,15 +73,15 @@ export function PokerTable({
                 </span>
               )}
               <span
-                className={`text-xs font-semibold truncate ${s.isUser ? "text-accent" : ""}`}
+                className={`table-seat-name text-xs font-semibold truncate ${s.isUser ? "text-accent" : ""}`}
               >
                 {s.name}
               </span>
             </div>
-            <div className="mono text-[11px] text-muted">
+            <div className="table-seat-stack mono text-[11px] text-muted">
               {s.stack.toLocaleString()} chips
             </div>
-            <div className="mt-1 flex justify-center min-h-[1.6rem]">
+            <div className="table-seat-cards mt-1 flex justify-center min-h-[1.6rem]">
               {s.folded ? (
                 <span className="text-[11px] text-muted italic">folded</span>
               ) : s.holeCards ? (
@@ -98,13 +98,13 @@ export function PokerTable({
               )}
             </div>
             {s.lastAction && (
-              <div className="text-[10px] text-info mt-0.5 truncate">
+              <div className="table-seat-action text-[10px] text-info mt-0.5 truncate">
                 {s.lastAction}
               </div>
             )}
           </div>
           {s.committed > 0 && (
-            <div className="mono text-center text-[11px] mt-1 text-accent">
+            <div className="table-seat-committed mono text-center text-[11px] mt-1 text-accent">
               {s.committed.toLocaleString()} chips
             </div>
           )}

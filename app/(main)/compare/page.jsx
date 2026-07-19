@@ -97,11 +97,11 @@ export default function ComparePage() {
         ))}
       </div>
       {rows.length >= 2 && (
-        <div className="panel overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="panel mobile-table-shell overflow-x-auto">
+          <table className="w-full min-w-[36rem] text-sm">
             <thead>
               <tr className="border-b border-line text-left">
-                <th className="label px-4 py-3 font-normal">Metric</th>
+                <th className="mobile-sticky-column label px-4 py-3 font-normal">Metric</th>
                 {rows.map((e) => (
                   <th key={e.id} className="px-4 py-3 font-semibold">
                     {e.config.name}
@@ -115,7 +115,7 @@ export default function ComparePage() {
                   key={m.label}
                   className="border-b border-line last:border-0"
                 >
-                  <td className="px-4 py-2.5 text-muted">{m.label}</td>
+                  <td className="mobile-sticky-column px-4 py-2.5 text-muted">{m.label}</td>
                   {rows.map((e) => (
                     <td
                       key={e.id}

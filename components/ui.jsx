@@ -87,7 +87,7 @@ export function PercentageBar({ value, label }) {
 }
 export function Empty({ title, body, action }) {
   return (
-    <div className="panel px-8 py-12 text-center">
+    <div className="panel px-5 py-9 sm:px-8 sm:py-12 text-center">
       <div className="text-lg font-semibold">{title}</div>
       <p className="text-sm text-muted mt-2 max-w-md mx-auto">{body}</p>
       {action && (
@@ -110,7 +110,7 @@ export function PageHeader({ title, sub, right }) {
         </h1>
         {sub && <p className="text-sm text-muted mt-1 max-w-2xl">{sub}</p>}
       </div>
-      {right}
+      {right && <div className="page-header-action shrink-0">{right}</div>}
     </div>
   );
 }
