@@ -31,7 +31,7 @@ export function ChipAmountInput({
     onChange(next);
   };
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="chip-amount-input flex items-center gap-1.5">
       <button
         type="button"
         className="btn px-3 py-1.5 mono text-base"

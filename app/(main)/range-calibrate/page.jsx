@@ -746,9 +746,9 @@ export default function RangeCalibratePage() {
       : null;
   const currentPosition = engine.positionOf(session.userSeat);
   return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div>
+    <div className={phase === "done" ? "" : "calibration-play-layout"}>
+      <div className="calibration-status-bar flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="calibration-session-summary">
           <span className="mono text-sm font-bold">
             Selected hand{" "}
             {Math.min(session.handsPlayed + 1, session.targetHands)} /{" "}
@@ -763,7 +763,7 @@ export default function RangeCalibratePage() {
             {session.session.config.bigBlind} chips
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="calibration-session-tools flex items-center gap-4">
           {currentHand && (
             <span className="mono text-sm text-accent font-bold">
               {currentPosition} · {currentHand}
@@ -786,7 +786,7 @@ export default function RangeCalibratePage() {
         </div>
       </div>
       <div
-        className="h-1.5 rounded bg-panel2 mb-5 overflow-hidden"
+        className="calibration-progress h-1.5 rounded bg-panel2 mb-5 overflow-hidden"
         role="progressbar"
         aria-valuenow={Math.round(progress * 100)}
         aria-valuemin={0}
@@ -798,20 +798,22 @@ export default function RangeCalibratePage() {
         />
       </div>
 
-      <PokerTable
-        seats={seats}
-        board={engine.board}
-        pot={engine.potSize}
-        street={engine.street}
-        fitViewport
-        animateCards
-        cardAnimationKey={engine.handNumber}
-      />
+      <div className="calibration-table-zone">
+        <PokerTable
+          seats={seats}
+          board={engine.board}
+          pot={engine.potSize}
+          street={engine.street}
+          fitViewport
+          animateCards
+          cardAnimationKey={engine.handNumber}
+        />
+      </div>
 
       <div className="panel calibration-controls mt-5 px-5 py-4">
         {phase === "playing" && ctx && legal ? (
-          <div>
-            <div className="flex flex-wrap items-center gap-3 mb-3 pb-3 border-b border-line">
+          <div className="calibration-controls-panel">
+            <div className="calibration-clock-row flex flex-wrap items-center gap-3 mb-3 pb-3 border-b border-line">
               <ActionClock remainingMs={decisionRemainingMs} />
               <div className="text-xs text-muted">
                 Timeout:{" "}
@@ -827,7 +829,7 @@ export default function RangeCalibratePage() {
                 </div>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="calibration-action-row flex flex-wrap items-center gap-3">
               <button className="btn" type="button" onClick={checkFold}>
                 Check / Fold rest of hand
               </button>
@@ -860,7 +862,7 @@ export default function RangeCalibratePage() {
               )}
               {(legal.types.includes("bet") ||
                 legal.types.includes("raise")) && (
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="calibration-betting-controls flex items-center gap-3 flex-wrap">
                   <button
                     className="btn btn-primary"
                     type="button"
@@ -878,7 +880,7 @@ export default function RangeCalibratePage() {
                     step={session.session.config.smallBlind}
                     value={betTo}
                     onChange={(event) => setBetTo(Number(event.target.value))}
-                    className="w-48"
+                    className="calibration-bet-slider w-48"
                     aria-label="Bet size in chips"
                   />
                   <ChipAmountInput
@@ -888,7 +890,7 @@ export default function RangeCalibratePage() {
                     step={session.session.config.smallBlind}
                     onChange={setBetTo}
                   />
-                  <div className="flex flex-wrap gap-1">
+                  <div className="calibration-bet-shortcuts flex flex-wrap gap-1">
                     {engine.street === "preflop" && (
                       <button
                         className="btn text-xs px-2 py-1"
@@ -897,8 +899,7 @@ export default function RangeCalibratePage() {
                         onClick={() => setBetTo(threeBigBlindChips)}
                         title="Set the total bet or raise to three times the big blind"
                       >
-                        {threeBigBlindChips.toLocaleString()} chips (3× big
-                        blind)
+                        {threeBigBlindChips.toLocaleString()} chips (3× BB)
                       </button>
                     )}
                     {[0.5, 0.66, 1].map((fraction) => (
@@ -936,9 +937,12 @@ export default function RangeCalibratePage() {
                   </div>
                 </div>
               )}
-              <div className="ml-auto text-xs text-muted mono">
+              <div
+                className="calibration-pot-context ml-auto text-xs text-muted mono"
+                title="SPR — stack-to-pot ratio"
+              >
                 pot {ctx.potSize.toLocaleString()} chips · to call{" "}
-                {legal.callAmount.toLocaleString()} chips · SPR (stack/pot){" "}
+                {legal.callAmount.toLocaleString()} chips · SPR{" "}
                 {ctx.stackToPotRatio.toFixed(1)}
               </div>
             </div>

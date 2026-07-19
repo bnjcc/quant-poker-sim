@@ -149,11 +149,34 @@ body::before {
 .range-scroll-hint { display: none; }
 .range-grid-scroll { scroll-snap-type: x proximity; }
 
+body:has(.calibration-play-layout) { overflow: hidden; overscroll-behavior: none; }
+body:has(.calibration-play-layout) .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+body:has(.calibration-play-layout) .app-main { min-height: 0; overflow: hidden; }
+.calibration-play-layout {
+  display: grid;
+  grid-template-rows: auto .375rem minmax(0, 1fr) auto;
+  gap: .5rem;
+  height: 100%;
+  min-height: 0;
+}
+.calibration-status-bar, .calibration-progress, .calibration-controls { margin-block: 0; }
+.calibration-session-summary { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 0; min-width: 0; }
+.calibration-session-tools { min-width: 0; }
+.calibration-table-zone { display: flex; min-width: 0; min-height: 0; align-items: center; justify-content: center; }
 .calibration-table {
-  width: min(100%, calc((100dvh - 18.5rem) * 16 / 9));
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   margin-inline: auto;
 }
-.calibration-controls { overflow-anchor: none; }
+.calibration-controls { min-height: 0; overflow-anchor: none; padding: .7rem 1rem; }
+.calibration-clock-row { margin-bottom: .55rem; padding-bottom: .55rem; }
+.calibration-action-row, .calibration-betting-controls { gap: .5rem; }
+.calibration-controls .btn { min-height: 2.25rem; padding-block: .4rem; }
+.calibration-controls .field { min-height: 2.25rem; }
+.calibration-bet-shortcuts .btn { min-height: 2rem; white-space: nowrap; }
+.calibration-pot-context { white-space: nowrap; }
 
 .acting-seat {
   border-color: var(--accent);
@@ -183,12 +206,12 @@ body::before {
 .theme-option-selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .theme-swatch { width: 1rem; height: 1rem; border-radius: 999px; box-shadow: 0 0 0 2px rgba(255,255,255,0.1), 0 0 14px currentColor; }
 
-@media (max-height: 700px) and (min-width: 768px) {
-  .calibration-table { width: min(100%, calc((100dvh - 15.5rem) * 16 / 9)); }
-}
-
-@media (max-width: 640px) {
-  .calibration-table { width: 100%; }
+@media (max-height: 700px) and (min-width: 641px) {
+  .calibration-play-layout { gap: .35rem; }
+  .calibration-controls { padding: .5rem .75rem; }
+  .calibration-clock-row { margin-bottom: .35rem; padding-bottom: .35rem; }
+  .calibration-controls .btn { min-height: 2rem; padding-block: .3rem; }
+  .calibration-bet-slider { display: none; }
 }
 
 .label { font-size: 0.67rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
@@ -369,6 +392,9 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
 .table-seat-wrap { width: clamp(5.5rem, 13vw, 9rem); }
 .table-seat-wrap-dense { width: clamp(4.5rem, 10vw, 7rem); }
 .table-seat { position: relative; z-index: 2; background: linear-gradient(145deg, rgba(20,23,29,.98), rgba(10,12,16,.98)); box-shadow: 0 8px 22px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04); }
+.table-seat-wrap-opponent { width: clamp(4.6rem, 8vw, 6.25rem); }
+.table-seat-wrap-opponent.table-seat-wrap-dense { width: clamp(4.15rem, 7vw, 5.35rem); }
+.table-seat-opponent { display: flex; min-height: 2.35rem; flex-direction: column; justify-content: center; border-radius: 9999px; }
 .table-pot { display: flex; align-items: center; gap: .4rem; padding: .25rem .55rem; border-radius: 999px; background: rgba(5,10,8,.35); border: 1px solid rgba(255,255,255,.05); }
 .table-pot > span { width: .4rem; height: .4rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
@@ -421,13 +447,43 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   body:has(.auth-shell) .app-atmosphere { opacity: .58; }
   .native-bar-row { grid-template-columns: 4.2rem minmax(4rem, 1fr) 4.1rem; gap: .45rem; }
   .native-chart-caption { flex-wrap: wrap; gap: .35rem .75rem; }
+  body:has(.calibration-play-layout) .app-main { padding: .4rem .5rem max(.4rem, env(safe-area-inset-bottom)); }
+  body:has(.calibration-play-layout) .mobile-tab-bar { display: none; }
+  .calibration-play-layout { grid-template-rows: auto .25rem minmax(0, 1fr) auto; gap: .35rem; }
+  .calibration-status-bar { gap: .2rem .5rem; }
+  .calibration-status-bar .mono.text-sm { font-size: .69rem; }
+  .calibration-status-bar .text-xs { font-size: .6rem; }
+  .calibration-status-bar .ml-3 { margin-left: .45rem; }
+  .calibration-session-tools { width: 100%; justify-content: space-between; gap: .4rem; }
+  .calibration-session-tools .btn { min-height: 1.8rem; padding: .25rem .5rem; font-size: .6rem; }
+  .calibration-progress { height: .25rem; }
+  .calibration-table-zone .calibration-table { width: 100%; height: 100%; aspect-ratio: auto !important; margin: 0; }
+  .calibration-controls { padding: .4rem .5rem; border-radius: 10px; }
+  .calibration-clock-row { gap: .3rem .55rem; margin-bottom: .35rem; padding-bottom: .35rem; }
+  .calibration-clock-row > .text-xs, .calibration-clock-row > .mono { font-size: .57rem; }
+  .calibration-action-row { gap: .3rem; }
+  .calibration-controls .btn { min-height: 2rem; padding: .3rem .5rem; font-size: .67rem; line-height: 1.05; }
+  .calibration-betting-controls { display: grid; flex: 1 1 100%; grid-template-columns: auto minmax(0, 1fr); gap: .3rem; }
+  .calibration-bet-slider { display: none; }
+  .chip-amount-input { min-width: 0; gap: .2rem; }
+  .chip-amount-input .btn { width: 2rem; padding-inline: 0; }
+  .chip-amount-input .field { width: 4.25rem; min-height: 2rem; padding: .25rem; font-size: .75rem; }
+  .chip-amount-input > span { display: none; }
+  .calibration-bet-shortcuts { grid-column: 1 / -1; flex-wrap: nowrap; gap: .2rem; }
+  .calibration-bet-shortcuts .btn { min-width: 0; flex: 1 1 auto; padding-inline: .38rem; font-size: .59rem; }
+  .calibration-pot-context { flex: 1 1 100%; margin-left: 0; text-align: center; font-size: .58rem; }
   .poker-table { aspect-ratio: .92 / 1 !important; border-width: 4px; }
   .poker-table::before { inset: 3%; }
   .table-seat-position { left: var(--phone-seat-left); top: var(--phone-seat-top); }
   .table-seat-wrap { width: clamp(3.45rem, 18vw, 4.1rem); }
   .table-seat-wrap-dense { width: clamp(3rem, 15.5vw, 3.55rem); }
   .table-seat { padding: .2rem .18rem; border-radius: .38rem; }
+  .table-seat-wrap-opponent { width: clamp(3.2rem, 16vw, 3.8rem); }
+  .table-seat-wrap-opponent.table-seat-wrap-dense { width: clamp(2.9rem, 14.5vw, 3.4rem); }
+  .table-seat-opponent { min-height: 1.8rem; padding: .18rem .28rem; border-radius: 9999px; }
+  .table-seat-opponent-meta { font-size: .48rem; line-height: .62rem; }
   .table-seat-name { font-size: .62rem; line-height: .8rem; }
+  .table-seat-opponent .table-seat-name { font-size: .54rem; line-height: .66rem; }
   .table-seat-stack { font-size: .54rem; line-height: .72rem; }
   .table-seat-stack-unit, .table-seat-committed-unit { display: none; }
   .table-seat-cards { min-height: 1.15rem; margin-top: .15rem; }
@@ -440,7 +496,6 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   .table-pot { max-width: 9rem; padding: .18rem .38rem; font-size: .62rem; white-space: nowrap; }
   .acting-seat { outline-width: 2px; outline-offset: 1px; }
   .calibration-table, .calibration-controls { overflow-anchor: none; }
-  .calibration-controls { min-height: 22rem; }
   .panel.overflow-x-auto, .overflow-x-auto { -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain; }
   .mobile-table-shell { margin-inline: -.1rem; border-radius: .75rem; }
   .mobile-sticky-column { position: sticky; left: 0; z-index: 1; background: #111319; box-shadow: 8px 0 14px rgba(0,0,0,.18); }

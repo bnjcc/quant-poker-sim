@@ -93,10 +93,6 @@ export function PokerTable({
     seats.findIndex((s) => s.isUser),
   );
   const ordered = [...seats.slice(userIdx), ...seats.slice(0, userIdx)];
-  const seatWidth =
-    seats.length > 6
-      ? "table-seat-wrap table-seat-wrap-dense"
-      : "table-seat-wrap";
   return (
     <div
       className={`poker-table relative w-full rounded-[48%_48%_46%_46%] ${fitViewport ? "calibration-table" : ""}`}
@@ -124,6 +120,18 @@ export function PokerTable({
       {ordered.map((s, i) => {
         const desktopSpot = seatSpot(i, ordered.length);
         const phoneSpot = mobileSeatSpot(i, ordered.length);
+        const opponentAction = s.isActing
+          ? "thinking…"
+          : s.folded
+            ? "folded"
+            : s.lastAction;
+        const seatLabel = `${s.name}, ${s.stack.toLocaleString()} chips${opponentAction ? `, ${opponentAction}` : ""}${s.committed > 0 ? `, ${s.committed.toLocaleString()} chips committed` : ""}`;
+        const compactOpponent = fitViewport && !s.isUser;
+        const seatWidth = compactOpponent
+          ? `table-seat-wrap table-seat-wrap-opponent${ordered.length > 6 ? " table-seat-wrap-dense" : ""}`
+          : ordered.length > 6
+            ? "table-seat-wrap table-seat-wrap-dense"
+            : "table-seat-wrap";
         return (
           <div
             key={s.seat}
@@ -136,8 +144,11 @@ export function PokerTable({
             }}
           >
             <div
-              className={`table-seat rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${s.isActing ? "acting-seat" : "border-line"} ${s.folded ? "opacity-40" : ""}`}
+              className={`table-seat border text-center transition-all ${compactOpponent ? "table-seat-opponent rounded-full px-2 py-1" : "rounded-lg px-1.5 py-1 sm:px-2.5 sm:py-1.5"} ${s.isActing ? "acting-seat" : "border-line"} ${s.folded ? "opacity-40" : ""}`}
+              role="group"
               aria-current={s.isActing ? "true" : undefined}
+              aria-label={seatLabel}
+              title={seatLabel}
             >
               <div className="flex items-center justify-center gap-1.5">
                 {s.isButton && (
@@ -154,29 +165,42 @@ export function PokerTable({
                   {s.name}
                 </span>
               </div>
-              <div className="table-seat-stack mono text-[11px] text-muted">
-                {s.stack.toLocaleString()}
-                <span className="table-seat-stack-unit"> chips</span>
-              </div>
-              <div className="table-seat-cards mt-1 flex justify-center min-h-[1.6rem]">
-                {s.folded ? (
-                  <span className="text-[11px] text-muted italic">folded</span>
-                ) : s.holeCards ? (
-                  <CardRow
-                    cards={s.holeCards}
-                    size={fitViewport && s.isUser ? "lg" : "sm"}
-                    animated={animateCards && s.isUser}
-                    animationKey={`${cardAnimationKey}:seat:${s.seat}`}
-                  />
-                ) : (
-                  <span className="mono text-[13px] tracking-widest text-muted">
-                    🂠🂠
-                  </span>
-                )}
-              </div>
-              {s.lastAction && (
-                <div className="table-seat-action text-[10px] text-info mt-0.5 truncate">
-                  {s.lastAction}
+              {!compactOpponent ? (
+                <>
+                  <div className="table-seat-stack mono text-[11px] text-muted">
+                    {s.stack.toLocaleString()}
+                    <span className="table-seat-stack-unit"> chips</span>
+                  </div>
+                  <div className="table-seat-cards mt-1 flex justify-center min-h-[1.6rem]">
+                    {s.folded ? (
+                      <span className="text-[11px] text-muted italic">
+                        folded
+                      </span>
+                    ) : s.holeCards ? (
+                      <CardRow
+                        cards={s.holeCards}
+                        size={fitViewport && s.isUser ? "lg" : "sm"}
+                        animated={animateCards && s.isUser}
+                        animationKey={`${cardAnimationKey}:seat:${s.seat}`}
+                      />
+                    ) : (
+                      <span className="mono text-[13px] tracking-widest text-muted">
+                        🂠🂠
+                      </span>
+                    )}
+                  </div>
+                  {s.lastAction && (
+                    <div className="table-seat-action text-[10px] text-info mt-0.5 truncate">
+                      {s.lastAction}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="table-seat-opponent-meta mono truncate text-[9px] leading-tight text-muted sm:text-[10px]">
+                  <span>{s.stack.toLocaleString()}</span>
+                  {opponentAction && (
+                    <span className="text-info"> · {opponentAction}</span>
+                  )}
                 </div>
               )}
             </div>

@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `3407cde Add calibration stakes and table-size selection`
-- Current uncommitted working tree: a 45-second user decision clock in both calibration flows, with heuristic-opponent virtual timing and the fixed 500ms opponent preview unchanged.
+- Latest committed production implementation: `2dc0354 Increase calibration action clock to 45 seconds`
+- Current uncommitted working tree: a no-scroll active-hand layout for both calibration flows, with compact oval opponent seats and condensed responsive betting controls.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `3407cde`, which adds calibration stakes and table-size selection on top of the PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `2dc0354`, which adds the 45-second user clock on top of calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -111,20 +111,21 @@ The application now has a dedicated phone experience instead of relying on compr
 ### Poker-table visibility on phones
 
 - `PokerTable` has explicit phone seat maps for tables with two through nine players. Seats occupy dedicated outer lanes rather than using the desktop ellipse, keeping the community-card and pot area clear.
-- The phone felt is taller, player boxes and cards are more compact, and redundant `chips` suffixes are hidden inside seat boxes to reduce width without hiding numeric stack or committed amounts.
+- Opponents render as compact two-line ovals containing their name plus chip stack/action state; hidden-card backs are omitted from those non-interactive seats. The user's larger seat keeps the visible hole cards and full chip stack.
+- Phone opponent ovals shrink further for full-ring tables, and redundant `chips` suffixes are hidden inside seat boxes to reduce width without hiding numeric stack or committed amounts.
 - The board and pot occupy a centered foreground layer. The flop, turn, river, and pot total therefore remain visible instead of being covered by player boxes.
-- Desktop seat geometry and sizing remain unchanged.
+- Opponent ovals expose a complete accessible label and title with name, chip stack, action state, and committed chips even when the visual text is truncated.
 
 ### Calibration scroll-position stability
 
-- Both `/calibrate` and `/range-calibrate` preserve `window.scrollX` and `window.scrollY` when **Next hand** advances the manual session. Scroll restoration runs after two animation frames so it occurs after React finishes rendering the new hand.
-- The phone calibration action panel reserves a 22rem minimum height across user decisions, opponent previews, and hand-complete states. This prevents the document from collapsing and moving the viewport upward when the action controls temporarily disappear.
-- Scroll anchoring is disabled for the calibration table and action panel so card/action transitions do not pull the decision buttons away from the user's chosen viewport position.
-- Together these changes let a phone user keep the decision controls at the bottom of the screen across consecutive calibrated hands without repeatedly scrolling down.
+- During an active hand, both `/calibrate` and `/range-calibrate` lock the app shell to `100dvh` and use a four-row grid for session status, progress, a flexible felt, and the action panel. The page itself cannot scroll, while the felt expands or contracts into the space remaining after the controls.
+- The prior 22rem mobile action-panel reservation is removed. Phone buttons, chip entry, sizing shortcuts, clock, and pot context use a compact layout; the redundant sizing slider is hidden on narrow or short screens while direct chip entry, increment buttons, 3× BB, percentage, pot, and all-in shortcuts remain available.
+- The fixed phone tab bar is hidden only during active calibration hands to return vertical space to the table. The sticky header and full hamburger navigation remain available.
+- Scroll anchoring stays disabled for the calibration table and action panel, and the existing next-hand viewport restoration remains as a defensive fallback.
 
 ### Mobile validation
 
-- The responsive implementation passes ESLint, all 12 Vitest files / 80 tests, and the Next.js production build across all 19 routes.
+- The current responsive implementation passes ESLint, all 15 Vitest files / 99 tests, and the Next.js production build across all 19 routes.
 - Browser-level phone regression tests are still a sensible follow-up; current verification is source-, lint-, unit/integration-, and production-build based.
 
 ## Timing-aware calibration and simulation completed
@@ -182,7 +183,7 @@ The current working tree closes the calibration and post-run review gaps identif
 ### Calibration presentation
 
 - The poker-table felt defaults to red and derives its color from the selected interface theme.
-- The user's hole cards render at the large card size in both calibration flows while opponent cards and other compact card displays remain unchanged.
+- The user's hole cards render at the large card size in both calibration flows. Opponent calibration seats omit decorative hidden-card backs and use compact oval summaries instead.
 - Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 45-second decision window. Heuristic opponents retain a separate 15-second virtual timing ceiling; their seeded timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
 - Both calibration flows expose **Check / Fold rest of hand**. The initial intentional action retains the user's real response time; later actions check when free or fold to a wager automatically and omit timing so they do not create an artificial 0ms timing tell. The mode resets after the hand.
 
@@ -427,7 +428,8 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
-- Current working-tree validation after increasing the calibration user clock to 45 seconds: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Timing tests assert the 45-second user clock and unchanged 15-second heuristic-opponent ceiling.
+- Current working-tree validation after the no-scroll calibration layout and oval-opponent-seat work: 15 test files and 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Poker-table rendering tests confirm calibration-only opponent ovals, accessible chip/action labels, and unchanged full opponent-card rendering outside calibration.
+- Validation after increasing the calibration user clock to 45 seconds: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Timing tests assert the 45-second user clock and unchanged 15-second heuristic-opponent ceiling.
 - Current working-tree validation after the upfront stake/table-size selector and fixed calibration lineup work: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
 - `tests/calibration.test.js`
   - Actual engine actions post exactly 1/3 or 2/5 blinds on both 6-player and 9-player calibration tables.
@@ -509,8 +511,9 @@ The production backend and deployment are connected:
 - Information-rich calibration and one-chip sizing commit `cb88e15` is pushed to the default production branch.
 - Selective preflop aggressor commit `441768f` adds the fourteenth bot archetype and guarantees that each new calibration lineup includes one hand-gated selective aggressor without forcing any aggressive action.
 - Stake and sizing commit `daff32f` adds the 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut.
-- Calibration game-selection commit `3407cde` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the upfront 6-player/9-player selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups. Exact live-site verification of that deployment remains pending.
-- The 45-second calibration user clock is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- Calibration game-selection commit `3407cde` adds the upfront 6-player/9-player selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups.
+- The 45-second calibration user clock commit `2dc0354` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
+- The no-scroll calibration layout and oval opponent seats are local and uncommitted. They have not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -534,13 +537,13 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/settings/page.jsx` — active storage summary, delete operations, browser import
 - `app/login/page.jsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.js` — authentication callback
-- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, and calibration height/scroll anchoring
+- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, and the active-calibration viewport grid/no-scroll behavior
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
 - `components/CalibrationGameSelector.jsx` — upfront 1/3-or-2/5 and 6-player-or-9-player calibration game selection plus the selected-game summary
 - `components/ChipAmountInput.jsx` — legal whole-chip entry plus configurable-increment decrement/increment controls used by calibration and strategy review
 - `components/StakePresetButtons.jsx` — shared 1/3- and 2/5-chip stake presets for calibration and experiment setup
-- `components/PokerTable.jsx` — shared desktop layout, dedicated 2–9 seat phone maps, unobstructed board/pot zone, action display, and calibration-specific user card sizing
+- `components/PokerTable.jsx` — shared desktop layout, dedicated 2–9 seat phone maps, unobstructed board/pot zone, accessible compact opponent ovals, action display, and calibration-specific user card sizing
 - `components/StartingHandGrid.jsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
 - `lib/audio/poker-sounds.js` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
 - `components/AnalyticsGlossary.jsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
@@ -573,6 +576,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `tests/timing.test.js` — timing classification, propagation, learning, compatibility, and batch-run coverage
 - `tests/calibration.test.js` — calibration hand sampling, defense probability, scenario coverage, later-street collection, and range legality
 - `tests/chip-amount.test.js` — exact one-chip stepping and legal-bound clamping
+- `tests/poker-table.test.js` — calibration-only opponent ovals, accessible seat details, and full-card rendering outside calibration
 - `tests/review.test.js` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage
 - `README.md` — operator setup
 - `docs/ARCHITECTURE.md` — system design
@@ -605,6 +609,7 @@ Do not regress these design constraints:
 - Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
 - Keep new games at the 1/3 default with the 2/5 preset available. Calibration amounts remain chip-denominated; small-blind incremental controls and the legal three-big-blind preflop shortcut must remain synchronized with the main bet amount.
 - Keep the calibration game selector before range editing, restrict calibration table sizes to 6 or 9 players, show only positions active at the selected size, and keep every calibration hand full at that chosen seat count. Do not disable normal turnover or sit-outs for experiments.
+- Keep active calibration hands within one viewport on phone and desktop. Opponents remain compact ovals, the user seat retains visible large hole cards, and every legal action/sizing control must stay accessible without page scrolling.
 - Preserve both drag-paint selection/erasing and accessible single-cell click/keyboard operation in the starting-hand grid.
 - Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
 - Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.
