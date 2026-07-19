@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { tableConfigSchema } from "@/types/experiment";
 import {
+  CALIBRATION_TABLE_SIZES,
   DEFAULT_TABLE,
   TABLE_STAKES,
   threeBigBlindChipAmount,
@@ -14,6 +15,7 @@ describe("table configuration", () => {
   it("defaults to 1/3 and offers the 2/5 preset", () => {
     expect(DEFAULT_TABLE.smallBlind).toBe(1);
     expect(DEFAULT_TABLE.bigBlind).toBe(3);
+    expect(CALIBRATION_TABLE_SIZES).toEqual([6, 9]);
     expect(TABLE_STAKES).toEqual([
       { label: "1 / 3 chips", smallBlind: 1, bigBlind: 3 },
       { label: "2 / 5 chips", smallBlind: 2, bigBlind: 5 },

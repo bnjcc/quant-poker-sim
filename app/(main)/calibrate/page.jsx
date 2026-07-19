@@ -28,7 +28,7 @@ import { getStore, newId } from "@/lib/storage/store";
 import { PokerTable } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
 import { ChipAmountInput } from "@/components/ChipAmountInput";
-import { StakePresetButtons } from "@/components/StakePresetButtons";
+import { CalibrationGameSelector } from "@/components/CalibrationGameSelector";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 export default function CalibratePage() {
   const router = useRouter();
@@ -67,7 +67,7 @@ export default function CalibratePage() {
       seed: `cal-${Date.now()}`,
       targetHands: hands,
       userBuyInBB: 100,
-      fixedLineup: buildCalibrationLineup(),
+      fixedLineup: buildCalibrationLineup(tableConfig.maxSeats),
     });
     sessionRef.current = ms;
     setPhase("playing");
@@ -293,7 +293,10 @@ export default function CalibratePage() {
           sub="Play an online-paced table with a 15-second action clock. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
         />
         <div className="panel px-6 py-6 max-w-xl">
-          <StakePresetButtons table={tableConfig} onChange={setTableConfig} />
+          <CalibrationGameSelector
+            table={tableConfig}
+            onChange={setTableConfig}
+          />
           <div className="label mt-5 mb-3">How many hands will you play?</div>
           <div className="flex flex-wrap gap-2">
             {CALIBRATION_SIZES.map((n) => (
@@ -330,10 +333,11 @@ export default function CalibratePage() {
         </div>
         <div className="mt-4 max-w-xl">
           <WarningNote>
-            Table: 6-max, blinds {tableConfig.smallBlind}/{tableConfig.bigBlind}{" "}
-            chips, {(100 * tableConfig.bigBlind).toLocaleString()}-chip buy-in
-            (100 big blinds), 5% rake capped at {DEFAULT_TABLE.rake.cap} chips.
-            A timeout checks when checking is free and folds when facing a bet.
+            Table: {tableConfig.maxSeats}-player, blinds{" "}
+            {tableConfig.smallBlind}/{tableConfig.bigBlind} chips,{" "}
+            {(100 * tableConfig.bigBlind).toLocaleString()}-chip buy-in (100 big
+            blinds), 5% rake capped at {DEFAULT_TABLE.rake.cap} chips. A timeout
+            checks when checking is free and folds when facing a bet.
             Calibration opponents get a hand-strength-weighted chance to defend
             raises and create later streets; calls are never forced. Experiments
             still use the normal configured player pool. One selective aggressor
@@ -379,7 +383,8 @@ export default function CalibratePage() {
             {ms.decisions.length} decisions recorded
           </span>
           <span className="text-xs text-muted ml-3 mono">
-            {ms.session.config.smallBlind}/{ms.session.config.bigBlind} chips
+            {ms.session.config.maxSeats}-player · {ms.session.config.smallBlind}
+            /{ms.session.config.bigBlind} chips
           </span>
         </div>
         <div className="flex items-center gap-3">

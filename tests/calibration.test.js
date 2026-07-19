@@ -65,6 +65,57 @@ describe("information-rich calibration", () => {
     );
   });
 
+  it("fills a nine-player table without repeating the selective aggressor", () => {
+    const lineup = buildCalibrationLineup(9);
+    expect(lineup).toHaveLength(8);
+    expect(
+      lineup.filter((profile) => profile.id === "selective-aggressor"),
+    ).toHaveLength(1);
+    expect(new Set(lineup.map((profile) => profile.id)).size).toBe(8);
+  });
+
+  it.each([
+    { smallBlind: 1, bigBlind: 3, maxSeats: 6 },
+    { smallBlind: 1, bigBlind: 3, maxSeats: 9 },
+    { smallBlind: 2, bigBlind: 5, maxSeats: 6 },
+    { smallBlind: 2, bigBlind: 5, maxSeats: 9 },
+  ])(
+    "posts $smallBlind/$bigBlind blinds at a $maxSeats-player calibration table",
+    ({ smallBlind, bigBlind, maxSeats }) => {
+      const config = {
+        ...DEFAULT_TABLE,
+        smallBlind,
+        bigBlind,
+        maxSeats,
+        rake: { percentage: 0, cap: 0, noFlopNoDrop: true },
+      };
+      const session = new ManualSession({
+        config,
+        pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+        seed: `calibration-${smallBlind}-${bigBlind}-${maxSeats}`,
+        targetHands: 1,
+        userBuyInBB: 100,
+        startingHands: ["AA"],
+        fixedLineup: buildCalibrationLineup(maxSeats),
+      });
+
+      const step = session.step(false);
+      expect(["awaiting-user", "hand-complete"]).toContain(step.kind);
+      expect(step.engine.players).toHaveLength(maxSeats);
+      expect(
+        step.engine.actions.find((action) => action.type === "post-sb"),
+      ).toMatchObject({ amount: smallBlind });
+      expect(
+        step.engine.actions.find((action) => action.type === "post-bb"),
+      ).toMatchObject({ amount: bigBlind });
+      expect(session.session.config).toMatchObject({
+        smallBlind,
+        bigBlind,
+        maxSeats,
+      });
+    },
+  );
+
   it("selectively raises playable hands without raising every time", () => {
     const profile = getPreset("selective-aggressor");
     const context = {

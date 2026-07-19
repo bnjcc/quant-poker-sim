@@ -29,10 +29,10 @@ import { usePokerSounds } from "@/lib/audio/poker-sounds";
 import { PokerTable } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
 import { ChipAmountInput } from "@/components/ChipAmountInput";
-import { StakePresetButtons } from "@/components/StakePresetButtons";
+import { CalibrationGameSelector } from "@/components/CalibrationGameSelector";
 import { StartingHandGrid } from "@/components/StartingHandGrid";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
-import { PREFLOP_POSITION_ORDER } from "@/types/poker";
+import { POSITIONS_BY_COUNT, PREFLOP_POSITION_ORDER } from "@/types/poker";
 
 function emptyPositionRanges() {
   return Object.fromEntries(
@@ -69,8 +69,24 @@ export default function RangeCalibratePage() {
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
   const [, force] = useState(0);
   const rerender = () => force((value) => value + 1);
+  const tablePositions = useMemo(
+    () =>
+      PREFLOP_POSITION_ORDER.filter((position) =>
+        POSITIONS_BY_COUNT[tableConfig.maxSeats].includes(position),
+      ),
+    [tableConfig.maxSeats],
+  );
   const activeRange =
     rangeMode === "position" ? positionRanges[activePosition] : selected;
+  const updateTableConfig = (nextTable) => {
+    setTableConfig(nextTable);
+    const nextPositions = PREFLOP_POSITION_ORDER.filter((position) =>
+      POSITIONS_BY_COUNT[nextTable.maxSeats].includes(position),
+    );
+    if (!nextPositions.includes(activePosition)) {
+      setActivePosition(nextPositions[0]);
+    }
+  };
   const updateActiveRange = (updater) => {
     if (rangeMode === "shared") {
       setSelected(updater);
@@ -204,7 +220,7 @@ export default function RangeCalibratePage() {
   advanceRef.current = advance;
   const start = useCallback(() => {
     const serializedPositionRanges = Object.fromEntries(
-      PREFLOP_POSITION_ORDER.map((position) => [
+      tablePositions.map((position) => [
         position,
         [...positionRanges[position]],
       ]),
@@ -229,7 +245,7 @@ export default function RangeCalibratePage() {
       seed: `range-cal-${Date.now()}`,
       targetHands: hands,
       userBuyInBB: 100,
-      fixedLineup: buildCalibrationLineup(),
+      fixedLineup: buildCalibrationLineup(tableConfig.maxSeats),
       ...(rangeMode === "position"
         ? { startingHandsByPosition: serializedPositionRanges }
         : { startingHands: [...selected] }),
@@ -245,6 +261,7 @@ export default function RangeCalibratePage() {
     target,
     sounds,
     tableConfig,
+    tablePositions,
   ]);
   const act = (type) => {
     const session = sessionRef.current;
@@ -326,7 +343,7 @@ export default function RangeCalibratePage() {
       const preflopRangesByPosition =
         rangeMode === "position"
           ? Object.fromEntries(
-              PREFLOP_POSITION_ORDER.map((position) => [
+              tablePositions.map((position) => [
                 position,
                 [...positionRanges[position]].sort(),
               ]),
@@ -420,7 +437,7 @@ export default function RangeCalibratePage() {
   if (phase === "range") {
     const combos = rangeComboCount(activeRange);
     const percentage = (combos / 1326) * 100;
-    const missingPositions = PREFLOP_POSITION_ORDER.filter(
+    const missingPositions = tablePositions.filter(
       (position) => positionRanges[position].size === 0,
     );
     const rangeReady =
@@ -438,6 +455,13 @@ export default function RangeCalibratePage() {
           }
           sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. Measurement opponents keep more pots alive and vary pressure and timing so each hand teaches the model more."
         />
+
+        <div className="panel px-5 py-5 mb-4 max-w-2xl">
+          <CalibrationGameSelector
+            table={tableConfig}
+            onChange={updateTableConfig}
+          />
+        </div>
 
         <div className="panel px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
@@ -495,11 +519,11 @@ export default function RangeCalibratePage() {
 
           {rangeMode === "position" && (
             <div
-              className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-4"
+              className={`grid grid-cols-3 gap-2 mb-4 ${tableConfig.maxSeats === 9 ? "sm:grid-cols-5 lg:grid-cols-9" : "sm:grid-cols-6"}`}
               role="tablist"
               aria-label="Choose a table position"
             >
-              {PREFLOP_POSITION_ORDER.map((position) => {
+              {tablePositions.map((position) => {
                 const range = positionRanges[position];
                 const positionCombos = rangeComboCount(range);
                 return (
@@ -624,8 +648,7 @@ export default function RangeCalibratePage() {
         </div>
 
         <div className="panel px-5 py-4 mt-4 max-w-2xl">
-          <StakePresetButtons table={tableConfig} onChange={setTableConfig} />
-          <div className="label mt-5 mb-3">
+          <div className="label mb-3">
             How many selected hands will you play?
           </div>
           <div className="flex flex-wrap gap-2">
@@ -672,9 +695,9 @@ export default function RangeCalibratePage() {
 
         <div className="mt-4 max-w-2xl">
           <WarningNote>
-            Table: 6-max, blinds {tableConfig.smallBlind}/{tableConfig.bigBlind}{" "}
-            chips with a {(100 * tableConfig.bigBlind).toLocaleString()}-chip
-            buy-in.{" "}
+            Table: {tableConfig.maxSeats}-player, blinds{" "}
+            {tableConfig.smallBlind}/{tableConfig.bigBlind} chips with a{" "}
+            {(100 * tableConfig.bigBlind).toLocaleString()}-chip buy-in.{" "}
             {rangeMode === "position"
               ? "Each chart controls first-in preflop play from its named seat. "
               : "The selected range controls first-in preflop play at every position. "}
@@ -735,6 +758,7 @@ export default function RangeCalibratePage() {
             {session.decisions.length} decisions recorded
           </span>
           <span className="text-xs text-muted ml-3 mono">
+            {session.session.config.maxSeats}-player ·{" "}
             {session.session.config.smallBlind}/
             {session.session.config.bigBlind} chips
           </span>

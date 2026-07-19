@@ -5,7 +5,7 @@
 export const SUITS = ["s", "h", "d", "c"];
 export const RANKS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 export const STREETS = ["preflop", "flop", "turn", "river"];
-/** Seat-count-aware position labels for 2..6 handed. */
+/** Seat-count-aware position labels for 2..9 handed. */
 export const POSITIONS_BY_COUNT = {
   2: ["BTN", "BB"],
   3: ["BTN", "SB", "BB"],

@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `441768f Add selective preflop aggressor`
-- Current uncommitted working tree: 1/3 default stakes, 2/5 stake presets, PokerStars-style small-blind sizing increments, and a chip-denominated three-big-blind preflop shortcut in both calibration flows.
+- Latest committed production implementation: `daff32f Add stake presets and PokerStars-style sizing`
+- Current uncommitted working tree: an upfront calibration-game selector with 1/3 or 2/5 stakes and 6-player or 9-player table sizes, seat-count-aware positional range editing, exact blind-post regression coverage, and fixed full calibration lineups without experiment sit-outs or turnover.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `441768f`, which adds the selective preflop aggressor on top of the opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `daff32f`, which adds 1/3 and 2/5 stake presets plus PokerStars-style calibration sizing on top of the selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -191,7 +191,7 @@ The current working tree closes the calibration and post-run review gaps identif
 - Manual calibration now uses a calibration-only information controller in `lib/simulation/calibration.js`; high-speed and detailed experiments continue to use the ordinary configured heuristic opponents without this wrapper.
 - A bot's normal hand-based preflop action remains authoritative. When that normal policy would fold to a normal-sized user raise, the bot receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness. Weak hands usually still fold, stronger hands defend more frequently, large raises and all-ins receive the normal policy, and no preflop call is forced.
 - `selective-aggressor` is the fourteenth heuristic archetype. It plays a moderately loose range, raises playable hands at a mixed hand-gated frequency, and occasionally 3-bets near the top of its normal defending range; it does not raise every hand like the maniac profile.
-- Every new manual calibration table receives one selective aggressor plus TAG, calling-station, recreational, and loose-passive opponents. This guarantees some preflop pressure capability without forcing an aggressive action on any deal; the selective aggressor still checks, calls, or folds when its cards and seeded frequency dictate.
+- Every new 6-player manual calibration table receives one selective aggressor plus TAG, calling-station, recreational, and loose-passive opponents. A 9-player table adds LAG, nit, and balanced-reg opponents without duplicating the selective aggressor. This guarantees some preflop pressure capability without forcing an aggressive action on any deal; the selective aggressor still checks, calls, or folds when its cards and seeded frequency dictate.
 - The selectable experiment-opponent list includes the new archetype at weight zero by default. Existing experiment defaults do not add it automatically, and the zero-pressure guard avoids consuming extra RNG draws for all pre-existing profiles, so `SIMULATION_VERSION` remains `1.7.0`.
 - The first bot that actually continues can become the hand's postflop measurement opponent. Postflop calibration rotates between passive showdown-oriented lines and pressure lines so the sample observes both checked-to decisions and decisions facing bets while retaining ordinary handling for large commitments.
 - Calibration opponent timing rotates evenly through snap, normal, and tank cues so short samples can observe timing-conditioned user reactions instead of receiving almost exclusively normal cues.
@@ -204,7 +204,10 @@ The current working tree closes the calibration and post-run review gaps identif
 ### Stakes and PokerStars-style calibration sizing
 
 - New calibration sessions and experiments default to 1/3 chips. Reusable stake buttons offer 1/3 and 2/5 in unrestricted calibration, range-first calibration, and experiment setup; experiment blind fields remain editable for custom stakes.
+- Range-first calibration presents the game selector before the range grid. Users choose both stakes and either a 6-player (6-max) or 9-player (full-ring) table before selecting hands; unrestricted all-hands calibration exposes the same game choices before dealing.
+- Position-specific editing follows the selected table: 6-max requires and displays UTG, HJ, CO, BTN, SB, and BB, while full ring requires and displays all nine positions. Switching table sizes keeps existing charts but moves the active tab to a valid position when necessary.
 - Both calibration flows persist the selected table configuration with the saved strategy, use a 300-chip buy-in at 1/3 or a 500-chip buy-in at 2/5, and continue to display stacks, calls, bets, raises, pots, and shortcut amounts in chips.
+- Calibration tables stay at exactly the selected seat count. Their fixed lineup does not use normal experiment turnover or random sit-outs; a felted calibration bot rebuys into the same seat and profile. Six-max retains the original five-opponent lineup, while full ring adds LAG, nit, and balanced-reg opponents and still contains exactly one selective aggressor. Batch experiments retain ordinary turnover and sit-out behavior.
 - The calibration slider, numeric-input arrow behavior, and explicit **−**/**+** buttons move in small-blind increments: one chip at 1/3 and two chips at 2/5. Direct numeric entry can still select any exact legal whole-chip amount.
 - A preflop shortcut prepares a total bet or raise of three big blinds: 9 chips at 1/3 and 15 chips at 2/5. It is disabled when that amount is outside the current legal minimum/maximum; the poker engine remains the final legality authority.
 - The glossary's blind examples now use 1/3. `SIMULATION_VERSION` remains `1.7.0` because the new default affects newly configured games, while versioned seeded decision logic is unchanged.
@@ -424,6 +427,12 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
+- Current working-tree validation after the upfront stake/table-size selector and fixed calibration lineup work: 14 test files and 97 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
+- `tests/calibration.test.js`
+  - Actual engine actions post exactly 1/3 or 2/5 blinds on both 6-player and 9-player calibration tables.
+  - Full-ring calibration receives eight distinct bot profiles with exactly one selective aggressor.
+- `tests/config.test.js`
+  - Calibration table-size choices are restricted to 6 and 9 players.
 - Current working-tree validation after the 1/3 and 2/5 stake presets and PokerStars-style calibration sizing work: 14 test files and 92 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
 - `tests/config.test.js`
   - 1/3 is the default, 2/5 is offered as a preset, and the three-big-blind chip shortcut resolves to 9 or 15 chips.
@@ -497,8 +506,9 @@ The production backend and deployment are connected:
 - Calibration viewport-stability commit `ae4c1ab` is pushed directly on top of the default production branch. Production therefore includes the phone-first navigation/layout pass, unobstructed mobile poker-table geometry, reserved action-panel height, disabled calibration scroll anchoring, and exact viewport restoration between hands.
 - Opponent-type analytics commit `ae95054` is pushed to the default production branch, triggering its Vercel production deployment. Exact live-site verification of that deployment remains pending.
 - Information-rich calibration and one-chip sizing commit `cb88e15` is pushed to the default production branch.
-- Selective preflop aggressor commit `441768f` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the fourteenth bot archetype and guarantees that each new calibration lineup includes one hand-gated selective aggressor without forcing any aggressive action. The push triggers Vercel production deployment; exact live-site verification of this deployment remains pending.
-- The 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut are local and uncommitted. They have not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- Selective preflop aggressor commit `441768f` adds the fourteenth bot archetype and guarantees that each new calibration lineup includes one hand-gated selective aggressor without forcing any aggressive action.
+- Stake and sizing commit `daff32f` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut. Exact live-site verification of that deployment remains pending.
+- The upfront 6-player/9-player calibration selector, seat-count-aware position editing, exact blind-post tests, and fixed full calibration lineups are local and uncommitted. They have not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -525,6 +535,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, and calibration height/scroll anchoring
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
+- `components/CalibrationGameSelector.jsx` — upfront 1/3-or-2/5 and 6-player-or-9-player calibration game selection plus the selected-game summary
 - `components/ChipAmountInput.jsx` — legal whole-chip entry plus configurable-increment decrement/increment controls used by calibration and strategy review
 - `components/StakePresetButtons.jsx` — shared 1/3- and 2/5-chip stake presets for calibration and experiment setup
 - `components/PokerTable.jsx` — shared desktop layout, dedicated 2–9 seat phone maps, unobstructed board/pot zone, action display, and calibration-specific user card sizing
@@ -536,9 +547,9 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands
 - `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
 - `lib/simulation/calibration.js` — combo-weighted hand sampler plus calibration-only hand-strength-weighted defense, postflop measurement scenarios, and balanced timing cues
-- `lib/simulation/defaults.js` — shared 1/3 default table, 1/3 and 2/5 stake presets, pool/calibration defaults, and three-big-blind chip sizing helper
+- `lib/simulation/defaults.js` — shared 1/3 default table, 1/3 and 2/5 stake presets, 6-player and 9-player calibration sizes, distinct seat-count-aware calibration lineups, pool defaults, and three-big-blind chip sizing helper
 - `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
-- `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, user decision logs, and stable bot-archetype metadata on hand histories
+- `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, user decision logs, stable bot-archetype metadata, normal experiment turnover, and fixed full calibration-lineup handling
 - `lib/analytics/aggregate.js` — incremental overall analytics plus proportional opponent-type matchup attribution and uncertainty ranges
 - `lib/player-model/policy.js` — v3 position- and timing-aware behavioral policy with v1/v2 compatibility
 - `lib/player-model/review.js` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
@@ -591,6 +602,7 @@ Do not regress these design constraints:
 - Keep the opponent preview clock hidden; the visible action clock is for the user's decisions only. Preserve the 500ms preview and stored full opponent timing.
 - Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
 - Keep new games at the 1/3 default with the 2/5 preset available. Calibration amounts remain chip-denominated; small-blind incremental controls and the legal three-big-blind preflop shortcut must remain synchronized with the main bet amount.
+- Keep the calibration game selector before range editing, restrict calibration table sizes to 6 or 9 players, show only positions active at the selected size, and keep every calibration hand full at that chosen seat count. Do not disable normal turnover or sit-outs for experiments.
 - Preserve both drag-paint selection/erasing and accessible single-cell click/keyboard operation in the starting-hand grid.
 - Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
 - Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.
