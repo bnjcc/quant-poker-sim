@@ -20,6 +20,7 @@ import {
   DEFAULT_POOL_SETTINGS,
   DEFAULT_TABLE,
   RELIABLE_SAMPLE_THRESHOLD,
+  threeBigBlindChipAmount,
 } from "@/lib/simulation/defaults";
 import { BehavioralPolicy } from "@/lib/player-model/policy";
 import { computeTendencies } from "@/lib/player-model/stats";
@@ -28,6 +29,7 @@ import { usePokerSounds } from "@/lib/audio/poker-sounds";
 import { PokerTable } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
 import { ChipAmountInput } from "@/components/ChipAmountInput";
+import { StakePresetButtons } from "@/components/StakePresetButtons";
 import { StartingHandGrid } from "@/components/StartingHandGrid";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 import { PREFLOP_POSITION_ORDER } from "@/types/poker";
@@ -48,6 +50,7 @@ export default function RangeCalibratePage() {
   const decisionStartedAtRef = useRef(0);
   const sounds = usePokerSounds();
   const [phase, setPhase] = useState("range");
+  const [tableConfig, setTableConfig] = useState(DEFAULT_TABLE);
   const [selected, setSelected] = useState(() => new Set());
   const [rangeMode, setRangeMode] = useState("shared");
   const [activePosition, setActivePosition] = useState("UTG");
@@ -221,7 +224,7 @@ export default function RangeCalibratePage() {
       ? Math.max(5, Math.min(2000, Number(customTarget) || 50))
       : target;
     const session = new ManualSession({
-      config: DEFAULT_TABLE,
+      config: tableConfig,
       pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
       seed: `range-cal-${Date.now()}`,
       targetHands: hands,
@@ -234,7 +237,15 @@ export default function RangeCalibratePage() {
     sessionRef.current = session;
     setPhase("playing");
     advanceRef.current(session);
-  }, [customTarget, positionRanges, rangeMode, selected, target, sounds]);
+  }, [
+    customTarget,
+    positionRanges,
+    rangeMode,
+    selected,
+    target,
+    sounds,
+    tableConfig,
+  ]);
   const act = (type) => {
     const session = sessionRef.current;
     if (!session || !ctx || activeDecisionRef.current !== ctx) return;
@@ -345,6 +356,7 @@ export default function RangeCalibratePage() {
         createdAt: new Date().toISOString(),
         method: "range-first",
         calibrationDesign: "information-rich-v1",
+        table: session.session.config,
         preflopRange: range,
         ...(preflopRangesByPosition ? { preflopRangesByPosition } : {}),
         seed: "range-manual",
@@ -612,7 +624,8 @@ export default function RangeCalibratePage() {
         </div>
 
         <div className="panel px-5 py-4 mt-4 max-w-2xl">
-          <div className="label mb-3">
+          <StakePresetButtons table={tableConfig} onChange={setTableConfig} />
+          <div className="label mt-5 mb-3">
             How many selected hands will you play?
           </div>
           <div className="flex flex-wrap gap-2">
@@ -659,6 +672,9 @@ export default function RangeCalibratePage() {
 
         <div className="mt-4 max-w-2xl">
           <WarningNote>
+            Table: 6-max, blinds {tableConfig.smallBlind}/{tableConfig.bigBlind}{" "}
+            chips with a {(100 * tableConfig.bigBlind).toLocaleString()}-chip
+            buy-in.{" "}
             {rangeMode === "position"
               ? "Each chart controls first-in preflop play from its named seat. "
               : "The selected range controls first-in preflop play at every position. "}
@@ -667,9 +683,9 @@ export default function RangeCalibratePage() {
             Calibration opponents get a hand-strength-weighted chance to defend
             raises and create later streets; calls are never forced. Experiments
             use the normal configured player pool. Timeouts check when free and
-            fold otherwise.
-            One selective aggressor at the calibration table sometimes raises
-            or 3-bets playable hands to create realistic pressure decisions.
+            fold otherwise. One selective aggressor at the calibration table
+            sometimes raises or 3-bets playable hands to create realistic
+            pressure decisions.
           </WarningNote>
         </div>
       </div>
@@ -686,6 +702,18 @@ export default function RangeCalibratePage() {
   }
   const legal = ctx?.legal;
   const progress = session.handsPlayed / session.targetHands;
+  const minimumBetTo = legal
+    ? legal.types.includes("bet")
+      ? legal.minBet
+      : legal.minRaiseTo
+    : 0;
+  const threeBigBlindChips = threeBigBlindChipAmount(
+    session.session.config.bigBlind,
+  );
+  const threeBigBlindIsLegal =
+    engine.street === "preflop" &&
+    threeBigBlindChips >= minimumBetTo &&
+    threeBigBlindChips <= (legal?.maxBetTo ?? 0);
   const userPlayer = engine.players.find(
     (player) => player.seat === session.userSeat,
   );
@@ -705,6 +733,10 @@ export default function RangeCalibratePage() {
           </span>
           <span className="text-xs text-muted ml-3">
             {session.decisions.length} decisions recorded
+          </span>
+          <span className="text-xs text-muted ml-3 mono">
+            {session.session.config.smallBlind}/
+            {session.session.config.bigBlind} chips
           </span>
         </div>
         <div className="flex items-center gap-4">
@@ -817,12 +849,9 @@ export default function RangeCalibratePage() {
                   </button>
                   <input
                     type="range"
-                    min={
-                      legal.types.includes("bet")
-                        ? legal.minBet
-                        : legal.minRaiseTo
-                    }
+                    min={minimumBetTo}
                     max={legal.maxBetTo}
+                    step={session.session.config.smallBlind}
                     value={betTo}
                     onChange={(event) => setBetTo(Number(event.target.value))}
                     className="w-48"
@@ -830,15 +859,24 @@ export default function RangeCalibratePage() {
                   />
                   <ChipAmountInput
                     value={betTo}
-                    min={
-                      legal.types.includes("bet")
-                        ? legal.minBet
-                        : legal.minRaiseTo
-                    }
+                    min={minimumBetTo}
                     max={legal.maxBetTo}
+                    step={session.session.config.smallBlind}
                     onChange={setBetTo}
                   />
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
+                    {engine.street === "preflop" && (
+                      <button
+                        className="btn text-xs px-2 py-1"
+                        type="button"
+                        disabled={!threeBigBlindIsLegal}
+                        onClick={() => setBetTo(threeBigBlindChips)}
+                        title="Set the total bet or raise to three times the big blind"
+                      >
+                        {threeBigBlindChips.toLocaleString()} chips (3× big
+                        blind)
+                      </button>
+                    )}
                     {[0.5, 0.66, 1].map((fraction) => (
                       <button
                         type="button"
@@ -849,9 +887,7 @@ export default function RangeCalibratePage() {
                             Math.min(
                               legal.maxBetTo,
                               Math.max(
-                                legal.types.includes("bet")
-                                  ? legal.minBet
-                                  : legal.minRaiseTo,
+                                minimumBetTo,
                                 Math.round(ctx.potSize * fraction) +
                                   (legal.types.includes("raise")
                                     ? legal.callAmount

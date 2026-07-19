@@ -10,6 +10,7 @@ export function ChipAmountInput({
   value,
   min,
   max,
+  step = 1,
   onChange,
   ariaLabel = "Bet size in chips",
 }) {
@@ -23,8 +24,9 @@ export function ChipAmountInput({
     setDraft(String(next));
     onChange(next);
   };
-  const stepBy = (delta) => {
-    const next = stepChipAmount(value, delta, min, max);
+  const chipStep = Math.max(1, Math.round(step));
+  const stepBy = (direction) => {
+    const next = stepChipAmount(value, direction * chipStep, min, max);
     setDraft(String(next));
     onChange(next);
   };
@@ -35,8 +37,8 @@ export function ChipAmountInput({
         className="btn px-3 py-1.5 mono text-base"
         onClick={() => stepBy(-1)}
         disabled={value <= min}
-        aria-label="Decrease bet by 1 chip"
-        title="Decrease by 1 chip"
+        aria-label={`Decrease bet by ${chipStep} ${chipStep === 1 ? "chip" : "chips"}`}
+        title={`Decrease by ${chipStep} ${chipStep === 1 ? "chip" : "chips"}`}
       >
         −
       </button>
@@ -45,7 +47,7 @@ export function ChipAmountInput({
         className="field w-24 py-1.5 mono"
         min={min}
         max={max}
-        step={1}
+        step={chipStep}
         inputMode="numeric"
         value={draft}
         onChange={(event) => {
@@ -72,8 +74,8 @@ export function ChipAmountInput({
         className="btn px-3 py-1.5 mono text-base"
         onClick={() => stepBy(1)}
         disabled={value >= max}
-        aria-label="Increase bet by 1 chip"
-        title="Increase by 1 chip"
+        aria-label={`Increase bet by ${chipStep} ${chipStep === 1 ? "chip" : "chips"}`}
+        title={`Increase by ${chipStep} ${chipStep === 1 ? "chip" : "chips"}`}
       >
         +
       </button>

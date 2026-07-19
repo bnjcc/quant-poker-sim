@@ -9,6 +9,7 @@ import {
   DEFAULT_TABLE,
 } from "@/lib/simulation/defaults";
 import { getStore, newId } from "@/lib/storage/store";
+import { StakePresetButtons } from "@/components/StakePresetButtons";
 import {
   multiplayerSetupError,
   participantPlayerId,
@@ -56,7 +57,9 @@ function NewExperimentInner() {
       const store = getStore();
       const [c, graph] = await Promise.all([
         store.listCalibrations(),
-        store.mode === "supabase" ? store.getSocialGraph() : Promise.resolve(null),
+        store.mode === "supabase"
+          ? store.getSocialGraph()
+          : Promise.resolve(null),
       ]);
       setCals(c);
       setSocialGraph(graph);
@@ -250,7 +253,9 @@ function NewExperimentInner() {
           </label>
           <label className="block">
             <span className="label">
-              {playMode === PLAY_MODES.SOLO ? "Saved strategy" : "Your saved strategy"}
+              {playMode === PLAY_MODES.SOLO
+                ? "Saved strategy"
+                : "Your saved strategy"}
             </span>
             <select
               className="field mt-1"
@@ -274,7 +279,10 @@ function NewExperimentInner() {
             <div className="rounded-md border border-line bg-panel2 px-3 py-3">
               <div className="flex items-baseline justify-between gap-3">
                 <span className="label">Add real users</span>
-                <Link href="/friends" className="text-xs text-accent hover:underline">
+                <Link
+                  href="/friends"
+                  className="text-xs text-accent hover:underline"
+                >
                   Manage friends
                 </Link>
               </div>
@@ -283,14 +291,18 @@ function NewExperimentInner() {
                 who published a multiplayer strategy can be selected.
               </p>
               {socialGraph.eligiblePlayers.length === 0 ? (
-                <div className="text-xs text-muted">No players are available yet.</div>
+                <div className="text-xs text-muted">
+                  No players are available yet.
+                </div>
               ) : (
                 <div className="space-y-1.5 max-h-44 overflow-y-auto">
                   {socialGraph.eligiblePlayers.map((player) => (
                     <label
                       key={player.userId}
                       className={`flex items-center gap-2 rounded px-2 py-1.5 ${
-                        player.strategy ? "cursor-pointer hover:bg-panel" : "opacity-50"
+                        player.strategy
+                          ? "cursor-pointer hover:bg-panel"
+                          : "opacity-50"
                       }`}
                     >
                       <input
@@ -305,9 +317,13 @@ function NewExperimentInner() {
                           )
                         }
                       />
-                      <span className="text-sm font-semibold">@{player.username}</span>
+                      <span className="text-sm font-semibold">
+                        @{player.username}
+                      </span>
                       <span className="text-[11px] text-muted">
-                        {player.relationshipDegree === 1 ? "friend" : "friend of friend"}
+                        {player.relationshipDegree === 1
+                          ? "friend"
+                          : "friend of friend"}
                       </span>
                       <span className="text-[11px] text-muted ml-auto truncate max-w-36">
                         {player.strategy?.name ?? "no shared strategy"}
@@ -317,13 +333,18 @@ function NewExperimentInner() {
                 </div>
               )}
               <div className="text-xs mt-2">
-                <span className="mono">{1 + selectedPlayerIds.length}</span> real users selected
+                <span className="mono">{1 + selectedPlayerIds.length}</span>{" "}
+                real users selected
                 {playMode === PLAY_MODES.PLAYERS_ONLY
                   ? " · minimum 3"
                   : " · minimum 2"}
               </div>
             </div>
           )}
+          <StakePresetButtons
+            table={cfg.table}
+            onChange={(table) => setCfg({ ...cfg, table })}
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Num
               label="Hands"
@@ -468,108 +489,118 @@ function NewExperimentInner() {
           ) : (
             <>
               <p className="text-xs text-muted mb-3">
-                Relative weights when seating and replacing bot opponents.
-                Bots join, leave, rebuy, and get replaced during the run.
+                Relative weights when seating and replacing bot opponents. Bots
+                join, leave, rebuy, and get replaced during the run.
               </p>
-          <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {AGENT_PRESETS.map((p) => (
-              <div
-                key={p.id}
-                className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)_1rem] items-center gap-2 sm:flex sm:gap-3"
-                title={p.description}
-              >
-                <span className="text-sm min-w-0 truncate sm:w-44">{p.name}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={5}
-                  step={1}
-                  value={cfg.pool.composition[p.id] ?? 0}
-                  onChange={(e) => setPoolWeight(p.id, Number(e.target.value))}
-                  className="flex-1"
-                  aria-label={`${p.name} weight`}
-                />
-                <span className="mono text-xs w-4 text-right">
-                  {cfg.pool.composition[p.id] ?? 0}
-                </span>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                {AGENT_PRESETS.map((p) => (
+                  <div
+                    key={p.id}
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(7rem,1.2fr)_1rem] items-center gap-2 sm:flex sm:gap-3"
+                    title={p.description}
+                  >
+                    <span className="text-sm min-w-0 truncate sm:w-44">
+                      {p.name}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={5}
+                      step={1}
+                      value={cfg.pool.composition[p.id] ?? 0}
+                      onChange={(e) =>
+                        setPoolWeight(p.id, Number(e.target.value))
+                      }
+                      className="flex-1"
+                      aria-label={`${p.name} weight`}
+                    />
+                    <span className="mono text-xs w-4 text-right">
+                      {cfg.pool.composition[p.id] ?? 0}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-            <Num
-              label="Avg session (hands)"
-              value={cfg.pool.avgSessionHands}
-              min={10}
-              max={5000}
-              step={10}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, avgSessionHands: v } })
-              }
-              hint="Mean of the geometric session-length distribution"
-            />
-            <Num
-              label="Turnover rate"
-              value={cfg.pool.turnover}
-              min={0}
-              max={2}
-              step={0.1}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, turnover: v } })
-              }
-              hint="Higher = more churn"
-            />
-            <Num
-              label="Stop-loss (buy-ins)"
-              value={cfg.pool.stopLossBuyIns}
-              min={0}
-              max={10}
-              step={1}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, stopLossBuyIns: v } })
-              }
-              hint="Players tend to leave after losing this many buy-ins (0 = off)"
-            />
-            <Num
-              label="Rebuy probability"
-              value={cfg.pool.rebuyProb}
-              min={0}
-              max={1}
-              step={0.05}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, rebuyProb: v } })
-              }
-            />
-            <Num
-              label="Skill multiplier"
-              value={cfg.pool.skillShift}
-              min={0.3}
-              max={1.5}
-              step={0.05}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, skillShift: v } })
-              }
-            />
-            <Num
-              label="Table looseness"
-              value={cfg.pool.looseness}
-              min={0.5}
-              max={1.8}
-              step={0.05}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, looseness: v } })
-              }
-            />
-            <Num
-              label="Table aggression"
-              value={cfg.pool.aggressionShift}
-              min={0.5}
-              max={1.8}
-              step={0.05}
-              onChange={(v) =>
-                setCfg({ ...cfg, pool: { ...cfg.pool, aggressionShift: v } })
-              }
-            />
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                <Num
+                  label="Avg session (hands)"
+                  value={cfg.pool.avgSessionHands}
+                  min={10}
+                  max={5000}
+                  step={10}
+                  onChange={(v) =>
+                    setCfg({
+                      ...cfg,
+                      pool: { ...cfg.pool, avgSessionHands: v },
+                    })
+                  }
+                  hint="Mean of the geometric session-length distribution"
+                />
+                <Num
+                  label="Turnover rate"
+                  value={cfg.pool.turnover}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  onChange={(v) =>
+                    setCfg({ ...cfg, pool: { ...cfg.pool, turnover: v } })
+                  }
+                  hint="Higher = more churn"
+                />
+                <Num
+                  label="Stop-loss (buy-ins)"
+                  value={cfg.pool.stopLossBuyIns}
+                  min={0}
+                  max={10}
+                  step={1}
+                  onChange={(v) =>
+                    setCfg({ ...cfg, pool: { ...cfg.pool, stopLossBuyIns: v } })
+                  }
+                  hint="Players tend to leave after losing this many buy-ins (0 = off)"
+                />
+                <Num
+                  label="Rebuy probability"
+                  value={cfg.pool.rebuyProb}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) =>
+                    setCfg({ ...cfg, pool: { ...cfg.pool, rebuyProb: v } })
+                  }
+                />
+                <Num
+                  label="Skill multiplier"
+                  value={cfg.pool.skillShift}
+                  min={0.3}
+                  max={1.5}
+                  step={0.05}
+                  onChange={(v) =>
+                    setCfg({ ...cfg, pool: { ...cfg.pool, skillShift: v } })
+                  }
+                />
+                <Num
+                  label="Table looseness"
+                  value={cfg.pool.looseness}
+                  min={0.5}
+                  max={1.8}
+                  step={0.05}
+                  onChange={(v) =>
+                    setCfg({ ...cfg, pool: { ...cfg.pool, looseness: v } })
+                  }
+                />
+                <Num
+                  label="Table aggression"
+                  value={cfg.pool.aggressionShift}
+                  min={0.5}
+                  max={1.8}
+                  step={0.05}
+                  onChange={(v) =>
+                    setCfg({
+                      ...cfg,
+                      pool: { ...cfg.pool, aggressionShift: v },
+                    })
+                  }
+                />
+              </div>
             </>
           )}
         </section>

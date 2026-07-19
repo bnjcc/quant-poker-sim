@@ -8,4 +8,10 @@ describe("chip amount stepping", () => {
     expect(stepChipAmount(12, 1, 5, 12)).toBe(12);
     expect(stepChipAmount(5, -1, 5, 12)).toBe(5);
   });
+
+  it("supports PokerStars-style small-blind increments", () => {
+    expect(stepChipAmount(15, 2, 5, 25)).toBe(17);
+    expect(stepChipAmount(15, -2, 5, 25)).toBe(13);
+    expect(stepChipAmount(24, 2, 5, 25)).toBe(25);
+  });
 });

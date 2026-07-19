@@ -80,6 +80,8 @@ Every voluntary action also carries a seeded virtual decision time. Manual calib
 
 Manual calibration wraps those heuristic opponents in an information-directed controller that is not used by batch experiments. Every calibration table starts with one selective aggressor alongside four contrasting profiles. Normal preflop decisions remain authoritative. When a bot's normal policy would fold to a user raise, it receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness; no call is forced. Postflop hands rotate between passive showdown lines and pressure, while snap/normal/tank cues are balanced. Starting hands come from a shuffled combo-weighted bag, preserving natural 4/6/12 class frequencies while reducing redundant independent draws. Calibration results are therefore measurement data, not a realistic opponent-pool performance estimate.
 
+New games default to 1/3 chips, with 2/5 available as a preset in both calibration flows and experiment setup. Calibration bet controls retain chip-denominated stacks and amounts, expose a three-big-blind preflop shortcut (9 chips at 1/3 or 15 chips at 2/5), and use the selected small blind as the slider and step-button increment to match PokerStars' fine-grained incremental adjustment mode. Direct numeric entry remains available for an exact legal chip amount.
+
 ## Batch runner (`lib/simulation/runner.js`)
 
 `runSimulation` is environment-agnostic: an async chunked loop (default 200 hands/chunk) that yields to the event loop, reports progress, honors a cancel callback, and returns aggregates + stored hands. In the browser it keeps the UI responsive; on a server it can run as-is inside a job worker.

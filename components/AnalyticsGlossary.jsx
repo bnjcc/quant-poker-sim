@@ -60,7 +60,7 @@ export const GLOSSARY_GROUPS = [
         plain:
           "Entering an unraised pot by only calling the big blind instead of raising.",
         example:
-          "Blinds are 1/2 and you are first in for 2 chips: that is an open-limp.",
+          "Blinds are 1/3 and you are first in for 3 chips: that is an open-limp.",
         advanced:
           "A limp behind another limper is different; this statistic tracks first-in opportunities.",
       },
@@ -95,7 +95,7 @@ export const GLOSSARY_GROUPS = [
         plain:
           "The larger forced blind and the standard unit used to compare games at different stakes.",
         example:
-          "At 1/2 blinds, 1 bb equals 2 chips and a 100bb stack equals 200 chips.",
+          "At 1/3 blinds, 1 bb equals 3 chips and a 100bb stack equals 300 chips.",
         advanced:
           "Lowercase bb usually means the measurement unit; BB can also refer to the player in the big-blind seat.",
       },
@@ -121,7 +121,7 @@ export const GLOSSARY_GROUPS = [
         full: "Small Blind",
         plain:
           "The seat posting the smaller forced bet, immediately left of the button in games with 3+ players.",
-        example: "At 1/2 blinds, the SB posts 1 chip.",
+        example: "At 1/3 blinds, the SB posts 1 chip.",
         advanced:
           "The SB acts early after the flop, which makes it a difficult position despite its discount preflop.",
       },
@@ -130,7 +130,7 @@ export const GLOSSARY_GROUPS = [
         full: "Big Blind",
         plain: "The seat posting the full forced blind.",
         example:
-          "At 1/2 blinds, the BB posts 2 chips and can check if nobody raises.",
+          "At 1/3 blinds, the BB posts 3 chips and can check if nobody raises.",
         advanced:
           "The BB closes the action preflop in an unraised pot but acts early after the flop.",
       },

@@ -1,5 +1,7 @@
 # QuantPoker Project Context
 
+> **Required maintenance rule:** Update this file after every project change. A code, UI, test, configuration, schema, workflow, deployment, or documentation task is not complete until `PROJECT_CONTEXT.md` records the final behavior, affected source files, validation results, commit/deployment state when known, and any new constraints. Future maintainers and LLM conversations must apply this update automatically in the same working session without waiting to be asked.
+
 Last updated: 2026-07-19
 
 This file is the handoff for future maintainers and LLM conversations. Read it before changing the project, then consult `README.md`, `docs/ARCHITECTURE.md`, and the relevant source files for implementation detail.
@@ -10,8 +12,10 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `ae95054 Add opponent-type strategy analytics`
-- Current uncommitted working tree: information-rich calibration opponents, a new selective-aggressor archetype and fixed calibration lineup, combo-weighted calibration hand sampling, hand-strength-weighted preflop defense chances with no forced calls, and explicit one-chip bet-size decrement/increment controls.
+- Latest committed production implementation: `441768f Add selective preflop aggressor`
+- Current uncommitted working tree: 1/3 default stakes, 2/5 stake presets, PokerStars-style small-blind sizing increments, and a chip-denominated three-big-blind preflop shortcut in both calibration flows.
+- Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
+- Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
 - Previous mobile poker-table implementation: `6efeda4 Fix mobile poker table visibility`
 - Initial phone-layout implementation: `2f1d327 Optimize phone viewing`
@@ -22,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `ae95054`, which adds opponent-type strategy analytics on top of the calibration viewport-stability and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `441768f`, which adds the selective preflop aggressor on top of the opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -193,9 +197,17 @@ The current working tree closes the calibration and post-run review gaps identif
 - Calibration opponent timing rotates evenly through snap, normal, and tank cues so short samples can observe timing-conditioned user reactions instead of receiving almost exclusively normal cues.
 - Range-first and all-hands calibration starting cards come from shuffled combo-weighted bags. The sampler retains natural suited/pair/offsuit 4/6/12 combination proportions while reducing redundant independent repeats in short sessions. Positional range mode maintains an independent bag for each position.
 - New calibrations store `calibrationDesign: "information-rich-v1"`. The setup and results UI explains that calibration hands are optimized for learning coverage rather than realistic opponent-pool profitability.
-- `ChipAmountInput` now places explicit **−** and **+** buttons around the numeric chip field. Each press changes the bet or raise by exactly one chip, disables at the current legal minimum/maximum, and remains synchronized with the slider, manual number entry, pot-fraction shortcuts, and all-in shortcut.
-- The shared one-chip controls appear in unrestricted calibration, range-first calibration, and corrected bet/raise sizing inside Simulated Hand Review.
+- `ChipAmountInput` places explicit **−** and **+** buttons around the numeric chip field, supports a caller-selected chip increment, disables at the current legal minimum/maximum, and remains synchronized with the slider, manual number entry, sizing shortcuts, and all-in shortcut.
+- Unrestricted and range-first calibration use the selected small blind as the increment; corrected bet/raise sizing inside Simulated Hand Review retains exact one-chip controls.
 - `SIMULATION_VERSION` remains `1.7.0` because these changes affect manual calibration data collection and controls, not seeded batch-simulation decisions.
+
+### Stakes and PokerStars-style calibration sizing
+
+- New calibration sessions and experiments default to 1/3 chips. Reusable stake buttons offer 1/3 and 2/5 in unrestricted calibration, range-first calibration, and experiment setup; experiment blind fields remain editable for custom stakes.
+- Both calibration flows persist the selected table configuration with the saved strategy, use a 300-chip buy-in at 1/3 or a 500-chip buy-in at 2/5, and continue to display stacks, calls, bets, raises, pots, and shortcut amounts in chips.
+- The calibration slider, numeric-input arrow behavior, and explicit **−**/**+** buttons move in small-blind increments: one chip at 1/3 and two chips at 2/5. Direct numeric entry can still select any exact legal whole-chip amount.
+- A preflop shortcut prepares a total bet or raise of three big blinds: 9 chips at 1/3 and 15 chips at 2/5. It is disabled when that amount is outside the current legal minimum/maximum; the poker engine remains the final legality authority.
+- The glossary's blind examples now use 1/3. `SIMULATION_VERSION` remains `1.7.0` because the new default affects newly configured games, while versioned seeded decision logic is unchanged.
 
 ### Calibration entry and range-selection usability
 
@@ -412,6 +424,11 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
+- Current working-tree validation after the 1/3 and 2/5 stake presets and PokerStars-style calibration sizing work: 14 test files and 92 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
+- `tests/config.test.js`
+  - 1/3 is the default, 2/5 is offered as a preset, and the three-big-blind chip shortcut resolves to 9 or 15 chips.
+- `tests/chip-amount.test.js`
+  - Exact one-chip stepping plus two-chip small-blind stepping and legal-bound clamping.
 - Current working-tree validation after the selective-aggressor, information-rich calibration, and one-chip sizing work: 14 test files and 90 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
 - `tests/calibration.test.js`
   - Combo-weighted shuffled starting-hand bags retain exact class proportions and selected-range legality
@@ -479,6 +496,9 @@ The production backend and deployment are connected:
 - Mobile poker-table commit `6efeda4` is pushed to `origin/agent/strategy-review-calibration` and merged into the default production branch `origin/agent/supabase-backend` at `2410d26`.
 - Calibration viewport-stability commit `ae4c1ab` is pushed directly on top of the default production branch. Production therefore includes the phone-first navigation/layout pass, unobstructed mobile poker-table geometry, reserved action-panel height, disabled calibration scroll anchoring, and exact viewport restoration between hands.
 - Opponent-type analytics commit `ae95054` is pushed to the default production branch, triggering its Vercel production deployment. Exact live-site verification of that deployment remains pending.
+- Information-rich calibration and one-chip sizing commit `cb88e15` is pushed to the default production branch.
+- Selective preflop aggressor commit `441768f` is the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. It adds the fourteenth bot archetype and guarantees that each new calibration lineup includes one hand-gated selective aggressor without forcing any aggressive action. The push triggers Vercel production deployment; exact live-site verification of this deployment remains pending.
+- The 1/3 default, 2/5 presets, small-blind sizing increments, and three-big-blind calibration shortcut are local and uncommitted. They have not been pushed to `agent/supabase-backend` or deployed to Vercel.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -492,10 +512,10 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 ## Important source map
 
 - `app/page.jsx` — dashboard hero, default calibration entry, workflow, and recent experiment summary
-- `app/calibrate/page.jsx` — creates and saves unrestricted calibration datasets; preserves the phone viewport between hands
-- `app/range-calibrate/page.jsx` — explicit 169-hand range selection plus timed betting calibration; preserves the phone viewport between hands
+- `app/calibrate/page.jsx` — creates and saves unrestricted calibration datasets with 1/3 or 2/5 stakes, chip-denominated three-big-blind sizing, and phone viewport preservation between hands
+- `app/range-calibrate/page.jsx` — explicit 169-hand range selection plus timed 1/3 or 2/5 betting calibration; preserves the phone viewport between hands
 - `app/glossary/page.jsx` — full beginner-friendly poker and advanced analytics glossary
-- `app/experiments/new/page.jsx` — creates experiments
+- `app/experiments/new/page.jsx` — creates experiments with 1/3 and 2/5 stake presets plus editable custom blinds
 - `app/experiments/[id]/page.jsx` — runs simulations, atomically finalizes results/hands, and renders opponent-type matchup analytics
 - `app/experiments/page.jsx` — previous-experiment history and saved-run entry points
 - `app/accuracy/page.jsx` — in-browser review-feedback summary
@@ -505,7 +525,8 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, and calibration height/scroll anchoring
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
-- `components/ChipAmountInput.jsx` — legal whole-chip entry plus explicit one-chip decrement/increment controls used by calibration and strategy review
+- `components/ChipAmountInput.jsx` — legal whole-chip entry plus configurable-increment decrement/increment controls used by calibration and strategy review
+- `components/StakePresetButtons.jsx` — shared 1/3- and 2/5-chip stake presets for calibration and experiment setup
 - `components/PokerTable.jsx` — shared desktop layout, dedicated 2–9 seat phone maps, unobstructed board/pot zone, action display, and calibration-specific user card sizing
 - `components/StartingHandGrid.jsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
 - `lib/audio/poker-sounds.js` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
@@ -515,6 +536,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands
 - `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
 - `lib/simulation/calibration.js` — combo-weighted hand sampler plus calibration-only hand-strength-weighted defense, postflop measurement scenarios, and balanced timing cues
+- `lib/simulation/defaults.js` — shared 1/3 default table, 1/3 and 2/5 stake presets, pool/calibration defaults, and three-big-blind chip sizing helper
 - `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
 - `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, user decision logs, and stable bot-archetype metadata on hand histories
 - `lib/analytics/aggregate.js` — incremental overall analytics plus proportional opponent-type matchup attribution and uncertainty ranges
@@ -568,6 +590,7 @@ Do not regress these design constraints:
 - Keep high-speed simulations virtual-time only; never make batch execution sleep for recorded action delays.
 - Keep the opponent preview clock hidden; the visible action clock is for the user's decisions only. Preserve the 500ms preview and stored full opponent timing.
 - Keep range-first calibration as the default entry while retaining unrestricted calibration as **All hands**.
+- Keep new games at the 1/3 default with the 2/5 preset available. Calibration amounts remain chip-denominated; small-blind incremental controls and the legal three-big-blind preflop shortcut must remain synchronized with the main bet amount.
 - Preserve both drag-paint selection/erasing and accessible single-cell click/keyboard operation in the starting-hand grid.
 - Treat heuristic timing tells as weak/noisy and do not present them as reliable indicators of hand strength.
 - Preserve beginner explanations alongside advanced metrics rather than hiding or removing the statistical detail.

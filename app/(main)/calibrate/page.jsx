@@ -18,6 +18,7 @@ import {
   DEFAULT_POOL_SETTINGS,
   DEFAULT_TABLE,
   RELIABLE_SAMPLE_THRESHOLD,
+  threeBigBlindChipAmount,
 } from "@/lib/simulation/defaults";
 import { BehavioralPolicy } from "@/lib/player-model/policy";
 import { computeTendencies } from "@/lib/player-model/stats";
@@ -27,6 +28,7 @@ import { getStore, newId } from "@/lib/storage/store";
 import { PokerTable } from "@/components/PokerTable";
 import { ActionClock } from "@/components/ActionClock";
 import { ChipAmountInput } from "@/components/ChipAmountInput";
+import { StakePresetButtons } from "@/components/StakePresetButtons";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
 export default function CalibratePage() {
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function CalibratePage() {
   const decisionStartedAtRef = useRef(0);
   const sounds = usePokerSounds();
   const [phase, setPhase] = useState("setup");
+  const [tableConfig, setTableConfig] = useState(DEFAULT_TABLE);
   const [target, setTarget] = useState(50);
   const [customTarget, setCustomTarget] = useState("");
   const [ctx, setCtx] = useState(null);
@@ -59,7 +62,7 @@ export default function CalibratePage() {
       ? Math.max(5, Math.min(2000, Number(customTarget) || 50))
       : target;
     const ms = new ManualSession({
-      config: DEFAULT_TABLE,
+      config: tableConfig,
       pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
       seed: `cal-${Date.now()}`,
       targetHands: hands,
@@ -69,7 +72,7 @@ export default function CalibratePage() {
     sessionRef.current = ms;
     setPhase("playing");
     advanceRef.current(ms);
-  }, [target, customTarget, sounds]);
+  }, [target, customTarget, sounds, tableConfig]);
   const advance = (ms) => {
     const step = ms.step(true);
     if ("engine" in step) {
@@ -217,7 +220,7 @@ export default function CalibratePage() {
       );
       const policy = new BehavioralPolicy();
       policy.train(ms.decisions, new Rng("train"));
-      const agg = new Aggregator(DEFAULT_TABLE.bigBlind);
+      const agg = new Aggregator(ms.session.config.bigBlind);
       for (const h of ms.histories) agg.addHand(h, ms.userSeat, true);
       const dataset = {
         id: newId("cal"),
@@ -225,6 +228,7 @@ export default function CalibratePage() {
         createdAt: new Date().toISOString(),
         method: "full-session",
         calibrationDesign: "information-rich-v1",
+        table: ms.session.config,
         seed: "manual",
         handsPlayed: ms.handsPlayed,
         decisions: ms.decisions,
@@ -289,7 +293,8 @@ export default function CalibratePage() {
           sub="Play an online-paced table with a 15-second action clock. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
         />
         <div className="panel px-6 py-6 max-w-xl">
-          <div className="label mb-3">How many hands will you play?</div>
+          <StakePresetButtons table={tableConfig} onChange={setTableConfig} />
+          <div className="label mt-5 mb-3">How many hands will you play?</div>
           <div className="flex flex-wrap gap-2">
             {CALIBRATION_SIZES.map((n) => (
               <button
@@ -325,16 +330,15 @@ export default function CalibratePage() {
         </div>
         <div className="mt-4 max-w-xl">
           <WarningNote>
-            Table: 6-max, blinds {DEFAULT_TABLE.smallBlind}/
-            {DEFAULT_TABLE.bigBlind} chips,{" "}
-            {(100 * DEFAULT_TABLE.bigBlind).toLocaleString()}-chip buy-in (100
-            big blinds), 5% rake capped at {DEFAULT_TABLE.rake.cap} chips. A
-            timeout checks when checking is free and folds when facing a bet.
+            Table: 6-max, blinds {tableConfig.smallBlind}/{tableConfig.bigBlind}{" "}
+            chips, {(100 * tableConfig.bigBlind).toLocaleString()}-chip buy-in
+            (100 big blinds), 5% rake capped at {DEFAULT_TABLE.rake.cap} chips.
+            A timeout checks when checking is free and folds when facing a bet.
             Calibration opponents get a hand-strength-weighted chance to defend
             raises and create later streets; calls are never forced. Experiments
-            still use the normal configured player pool.
-            One selective aggressor at the calibration table sometimes raises
-            or 3-bets playable hands to create realistic pressure decisions.
+            still use the normal configured player pool. One selective aggressor
+            at the calibration table sometimes raises or 3-bets playable hands
+            to create realistic pressure decisions.
           </WarningNote>
         </div>
       </div>
@@ -351,6 +355,18 @@ export default function CalibratePage() {
   }
   const legal = ctx?.legal;
   const progress = ms.handsPlayed / ms.targetHands;
+  const minimumBetTo = legal
+    ? legal.types.includes("bet")
+      ? legal.minBet
+      : legal.minRaiseTo
+    : 0;
+  const threeBigBlindChips = threeBigBlindChipAmount(
+    ms.session.config.bigBlind,
+  );
+  const threeBigBlindIsLegal =
+    engine.street === "preflop" &&
+    threeBigBlindChips >= minimumBetTo &&
+    threeBigBlindChips <= (legal?.maxBetTo ?? 0);
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -361,6 +377,9 @@ export default function CalibratePage() {
           </span>
           <span className="text-xs text-muted ml-3">
             {ms.decisions.length} decisions recorded
+          </span>
+          <span className="text-xs text-muted ml-3 mono">
+            {ms.session.config.smallBlind}/{ms.session.config.bigBlind} chips
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -460,12 +479,9 @@ export default function CalibratePage() {
                   </button>
                   <input
                     type="range"
-                    min={
-                      legal.types.includes("bet")
-                        ? legal.minBet
-                        : legal.minRaiseTo
-                    }
+                    min={minimumBetTo}
                     max={legal.maxBetTo}
+                    step={ms.session.config.smallBlind}
                     value={betTo}
                     onChange={(e) => setBetTo(Number(e.target.value))}
                     className="w-48"
@@ -473,15 +489,24 @@ export default function CalibratePage() {
                   />
                   <ChipAmountInput
                     value={betTo}
-                    min={
-                      legal.types.includes("bet")
-                        ? legal.minBet
-                        : legal.minRaiseTo
-                    }
+                    min={minimumBetTo}
                     max={legal.maxBetTo}
+                    step={ms.session.config.smallBlind}
                     onChange={setBetTo}
                   />
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap gap-1">
+                    {engine.street === "preflop" && (
+                      <button
+                        className="btn text-xs px-2 py-1"
+                        type="button"
+                        disabled={!threeBigBlindIsLegal}
+                        onClick={() => setBetTo(threeBigBlindChips)}
+                        title="Set the total bet or raise to three times the big blind"
+                      >
+                        {threeBigBlindChips.toLocaleString()} chips (3× big
+                        blind)
+                      </button>
+                    )}
                     {[0.5, 0.66, 1].map((f) => (
                       <button
                         key={f}
@@ -491,9 +516,7 @@ export default function CalibratePage() {
                             Math.min(
                               legal.maxBetTo,
                               Math.max(
-                                legal.types.includes("bet")
-                                  ? legal.minBet
-                                  : legal.minRaiseTo,
+                                minimumBetTo,
                                 Math.round(ctx.potSize * f) +
                                   (legal.types.includes("raise")
                                     ? legal.callAmount
