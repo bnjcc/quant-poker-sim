@@ -72,6 +72,15 @@ The poker engine, evaluator, agents, player model, simulator, and analytics rema
 - `supabase/migrations/20260718000000_social_multiplayer.sql` adds profiles, canonical friend connections, opt-in strategy snapshots, two-hop access checks, social RPCs, triggers, grants, and RLS.
 - Simulation version `1.6.0` covers the multiplayer seat/aggregation behavior.
 
+## Position-specific ranges and strategy leaderboard
+
+- Range-first calibration now offers **Same at every position** and **Set by position** modes. Positional mode stores independent UTG, UTG+1, MP, LJ, HJ, CO, BTN, SB, and BB charts, shows combination coverage for each, and can copy one chart to every seat as a starting point.
+- Manual calibration deals a starting hand from the chart matching the user's actual position for that hand. Behavioral-policy serialization is version 3 and applies the matching position chart to first-in decisions while retaining the shared chart as a compatibility fallback.
+- Strategy review filtering and corrections retain the position-specific charts, and the strategy profile displays each chart separately.
+- The dashboard shows the top three strategies. Browser mode ranks local completed runs; cloud mode calls the authenticated `get_strategy_leaderboard` database function, which returns only rank, username, strategy name, hand-weighted win rate, experiment count, and total hands. Private experiments and hand histories remain protected by RLS.
+- `supabase/migrations/20260719000000_strategy_leaderboard.sql` adds the read-only leaderboard function. It was applied to hosted Supabase through the SQL editor on 2026-07-19.
+- `SIMULATION_VERSION` is `1.7.0` because position-specific range selection can change seeded decisions.
+
 ## Timing-aware calibration and simulation completed
 
 The full-session and range-first calibration flows now behave like paced online poker tables.
@@ -335,6 +344,12 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
+- Current working-tree validation after the position-range and leaderboard work: 12 test files and 80 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
+- `tests/leaderboard.test.js`
+  - Completed runs are grouped by strategy and ranked by hand-weighted win rate
+- `tests/range.test.js`
+  - Position-specific calibration deals and policy serialization use the matching seat chart
+
 - `tests/storage.test.js`
   - Non-finite JSON values round-trip correctly
   - Normalized database fields override stale JSON payload metadata
@@ -369,6 +384,7 @@ The production backend and deployment are connected:
 
 - The repository is linked to Supabase project `oxrqtwqkzkembnglhbtn`.
 - Migrations `20260717000000_initial_user_data.sql`, `20260717010000_strategy_reviews.sql`, and `20260718000000_social_multiplayer.sql` are recorded in remote migration history and applied. The multiplayer migration was pushed and verified against the linked project on 2026-07-18.
+- `20260719000000_strategy_leaderboard.sql` was applied to the hosted project through the SQL editor on 2026-07-19; the matching migration remains committed locally for reproducible setup.
 - The earlier detailed remote verification found the 3 initial application tables, 3 RLS-enabled tables, 12 policies, and `finalize_experiment_run`; the applied follow-up migration adds `strategy_reviews` and `save_experiment_strategy_review`.
 - Supabase Auth Site URL is `https://poker-sim-iota.vercel.app`.
 - Local, production, stable Vercel alias, and `*-optvis.vercel.app` preview confirmation URLs are allowed.
@@ -412,7 +428,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
 - `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
 - `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, and user decision logs
-- `lib/player-model/policy.js` — v2 timing-aware behavioral policy with v1 compatibility
+- `lib/player-model/policy.js` — v3 position- and timing-aware behavioral policy with v1/v2 compatibility
 - `lib/player-model/review.js` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
 - `lib/agents/agent.js` — heuristic decisions, virtual pacing, and deliberately weak timing reads
 - `lib/poker/engine.js` — optional timing metadata on voluntary actions
@@ -426,6 +442,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `types/poker.js` — shared poker constants
 - `supabase/migrations/20260717000000_initial_user_data.sql` — schema, RLS, triggers, finalizer
 - `supabase/migrations/20260717010000_strategy_reviews.sql` — normalized review feedback, RLS, and atomic experiment/review save function
+- `supabase/migrations/20260719000000_strategy_leaderboard.sql` — authenticated, aggregate top-strategy RPC
 - `supabase/tests/database/schema_and_rls.test.sql` — pgTAP database tests
 - `tests/timing.test.js` — timing classification, propagation, learning, compatibility, and batch-run coverage
 - `tests/review.test.js` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage

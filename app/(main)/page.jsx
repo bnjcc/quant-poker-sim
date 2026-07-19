@@ -43,12 +43,21 @@ function StepCard({ n, title, body, href, cta, done, secondary }) {
 export default function Dashboard() {
   const [cals, setCals] = useState(null);
   const [exps, setExps] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [leaderboardError, setLeaderboardError] = useState(false);
   useEffect(() => {
     const store = getStore();
     store.listCalibrations().then(setCals);
     store.listExperiments().then(setExps);
+    store
+      .getStrategyLeaderboard(3)
+      .then(setLeaderboard)
+      .catch(() => {
+        setLeaderboardError(true);
+        setLeaderboard([]);
+      });
   }, []);
-  if (cals === null || exps === null)
+  if (cals === null || exps === null || leaderboard === null)
     return <div className="text-muted text-sm">Loading…</div>;
   const completed = exps.filter((e) => e.results);
   const totalHands = completed.reduce(
@@ -126,6 +135,76 @@ export default function Dashboard() {
           }
         />
       </div>
+
+      <section className="panel px-5 py-5 mb-8">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+          <div>
+            <div className="section-kicker mb-1">
+              <span>Strategy leaderboard</span>
+              <span className="section-rule" />
+            </div>
+            <h2 className="text-lg font-semibold">Top three strategies</h2>
+            <p className="text-xs text-muted mt-1 max-w-2xl">
+              Ranked by hand-weighted win rate across completed experiments.
+              More simulated hands carry more weight than short runs.
+            </p>
+          </div>
+          <span className="text-[11px] text-muted mono">
+            {getStore().mode === "supabase"
+              ? "database rankings"
+              : "this browser"}
+          </span>
+        </div>
+        {leaderboardError ? (
+          <div className="rounded-lg border border-line bg-panel2 px-4 py-3 text-sm text-muted">
+            Rankings are temporarily unavailable.
+          </div>
+        ) : leaderboard.length === 0 ? (
+          <div className="rounded-lg border border-line bg-panel2 px-4 py-4 text-sm text-muted">
+            Complete an experiment to place a strategy on the leaderboard.
+          </div>
+        ) : (
+          <ol className="grid md:grid-cols-3 gap-3">
+            {leaderboard.map((strategy) => (
+              <li
+                key={strategy.username + ":" + strategy.strategyName}
+                className="rounded-xl border border-line bg-panel2 px-4 py-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="mono text-sm font-bold text-accent">
+                    #{strategy.rank}
+                  </span>
+                  <span
+                    className="mono text-lg font-bold"
+                    style={{
+                      color:
+                        strategy.winRate >= 0 ? "var(--gain)" : "var(--loss)",
+                    }}
+                  >
+                    {fmtWinRatePct(strategy.winRate)}
+                  </span>
+                </div>
+                <div className="font-semibold mt-3 truncate">
+                  {strategy.strategyName}
+                </div>
+                <div className="text-xs text-muted mt-1">
+                  {strategy.username === "You"
+                    ? "You"
+                    : "@" + strategy.username}
+                  {" · "}
+                  {strategy.experimentCount}{" "}
+                  {strategy.experimentCount === 1
+                    ? "experiment"
+                    : "experiments"}
+                </div>
+                <div className="text-[11px] text-muted mono mt-2">
+                  {strategy.totalHands.toLocaleString()} simulated hands
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
       {completed.length > 0 && (
         <>

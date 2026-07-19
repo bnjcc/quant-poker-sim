@@ -29,6 +29,14 @@ import { ActionClock } from "@/components/ActionClock";
 import { ChipAmountInput } from "@/components/ChipAmountInput";
 import { StartingHandGrid } from "@/components/StartingHandGrid";
 import { Empty, PageHeader, WarningNote, fmtChips } from "@/components/ui";
+import { PREFLOP_POSITION_ORDER } from "@/types/poker";
+
+function emptyPositionRanges() {
+  return Object.fromEntries(
+    PREFLOP_POSITION_ORDER.map((position) => [position, new Set()]),
+  );
+}
+
 export default function RangeCalibratePage() {
   const router = useRouter();
   const sessionRef = useRef(null);
@@ -40,6 +48,9 @@ export default function RangeCalibratePage() {
   const sounds = usePokerSounds();
   const [phase, setPhase] = useState("range");
   const [selected, setSelected] = useState(() => new Set());
+  const [rangeMode, setRangeMode] = useState("shared");
+  const [activePosition, setActivePosition] = useState("UTG");
+  const [positionRanges, setPositionRanges] = useState(emptyPositionRanges);
   const [target, setTarget] = useState(50);
   const [customTarget, setCustomTarget] = useState("");
   const [ctx, setCtx] = useState(null);
@@ -54,8 +65,20 @@ export default function RangeCalibratePage() {
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
   const [, force] = useState(0);
   const rerender = () => force((value) => value + 1);
+  const activeRange =
+    rangeMode === "position" ? positionRanges[activePosition] : selected;
+  const updateActiveRange = (updater) => {
+    if (rangeMode === "shared") {
+      setSelected(updater);
+      return;
+    }
+    setPositionRanges((current) => ({
+      ...current,
+      [activePosition]: updater(current[activePosition] ?? new Set()),
+    }));
+  };
   const toggleHand = (notation) => {
-    setSelected((current) => {
+    updateActiveRange((current) => {
       const next = new Set(current);
       if (next.has(notation)) next.delete(notation);
       else next.add(notation);
@@ -63,7 +86,7 @@ export default function RangeCalibratePage() {
     });
   };
   const setHandSelected = (notation, active) => {
-    setSelected((current) => {
+    updateActiveRange((current) => {
       if (current.has(notation) === active) return current;
       const next = new Set(current);
       if (active) next.add(notation);
@@ -72,12 +95,34 @@ export default function RangeCalibratePage() {
     });
   };
   const addGroup = (predicate) => {
-    setSelected((current) => {
+    updateActiveRange((current) => {
       const next = new Set(current);
       for (const hand of ALL_STARTING_HANDS)
         if (predicate(hand)) next.add(hand.notation);
       return next;
     });
+  };
+  const enablePositionRanges = () => {
+    setPositionRanges((current) => {
+      const alreadyConfigured = Object.values(current).some(
+        (range) => range.size > 0,
+      );
+      if (alreadyConfigured || selected.size === 0) return current;
+      return Object.fromEntries(
+        PREFLOP_POSITION_ORDER.map((position) => [position, new Set(selected)]),
+      );
+    });
+    setRangeMode("position");
+  };
+  const copyActiveRangeToAllPositions = () => {
+    setPositionRanges(
+      Object.fromEntries(
+        PREFLOP_POSITION_ORDER.map((position) => [
+          position,
+          new Set(activeRange),
+        ]),
+      ),
+    );
   };
   const advance = (session) => {
     const step = session.step(true);
@@ -154,7 +199,21 @@ export default function RangeCalibratePage() {
   };
   advanceRef.current = advance;
   const start = useCallback(() => {
-    if (selected.size === 0) return;
+    const serializedPositionRanges = Object.fromEntries(
+      PREFLOP_POSITION_ORDER.map((position) => [
+        position,
+        [...positionRanges[position]],
+      ]),
+    );
+    if (
+      (rangeMode === "shared" && selected.size === 0) ||
+      (rangeMode === "position" &&
+        Object.values(serializedPositionRanges).some(
+          (range) => range.length === 0,
+        ))
+    ) {
+      return;
+    }
     sounds.unlock();
     audibleCardsRef.current = null;
     const hands = customTarget
@@ -166,12 +225,14 @@ export default function RangeCalibratePage() {
       seed: `range-cal-${Date.now()}`,
       targetHands: hands,
       userBuyInBB: 100,
-      startingHands: [...selected],
+      ...(rangeMode === "position"
+        ? { startingHandsByPosition: serializedPositionRanges }
+        : { startingHands: [...selected] }),
     });
     sessionRef.current = session;
     setPhase("playing");
     advanceRef.current(session);
-  }, [customTarget, selected, target, sounds]);
+  }, [customTarget, positionRanges, rangeMode, selected, target, sounds]);
   const act = (type) => {
     const session = sessionRef.current;
     if (!session || !ctx || activeDecisionRef.current !== ctx) return;
@@ -241,7 +302,22 @@ export default function RangeCalibratePage() {
     setSaving(true);
     setError(null);
     try {
-      const range = [...selected].sort();
+      const preflopRangesByPosition =
+        rangeMode === "position"
+          ? Object.fromEntries(
+              PREFLOP_POSITION_ORDER.map((position) => [
+                position,
+                [...positionRanges[position]].sort(),
+              ]),
+            )
+          : undefined;
+      const range = [
+        ...new Set(
+          preflopRangesByPosition
+            ? Object.values(preflopRangesByPosition).flat()
+            : [...selected],
+        ),
+      ].sort();
       const tendencies = computeTendencies(
         session.decisions,
         session.histories,
@@ -250,12 +326,16 @@ export default function RangeCalibratePage() {
       const policy = new BehavioralPolicy();
       policy.train(session.decisions, new Rng("range-train"));
       policy.setPreflopRange(range);
+      if (preflopRangesByPosition) {
+        policy.setPreflopRangesByPosition(preflopRangesByPosition);
+      }
       const dataset = {
         id: newId("cal"),
-        name: `Range-first calibration ${new Date().toLocaleString()} (${range.length} hands)`,
+        name: `Range-first calibration ${new Date().toLocaleString()} (${preflopRangesByPosition ? "position ranges" : `${range.length} hands`})`,
         createdAt: new Date().toISOString(),
         method: "range-first",
         preflopRange: range,
+        ...(preflopRangesByPosition ? { preflopRangesByPosition } : {}),
         seed: "range-manual",
         handsPlayed: session.handsPlayed,
         decisions: session.decisions,
@@ -315,8 +395,15 @@ export default function RangeCalibratePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx, engine, phase, session]);
   if (phase === "range") {
-    const combos = rangeComboCount(selected);
+    const combos = rangeComboCount(activeRange);
     const percentage = (combos / 1326) * 100;
+    const missingPositions = PREFLOP_POSITION_ORDER.filter(
+      (position) => positionRanges[position].size === 0,
+    );
+    const rangeReady =
+      rangeMode === "shared"
+        ? selected.size > 0
+        : missingPositions.length === 0;
     return (
       <div>
         <PageHeader
@@ -334,19 +421,84 @@ export default function RangeCalibratePage() {
             <div>
               <div className="font-semibold">Pick your starting range</div>
               <div className="text-sm text-muted mt-1">
-                Click individual hands or add a group. Selected hands are
-                highlighted.
+                {rangeMode === "position"
+                  ? `Editing your ${activePosition} first-in range. Switch positions to give every seat its own chart.`
+                  : "Click individual hands or add a group. This shared chart applies at every position."}
               </div>
             </div>
             <div className="text-right">
               <div className="mono font-bold text-accent">
-                {selected.size} / 169 hands
+                {activeRange.size} / 169 hands
               </div>
               <div className="text-xs text-muted mono">
                 {combos} / 1,326 combos · {percentage.toFixed(1)}%
               </div>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div
+              className="inline-flex rounded-lg border border-line bg-panel2 p-1"
+              aria-label="Range position mode"
+            >
+              <button
+                className={`btn text-xs min-h-0 px-3 py-1.5 ${rangeMode === "shared" ? "btn-primary" : ""}`}
+                type="button"
+                onClick={() => setRangeMode("shared")}
+                aria-pressed={rangeMode === "shared"}
+              >
+                Same at every position
+              </button>
+              <button
+                className={`btn text-xs min-h-0 px-3 py-1.5 ${rangeMode === "position" ? "btn-primary" : ""}`}
+                type="button"
+                onClick={enablePositionRanges}
+                aria-pressed={rangeMode === "position"}
+              >
+                Set by position
+              </button>
+            </div>
+            {rangeMode === "position" && (
+              <button
+                className="btn text-xs"
+                type="button"
+                onClick={copyActiveRangeToAllPositions}
+                disabled={activeRange.size === 0}
+              >
+                Copy {activePosition} to all positions
+              </button>
+            )}
+          </div>
+
+          {rangeMode === "position" && (
+            <div
+              className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-4"
+              role="tablist"
+              aria-label="Choose a table position"
+            >
+              {PREFLOP_POSITION_ORDER.map((position) => {
+                const range = positionRanges[position];
+                const positionCombos = rangeComboCount(range);
+                return (
+                  <button
+                    key={position}
+                    className={`btn min-h-0 px-2 py-2 flex-col gap-0 ${activePosition === position ? "btn-primary" : ""}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={activePosition === position}
+                    onClick={() => setActivePosition(position)}
+                  >
+                    <span className="mono text-xs font-bold">{position}</span>
+                    <span className="text-[10px] opacity-75">
+                      {range.size === 0
+                        ? "not set"
+                        : `${((positionCombos / 1326) * 100).toFixed(1)}%`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           <div
             className="flex flex-wrap gap-2 mb-4"
@@ -423,8 +575,9 @@ export default function RangeCalibratePage() {
               className="btn text-xs"
               type="button"
               onClick={() =>
-                setSelected(
-                  new Set(ALL_STARTING_HANDS.map((hand) => hand.notation)),
+                updateActiveRange(
+                  () =>
+                    new Set(ALL_STARTING_HANDS.map((hand) => hand.notation)),
                 )
               }
             >
@@ -433,15 +586,15 @@ export default function RangeCalibratePage() {
             <button
               className="btn text-xs"
               type="button"
-              onClick={() => setSelected(new Set())}
-              disabled={selected.size === 0}
+              onClick={() => updateActiveRange(() => new Set())}
+              disabled={activeRange.size === 0}
             >
               Clear
             </button>
           </div>
 
           <StartingHandGrid
-            selected={selected}
+            selected={activeRange}
             onToggle={toggleHand}
             onSetSelected={setHandSelected}
           />
@@ -480,23 +633,27 @@ export default function RangeCalibratePage() {
             className="btn btn-primary mt-5"
             type="button"
             onClick={start}
-            disabled={selected.size === 0}
+            disabled={!rangeReady}
           >
             Next: calibrate my betting
           </button>
-          {selected.size === 0 && (
+          {!rangeReady && (
             <div className="text-xs text-muted mt-2">
-              Select at least one hand to continue.
+              {rangeMode === "position"
+                ? `Set at least one hand for: ${missingPositions.join(", ")}. Start with one chart and use “Copy to all positions” if you want a quick baseline.`
+                : "Select at least one hand to continue."}
             </div>
           )}
         </div>
 
         <div className="mt-4 max-w-2xl">
           <WarningNote>
-            The selected range controls first-in preflop play. When the
-            simulation faces a raise, your recorded reactions and the model
-            prior still determine whether it folds, calls, or raises. Timeouts
-            check when free and fold otherwise.
+            {rangeMode === "position"
+              ? "Each chart controls first-in preflop play from its named seat. "
+              : "The selected range controls first-in preflop play at every position. "}
+            When the simulation faces a raise, your recorded reactions and the
+            model prior still determine whether it folds, calls, or raises.
+            Timeouts check when free and fold otherwise.
           </WarningNote>
         </div>
       </div>
@@ -513,8 +670,14 @@ export default function RangeCalibratePage() {
   }
   const legal = ctx?.legal;
   const progress = session.handsPlayed / session.targetHands;
+  const userPlayer = engine.players.find(
+    (player) => player.seat === session.userSeat,
+  );
   const currentHand =
-    ctx?.holeCards.length === 2 ? holeNotation(ctx.holeCards) : null;
+    userPlayer?.holeCards?.length === 2
+      ? holeNotation(userPlayer.holeCards)
+      : null;
+  const currentPosition = engine.positionOf(session.userSeat);
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -531,7 +694,7 @@ export default function RangeCalibratePage() {
         <div className="flex items-center gap-4">
           {currentHand && (
             <span className="mono text-sm text-accent font-bold">
-              {currentHand}
+              {currentPosition} · {currentHand}
             </span>
           )}
           <button

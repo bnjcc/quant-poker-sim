@@ -389,7 +389,7 @@ describe("online action timing", () => {
     const tank = policy.probabilities(tankContext, snapBucket);
     expect(snap.probs.fold).toBeGreaterThan(tank.probs.fold);
     expect(tank.probs.call).toBeGreaterThan(snap.probs.call);
-    expect(policy.serialize().version).toBe(2);
+    expect(policy.serialize().version).toBe(3);
     const legacy = {
       ...policy.serialize(),
       version: 1,

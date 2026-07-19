@@ -143,6 +143,21 @@ describe("strategy review sampling", () => {
     ]);
     expect(selected.map((item) => item.handNumber)).toEqual([1]);
   });
+  it("uses the matching position chart when filtering review hands", () => {
+    const bbDecision = decision(1);
+    const utgDecision = {
+      ...decision(2),
+      context: { ...context(2), position: "UTG" },
+    };
+    const selected = selectReviewDecisions(
+      [hand(1), hand(2)],
+      [bbDecision, utgDecision],
+      8,
+      ["72o"],
+      { BB: ["72o"], UTG: ["AA"] },
+    );
+    expect(selected.map((item) => item.handNumber)).toEqual([1]);
+  });
   it("leaves all-hands review sampling unchanged when no explicit range is supplied", () => {
     const selected = selectReviewDecisions(
       [hand(1), hand(2)],

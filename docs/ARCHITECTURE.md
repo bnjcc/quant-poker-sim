@@ -68,7 +68,7 @@ Two layers:
    - bet sizes are sampled from the user's empirical pot-fraction pool blended with a ⅔-pot prior.
    - decision time is sampled from matching empirical action/context observations, with an online-style human prior when no timing data exists; learned timeouts produce the legal check/fold default.
 
-Range-first calibrations add an explicit 169-hand first-in range to the serialized policy. Unselected hands fold when voluntarily entering an unraised pot (or check a free big-blind option); selected hands always continue and the learned policy chooses the action and size. The explicit chart is deliberately not applied when facing a raise, where recorded reactions and the normal model prior still govern play.
+Range-first calibrations add either one shared 169-hand first-in range or a chart keyed by exact table position to the serialized policy. Manual positional calibration forces a hand from the chart matching the user's current seat. Unselected hands fold when voluntarily entering an unraised pot (or check a free big-blind option); selected hands always continue and the learned policy chooses the action and size. The explicit chart is deliberately not applied when facing a raise, where recorded reactions and the normal model prior still govern play. Policy version 3 serializes position charts while remaining compatible with version 1 and 2 strategies.
 
 Every simulated decision logs its probabilities and its **confidence** (data-vs-prior weight); the experiment page reports the average so users can see how much of "their" play was actually theirs.
 
@@ -106,6 +106,7 @@ All persistence goes through the shared data-store contract. In addition to cali
 
 ```js
 const dataStore = {
+  getStrategyLeaderboard(limit) {},
   listCalibrations() {},
   getCalibration(id) {},
   saveCalibration(calibration) {},
@@ -130,6 +131,8 @@ Two implementations ship:
 - `SupabaseStore` is selected when both public Supabase variables are configured. Supabase Auth owns identity; `calibrations`, `experiments`, and `experiment_hands` carry `user_id`, and RLS restricts every operation to `auth.uid()`. Large nested domain models remain JSONB payloads while query/order/status fields are normalized. Hand writes are batched into a new revision, which becomes active only after every batch succeeds; reads of the active revision are paginated.
 - `strategy_reviews` stores one normalized row per review round plus the complete answer payload. The `save_experiment_strategy_review` database function commits that row together with the experiment's calibrated policy and pending-rerun state. Testers can read only their own rows in the app; the Supabase project owner can analyze all rows from the backend dashboard.
 - `LocalStorageStore` remains the zero-setup fallback (~5 MB budget, 3,000-hand cap per experiment with eviction).
+
+The dashboard leaderboard follows the same storage split. Browser mode derives the top three local strategies from completed experiments. Supabase mode calls `get_strategy_leaderboard`, a stable security-definer function that reads private completed rows and returns only username, strategy name, hand-weighted win rate, run count, and total hands. Direct experiment and hand access remains governed by the existing owner-only RLS policies.
 
 The database definition is migration-driven in `supabase/migrations/`. Experiment hands cascade on experiment deletion. Calibration deletion sets the experiment's normalized calibration reference to null, preserving completed results while preventing a rerun. JSON storage uses a small codec so analytics values such as infinite profit factor do not degrade to `null`.
 

@@ -81,6 +81,7 @@ export function StrategyReview({
   decisions,
   roundNumber,
   preflopRange,
+  preflopRangesByPosition,
   disabled = false,
   onComplete,
 }) {
@@ -91,16 +92,24 @@ export function StrategyReview({
         decisions,
         Number.MAX_SAFE_INTEGER,
         preflopRange,
+        preflopRangesByPosition,
       ),
-    [hands, decisions, preflopRange],
+    [hands, decisions, preflopRange, preflopRangesByPosition],
   );
   const [reviewCount, setReviewCount] = useState(() =>
     Math.min(DEFAULT_REVIEW_HAND_COUNT, Math.max(1, eligibleDecisions.length)),
   );
   const [reviewStarted, setReviewStarted] = useState(false);
   const sample = useMemo(
-    () => selectReviewDecisions(hands, decisions, reviewCount, preflopRange),
-    [hands, decisions, preflopRange, reviewCount],
+    () =>
+      selectReviewDecisions(
+        hands,
+        decisions,
+        reviewCount,
+        preflopRange,
+        preflopRangesByPosition,
+      ),
+    [hands, decisions, preflopRange, preflopRangesByPosition, reviewCount],
   );
   const handByNumber = useMemo(
     () => new Map(hands.map((hand) => [hand.handNumber, hand])),
@@ -135,7 +144,7 @@ export function StrategyReview({
   if (eligibleDecisions.length === 0) {
     return (
       <div className="text-sm text-muted">
-        {preflopRange
+        {preflopRange || preflopRangesByPosition
           ? "This run does not contain review-ready decisions from starting hands in your selected range."
           : "This run does not contain review-ready decision context. Run the experiment again with engine v1.3 or newer."}
       </div>
@@ -148,7 +157,7 @@ export function StrategyReview({
         <p className="text-xs text-muted mt-1">
           {eligibleDecisions.length.toLocaleString()} review-ready{" "}
           {eligibleDecisions.length === 1 ? "hand is" : "hands are"} available.
-          {preflopRange
+          {preflopRange || preflopRangesByPosition
             ? " Hands outside your selected starting range are excluded."
             : ""}
         </p>

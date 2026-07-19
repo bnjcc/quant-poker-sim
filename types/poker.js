@@ -16,3 +16,16 @@ export const POSITIONS_BY_COUNT = {
   8: ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO"],
   9: ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO"],
 };
+
+/** Natural preflop range-editing order from earliest position to the blinds. */
+export const PREFLOP_POSITION_ORDER = [
+  "UTG",
+  "UTG+1",
+  "MP",
+  "LJ",
+  "HJ",
+  "CO",
+  "BTN",
+  "SB",
+  "BB",
+];

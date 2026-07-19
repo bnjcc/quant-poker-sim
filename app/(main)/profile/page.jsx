@@ -14,6 +14,7 @@ import {
   fmtPct,
 } from "@/components/ui";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
+import { PREFLOP_POSITION_ORDER } from "@/types/poker";
 function TendencyRow({ label, stat, hint }) {
   return (
     <div
@@ -67,9 +68,25 @@ export default function ProfilePage() {
   const cal = cals.find((c) => c.id === selected) ?? cals[0];
   const t = cal.tendencies;
   const small = cal.handsPlayed < RELIABLE_SAMPLE_THRESHOLD;
+  const positionalRanges = cal.preflopRangesByPosition ?? null;
   const rangeFirst =
-    cal.method === "range-first" && Boolean(cal.preflopRange?.length);
-  const rangeCombos = rangeFirst ? rangeComboCount(cal.preflopRange ?? []) : 0;
+    cal.method === "range-first" &&
+    Boolean(cal.preflopRange?.length || positionalRanges);
+  const positionRangeStats = positionalRanges
+    ? PREFLOP_POSITION_ORDER.filter(
+        (position) => positionalRanges[position] !== undefined,
+      ).map((position) => ({
+        position,
+        range: positionalRanges[position],
+        combos: rangeComboCount(positionalRanges[position]),
+      }))
+    : [];
+  const rangeCombos = positionalRanges
+    ? positionRangeStats.reduce((sum, item) => sum + item.combos, 0) /
+      Math.max(1, positionRangeStats.length)
+    : rangeFirst
+      ? rangeComboCount(cal.preflopRange ?? [])
+      : 0;
   const timedDecisions = cal.decisions.filter(
     (decision) =>
       decision.responseTimeMs !== undefined &&
@@ -221,14 +238,22 @@ export default function ProfilePage() {
         {rangeFirst ? (
           <>
             <Stat
-              label="Selected hands"
-              value={`${cal.preflopRange?.length ?? 0} / 169`}
-              sub="explicit first-in range"
+              label={positionalRanges ? "Position charts" : "Selected hands"}
+              value={
+                positionalRanges
+                  ? `${positionRangeStats.length} / ${PREFLOP_POSITION_ORDER.length}`
+                  : `${cal.preflopRange?.length ?? 0} / 169`
+              }
+              sub={
+                positionalRanges
+                  ? `${cal.preflopRange?.length ?? 0} unique starting hands`
+                  : "explicit first-in range"
+              }
             />
             <Stat
-              label="Range coverage"
+              label={positionalRanges ? "Average range" : "Range coverage"}
               value={fmtPct(rangeCombos / 1326, 1)}
-              sub={`${rangeCombos} card combinations`}
+              sub={`${Math.round(rangeCombos)} card combinations${positionalRanges ? " per position" : ""}`}
             />
           </>
         ) : (
@@ -287,15 +312,43 @@ export default function ProfilePage() {
 
       {rangeFirst && (
         <section className="panel px-5 py-4 mb-4">
-          <h2 className="font-semibold">Explicit preflop range</h2>
+          <h2 className="font-semibold">
+            {positionalRanges
+              ? "Preflop ranges by position"
+              : "Explicit preflop range"}
+          </h2>
           <p className="text-xs text-muted mt-1 mb-3">
             Unselected hands fold first-in (or check a free big-blind option).
             Selected hands continue; the learned model chooses how. Responses to
             raises still use your recorded decisions and the model prior.
           </p>
-          <div className="mono text-xs leading-relaxed text-ink">
-            {cal.preflopRange?.join(" · ")}
-          </div>
+          {positionalRanges ? (
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {positionRangeStats.map(({ position, range, combos }) => (
+                <div
+                  key={position}
+                  className="rounded-lg border border-line bg-panel2 px-3 py-3"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="mono font-bold text-accent">
+                      {position}
+                    </span>
+                    <span className="text-[11px] text-muted mono">
+                      {range.length} hands ·{" "}
+                      {((combos / 1326) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="mono text-[11px] leading-relaxed text-ink">
+                    {range.join(" · ") || "No first-in hands"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mono text-xs leading-relaxed text-ink">
+              {cal.preflopRange?.join(" · ")}
+            </div>
+          )}
         </section>
       )}
 

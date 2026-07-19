@@ -15,6 +15,7 @@ import {
   DEFAULT_POOL_SETTINGS,
   DEFAULT_TABLE,
 } from "@/lib/simulation/defaults";
+import { PREFLOP_POSITION_ORDER } from "@/types/poker";
 describe("starting-hand ranges", () => {
   it("builds the full 169-hand matrix covering all 1,326 combinations", () => {
     expect(ALL_STARTING_HANDS).toHaveLength(169);
@@ -87,6 +88,47 @@ describe("starting-hand ranges", () => {
       ).toBe(true);
     }
   });
+  it("deals from the range assigned to the user's current position", () => {
+    const notationByPosition = Object.fromEntries(
+      PREFLOP_POSITION_ORDER.map((position, index) => [
+        position,
+        ["AA", "KK", "QQ", "JJ", "TT", "99", "88", "77", "66"][index],
+      ]),
+    );
+    const session = new ManualSession({
+      config: DEFAULT_TABLE,
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: "positional-range-manual",
+      targetHands: 18,
+      userBuyInBB: 100,
+      startingHandsByPosition: Object.fromEntries(
+        Object.entries(notationByPosition).map(([position, notation]) => [
+          position,
+          [notation],
+        ]),
+      ),
+    });
+    let guard = 0;
+    while (guard++ < 8000) {
+      const step = session.step();
+      if (step.kind === "session-complete") break;
+      if (step.kind === "awaiting-user") {
+        session.submitUserAction(
+          step.context,
+          step.context.legal.types.includes("fold")
+            ? { type: "fold" }
+            : { type: "check" },
+        );
+      }
+    }
+    expect(session.histories).toHaveLength(18);
+    for (const history of session.histories) {
+      const user = history.players.find((player) => player.playerId === "user");
+      expect(holeNotation(history.holeCards[user.seat])).toBe(
+        notationByPosition[user.position],
+      );
+    }
+  });
 });
 describe("explicit range policy", () => {
   const baseContext = {
@@ -143,5 +185,34 @@ describe("explicit range policy", () => {
     };
     const sampled = policy.sample(facingRaise, new Rng("facing-raise"));
     expect(sampled.explain.bucketKey).not.toContain("explicit-range");
+  });
+  it("applies different explicit ranges at different positions", () => {
+    const policy = new BehavioralPolicy()
+      .setPreflopRange(["AA"])
+      .setPreflopRangesByPosition({
+        UTG: ["AKs"],
+        BB: ["72o"],
+      });
+    const utg = policy.sample(
+      { ...baseContext, position: "UTG" },
+      new Rng("positional-utg"),
+    );
+    expect(utg.action.type).toBe("fold");
+    const bbContext = { ...baseContext, position: "BB" };
+    const bb = policy.probabilities(
+      bbContext,
+      strengthBucket(bbContext, new Rng("positional-bb")),
+    );
+    expect(bb.probs.fold).toBe(0);
+    const serialized = policy.serialize();
+    expect(serialized.version).toBe(3);
+    expect(serialized.preflopRangesByPosition.BB).toEqual(["72o"]);
+    const restored = BehavioralPolicy.deserialize(serialized);
+    expect(
+      restored.sample(
+        { ...baseContext, position: "UTG" },
+        new Rng("positional-restored"),
+      ).action.type,
+    ).toBe("fold");
   });
 });

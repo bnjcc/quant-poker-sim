@@ -3,12 +3,31 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(28);
+select plan(31);
 
 select has_table('public', 'calibrations', 'calibrations table exists');
 select has_table('public', 'experiments', 'experiments table exists');
 select has_table('public', 'experiment_hands', 'experiment_hands table exists');
 select has_table('public', 'strategy_reviews', 'strategy_reviews table exists');
+
+select ok(
+  to_regprocedure('public.get_strategy_leaderboard(integer)') is not null,
+  'strategy leaderboard function exists'
+);
+
+select ok(
+  has_function_privilege(
+    'authenticated',
+    'public.get_strategy_leaderboard(integer)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.get_strategy_leaderboard(integer)',
+    'execute'
+  ),
+  'only authenticated clients can execute the leaderboard function'
+);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.calibrations'::regclass),
@@ -119,6 +138,15 @@ select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002
 insert into public.calibrations (id, name, hands_played, payload)
 values ('cal_b', 'User B calibration', 50, '{}');
 
+insert into public.experiments (
+  id, calibration_id, status, payload
+) values (
+  'exp_rank_b',
+  'cal_b',
+  'complete',
+  '{"strategyName":"User B strategy","results":{"bb100":12,"totalHands":1000}}'
+);
+
 select is(
   (select count(*) from public.calibrations),
   1::bigint,
@@ -163,6 +191,21 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001
 
 insert into public.experiments (id, calibration_id, status, payload)
 values ('exp_a', 'cal_a', 'pending', '{}');
+
+insert into public.experiments (id, calibration_id, status, payload)
+values (
+  'exp_rank_a',
+  'cal_a',
+  'complete',
+  '{"strategyName":"User A strategy","results":{"bb100":5,"totalHands":2000}}'
+);
+
+select is(
+  (select username from public.get_strategy_leaderboard(3) where rank = 1),
+  (select username from public.profiles
+    where user_id = '20000000-0000-0000-0000-000000000002'),
+  'leaderboard ranks the best hand-weighted strategy across users'
+);
 
 select is(
   (select calibration_id from public.experiments where id = 'exp_a'),

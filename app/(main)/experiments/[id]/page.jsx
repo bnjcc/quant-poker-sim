@@ -481,6 +481,10 @@ export default function ExperimentDetailPage() {
                   (exp.strategyReview?.calibratedPolicy ?? cal?.policy)
                     ?.preflopRange
                 }
+                preflopRangesByPosition={
+                  (exp.strategyReview?.calibratedPolicy ?? cal?.policy)
+                    ?.preflopRangesByPosition
+                }
                 disabled={running}
                 onComplete={submitStrategyReview}
               />
