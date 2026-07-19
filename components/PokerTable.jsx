@@ -10,6 +10,74 @@ function seatSpot(index, count) {
     top: `${50 + Math.sin(angle) * verticalRadius}%`,
   };
 }
+
+/** Phone layouts keep seats in an outer lane so the board stays unobstructed. */
+function mobileSeatSpot(index, count) {
+  const layouts = {
+    2: [
+      [50, 86],
+      [50, 14],
+    ],
+    3: [
+      [50, 86],
+      [17, 22],
+      [83, 22],
+    ],
+    4: [
+      [50, 86],
+      [15, 56],
+      [50, 13],
+      [85, 56],
+    ],
+    5: [
+      [50, 86],
+      [15, 71],
+      [18, 20],
+      [82, 20],
+      [85, 71],
+    ],
+    6: [
+      [50, 86],
+      [15, 71],
+      [17, 20],
+      [50, 12],
+      [83, 20],
+      [85, 71],
+    ],
+    7: [
+      [50, 86],
+      [14, 71],
+      [15, 24],
+      [37, 11],
+      [63, 11],
+      [85, 24],
+      [86, 71],
+    ],
+    8: [
+      [50, 86],
+      [14, 72],
+      [14, 39],
+      [28, 13],
+      [50, 10],
+      [72, 13],
+      [86, 39],
+      [86, 72],
+    ],
+    9: [
+      [50, 86],
+      [14, 72],
+      [14, 43],
+      [17, 19],
+      [39, 10],
+      [61, 10],
+      [83, 19],
+      [86, 43],
+      [86, 72],
+    ],
+  };
+  const [left, top] = layouts[count]?.[index] ?? [50, 50];
+  return { left: `${left}%`, top: `${top}%` };
+}
 export function PokerTable({
   seats,
   board,
@@ -53,63 +121,74 @@ export function PokerTable({
         </div>
       </div>
 
-      {ordered.map((s, i) => (
-        <div
-          key={s.seat}
-          className={`absolute -translate-x-1/2 -translate-y-1/2 ${seatWidth}`}
-          style={seatSpot(i, ordered.length)}
-        >
+      {ordered.map((s, i) => {
+        const desktopSpot = seatSpot(i, ordered.length);
+        const phoneSpot = mobileSeatSpot(i, ordered.length);
+        return (
           <div
-            className={`table-seat rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${s.isActing ? "acting-seat" : "border-line"} ${s.folded ? "opacity-40" : ""}`}
-            aria-current={s.isActing ? "true" : undefined}
+            key={s.seat}
+            className={`table-seat-position absolute -translate-x-1/2 -translate-y-1/2 ${seatWidth}`}
+            style={{
+              "--seat-left": desktopSpot.left,
+              "--seat-top": desktopSpot.top,
+              "--phone-seat-left": phoneSpot.left,
+              "--phone-seat-top": phoneSpot.top,
+            }}
           >
-            <div className="flex items-center justify-center gap-1.5">
-              {s.isButton && (
+            <div
+              className={`table-seat rounded-lg border px-1.5 py-1 sm:px-2.5 sm:py-1.5 text-center transition-all ${s.isActing ? "acting-seat" : "border-line"} ${s.folded ? "opacity-40" : ""}`}
+              aria-current={s.isActing ? "true" : undefined}
+            >
+              <div className="flex items-center justify-center gap-1.5">
+                {s.isButton && (
+                  <span
+                    className="mono text-[10px] font-bold rounded-full px-1 border border-accent text-accent"
+                    title="Dealer button"
+                  >
+                    D
+                  </span>
+                )}
                 <span
-                  className="mono text-[10px] font-bold rounded-full px-1 border border-accent text-accent"
-                  title="Dealer button"
+                  className={`table-seat-name text-xs font-semibold truncate ${s.isUser ? "text-accent" : ""}`}
                 >
-                  D
+                  {s.name}
                 </span>
+              </div>
+              <div className="table-seat-stack mono text-[11px] text-muted">
+                {s.stack.toLocaleString()}
+                <span className="table-seat-stack-unit"> chips</span>
+              </div>
+              <div className="table-seat-cards mt-1 flex justify-center min-h-[1.6rem]">
+                {s.folded ? (
+                  <span className="text-[11px] text-muted italic">folded</span>
+                ) : s.holeCards ? (
+                  <CardRow
+                    cards={s.holeCards}
+                    size={fitViewport && s.isUser ? "lg" : "sm"}
+                    animated={animateCards && s.isUser}
+                    animationKey={`${cardAnimationKey}:seat:${s.seat}`}
+                  />
+                ) : (
+                  <span className="mono text-[13px] tracking-widest text-muted">
+                    🂠🂠
+                  </span>
+                )}
+              </div>
+              {s.lastAction && (
+                <div className="table-seat-action text-[10px] text-info mt-0.5 truncate">
+                  {s.lastAction}
+                </div>
               )}
-              <span
-                className={`table-seat-name text-xs font-semibold truncate ${s.isUser ? "text-accent" : ""}`}
-              >
-                {s.name}
-              </span>
             </div>
-            <div className="table-seat-stack mono text-[11px] text-muted">
-              {s.stack.toLocaleString()} chips
-            </div>
-            <div className="table-seat-cards mt-1 flex justify-center min-h-[1.6rem]">
-              {s.folded ? (
-                <span className="text-[11px] text-muted italic">folded</span>
-              ) : s.holeCards ? (
-                <CardRow
-                  cards={s.holeCards}
-                  size={fitViewport && s.isUser ? "lg" : "sm"}
-                  animated={animateCards && s.isUser}
-                  animationKey={`${cardAnimationKey}:seat:${s.seat}`}
-                />
-              ) : (
-                <span className="mono text-[13px] tracking-widest text-muted">
-                  🂠🂠
-                </span>
-              )}
-            </div>
-            {s.lastAction && (
-              <div className="table-seat-action text-[10px] text-info mt-0.5 truncate">
-                {s.lastAction}
+            {s.committed > 0 && (
+              <div className="table-seat-committed mono text-center text-[11px] mt-1 text-accent">
+                {s.committed.toLocaleString()}
+                <span className="table-seat-committed-unit"> chips</span>
               </div>
             )}
           </div>
-          {s.committed > 0 && (
-            <div className="table-seat-committed mono text-center text-[11px] mt-1 text-accent">
-              {s.committed.toLocaleString()} chips
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
