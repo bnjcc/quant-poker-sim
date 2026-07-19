@@ -1,15 +1,20 @@
 # QuantPoker Project Context
 
-Last updated: 2026-07-18
+Last updated: 2026-07-19
 
 This file is the handoff for future maintainers and LLM conversations. Read it before changing the project, then consult `README.md`, `docs/ARCHITECTURE.md`, and the relevant source files for implementation detail.
 
 ## Current repository state
 
 - GitHub repository: `https://github.com/bnjcc/poker-sim`
-- Active branch: `agent/strategy-review-calibration`
-- Branch tracks: `origin/agent/strategy-review-calibration`
-- Latest implementation: `7a8c247 Convert application to JavaScript`
+- Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
+- Active branch: `deploy/mobile-scroll-fix-20260719-030729`
+- Branch tracks: `origin/agent/supabase-backend`
+- Latest committed production implementation: `ae95054 Add opponent-type strategy analytics`
+- Current uncommitted working tree: information-rich calibration opponents, combo-weighted calibration hand sampling, hand-strength-weighted preflop defense chances with no forced calls, and explicit one-chip bet-size decrement/increment controls.
+- Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
+- Previous mobile poker-table implementation: `6efeda4 Fix mobile poker table visibility`
+- Initial phone-layout implementation: `2f1d327 Optimize phone viewing`
 - Latest pre-migration feature implementation: `10e698c Improve calibration controls and full-ring review`
 - Main beginner-analytics/calibration release: `2511582 Make analytics and calibration more approachable`
 - Previous workflow release: `a55a741 Improve calibration, reviews, and strategy profiles`
@@ -17,7 +22,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration`, the remote default/production branch `origin/agent/supabase-backend`, and `origin/HEAD` all point to JavaScript migration commit `7a8c247` before this documentation-only update.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `ae95054`, which adds opponent-type strategy analytics on top of the calibration viewport-stability and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -81,6 +86,43 @@ The poker engine, evaluator, agents, player model, simulator, and analytics rema
 - `supabase/migrations/20260719000000_strategy_leaderboard.sql` adds the read-only leaderboard function. It was applied to hosted Supabase through the SQL editor on 2026-07-19.
 - `SIMULATION_VERSION` is `1.7.0` because position-specific range selection can change seeded decisions.
 
+## Phone-first interface and mobile calibration stability
+
+The application now has a dedicated phone experience instead of relying on compressed desktop layouts.
+
+### Mobile navigation and shared layout
+
+- The former horizontally scrolling mobile navigation was replaced with a compact sticky top bar, a five-item bottom tab bar for the most common destinations, and a full grouped navigation drawer for secondary pages.
+- The drawer locks background scrolling while open, closes after route changes or Escape, retains active-route indicators, and includes cloud sign-out when available.
+- Top and bottom navigation account for device safe areas. Main content reserves bottom space so the fixed tab bar never covers page actions.
+- Phone buttons use larger touch targets, form controls use a 16px input size to prevent unwanted mobile zoom, page headers and hero actions stack vertically, and dense two-column forms collapse where needed.
+
+### Mobile data and workflow views
+
+- Previous experiments and model-accuracy history render as readable cards on phones while retaining their desktop tables at larger widths.
+- The comparison table remains horizontally explorable on phones and keeps the metric column sticky while scrolling.
+- Charts, captions, empty states, profile controls, experiment configuration, and the hand-replay dialog use narrower spacing and phone-safe wrapping.
+- The 169-hand starting-range grid retains its touch-friendly horizontal scrolling and now shows a phone-only swipe instruction.
+
+### Poker-table visibility on phones
+
+- `PokerTable` has explicit phone seat maps for tables with two through nine players. Seats occupy dedicated outer lanes rather than using the desktop ellipse, keeping the community-card and pot area clear.
+- The phone felt is taller, player boxes and cards are more compact, and redundant `chips` suffixes are hidden inside seat boxes to reduce width without hiding numeric stack or committed amounts.
+- The board and pot occupy a centered foreground layer. The flop, turn, river, and pot total therefore remain visible instead of being covered by player boxes.
+- Desktop seat geometry and sizing remain unchanged.
+
+### Calibration scroll-position stability
+
+- Both `/calibrate` and `/range-calibrate` preserve `window.scrollX` and `window.scrollY` when **Next hand** advances the manual session. Scroll restoration runs after two animation frames so it occurs after React finishes rendering the new hand.
+- The phone calibration action panel reserves a 22rem minimum height across user decisions, opponent previews, and hand-complete states. This prevents the document from collapsing and moving the viewport upward when the action controls temporarily disappear.
+- Scroll anchoring is disabled for the calibration table and action panel so card/action transitions do not pull the decision buttons away from the user's chosen viewport position.
+- Together these changes let a phone user keep the decision controls at the bottom of the screen across consecutive calibrated hands without repeatedly scrolling down.
+
+### Mobile validation
+
+- The responsive implementation passes ESLint, all 12 Vitest files / 80 tests, and the Next.js production build across all 19 routes.
+- Browser-level phone regression tests are still a sensible follow-up; current verification is source-, lint-, unit/integration-, and production-build based.
+
 ## Timing-aware calibration and simulation completed
 
 The full-session and range-first calibration flows now behave like paced online poker tables.
@@ -139,6 +181,18 @@ The current working tree closes the calibration and post-run review gaps identif
 - The user's hole cards render at the large card size in both calibration flows while opponent cards and other compact card displays remain unchanged.
 - Opponent turns use a fixed 500ms live preview in both calibration pages, but the action clock renders only for the user's 15-second decision window. The seeded virtual timing is still stored on the action, shown beside the decision under the player's name, and used by the timing-aware model.
 - Both calibration flows expose **Check / Fold rest of hand**. The initial intentional action retains the user's real response time; later actions check when free or fold to a wager automatically and omit timing so they do not create an artificial 0ms timing tell. The mode resets after the hand.
+
+### Information-rich calibration and precise bet sizing
+
+- Manual calibration now uses a calibration-only information controller in `lib/simulation/calibration.js`; high-speed and detailed experiments continue to use the ordinary configured heuristic opponents without this wrapper.
+- A bot's normal hand-based preflop action remains authoritative. When that normal policy would fold to a normal-sized user raise, the bot receives only a capped extra call chance based on its actual hole-card strength, pot odds, stack commitment, and profile looseness. Weak hands usually still fold, stronger hands defend more frequently, large raises and all-ins receive the normal policy, and no preflop call is forced.
+- The first bot that actually continues can become the hand's postflop measurement opponent. Postflop calibration rotates between passive showdown-oriented lines and pressure lines so the sample observes both checked-to decisions and decisions facing bets while retaining ordinary handling for large commitments.
+- Calibration opponent timing rotates evenly through snap, normal, and tank cues so short samples can observe timing-conditioned user reactions instead of receiving almost exclusively normal cues.
+- Range-first and all-hands calibration starting cards come from shuffled combo-weighted bags. The sampler retains natural suited/pair/offsuit 4/6/12 combination proportions while reducing redundant independent repeats in short sessions. Positional range mode maintains an independent bag for each position.
+- New calibrations store `calibrationDesign: "information-rich-v1"`. The setup and results UI explains that calibration hands are optimized for learning coverage rather than realistic opponent-pool profitability.
+- `ChipAmountInput` now places explicit **−** and **+** buttons around the numeric chip field. Each press changes the bet or raise by exactly one chip, disables at the current legal minimum/maximum, and remains synchronized with the slider, manual number entry, pot-fraction shortcuts, and all-in shortcut.
+- The shared one-chip controls appear in unrestricted calibration, range-first calibration, and corrected bet/raise sizing inside Simulated Hand Review.
+- `SIMULATION_VERSION` remains `1.7.0` because these changes affect manual calibration data collection and controls, not seeded batch-simulation decisions.
 
 ### Calibration entry and range-selection usability
 
@@ -203,6 +257,17 @@ QuantPoker now explains its poker acronyms and advanced analytics without removi
 - A corrected review bet or raise automatically starts at the calibration flow's legal two-thirds-pot suggestion. Review corrections also expose the same sizing slider and 50%, 66%, pot, and all-in shortcuts.
 - Both all-hands and range-first calibration synthesize lightweight card-deal and decision sounds without external media files. Sounds default on after a user gesture, persist their mute state locally, and have an in-session toggle.
 - Calibration hole cards and newly revealed board cards turn into view with staggered card animation. Reduced-motion preferences continue to collapse animation duration globally.
+
+## Opponent-type strategy performance analytics completed
+
+- Completed solo and real-users-with-bots experiments now show which heuristic player archetypes the selected strategy performed best and worst against.
+- `TableSession` preserves each heuristic player's stable archetype ID and name in completed hand histories. Analytics therefore use explicit metadata instead of parsing randomized display names such as `Miko (tag)`.
+- `Aggregator` emits `byOpponentType` results containing opponent-hand encounter counts, decisive encounters, attributed chips and big blinds, a normalized matchup score, and an approximate 95% range.
+- Multiway results use proportional chip-transfer attribution: user gains are apportioned among opponents that lost chips, while user losses are apportioned among opponents that won chips. Scores are normalized per 100 opponent-seat encounters so frequently selected pool types are not favored merely because several copies shared a table.
+- The results page presents beginner-friendly **Best matchup result** and **Hardest matchup result** cards plus a full ranked table with relative bars, matchup score, attributed result, encounter count, and the archetype description.
+- The UI explains that this is a directional comparison inside the configured mixed simulated table, not a pure heads-up test. Players-only experiments omit this bot-archetype section.
+- Existing saved runs do not contain archetype metadata, so matchup analytics appear after a new run or rerun. No database migration was required because experiment results and hand histories are stored as versioned JSON payloads.
+- `SIMULATION_VERSION` remains `1.7.0`: this feature adds metadata and result analysis without changing seeded decisions or hand outcomes.
 
 ## Supabase work completed
 
@@ -344,7 +409,19 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
-- Current working-tree validation after the position-range and leaderboard work: 12 test files and 80 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
+- Current working-tree validation after the information-rich calibration and one-chip sizing work: 14 test files and 88 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
+- `tests/calibration.test.js`
+  - Combo-weighted shuffled starting-hand bags retain exact class proportions and selected-range legality
+  - Passive/pressure scenarios and snap/normal/tank cues all receive coverage
+  - Stronger hands receive a higher calibration defend chance, while worse prices and larger commitments reduce it
+  - Scripted user raises produce both defended and uncontested pots and still collect later-street decisions
+- `tests/chip-amount.test.js`
+  - One-chip decrement/increment stepping and legal-bound clamping
+- Current working-tree validation after the opponent-type analytics work: 12 test files and 81 tests pass, ESLint passes, and the Next.js production build passes all 19 routes.
+- `tests/simulation.test.js`
+  - Completed bot players retain explicit archetype IDs and names
+  - Simulation aggregates contain opponent-type encounter results
+  - Proportional multiway attribution ranks archetypes correctly and reconciles to the user's total result in bot-only hands
 - `tests/leaderboard.test.js`
   - Completed runs are grouped by strategy and ranked by hand-weighted win rate
 - `tests/range.test.js`
@@ -382,6 +459,7 @@ The pgTAP file contains 28 assertions covering all four tables, RLS, grants, own
 
 The production backend and deployment are connected:
 
+- The main live branch is `agent/supabase-backend` (`origin/agent/supabase-backend`). The local deployment branch tracks it, `origin/HEAD` points to it, and pushes to it trigger the Vercel production deployment.
 - The repository is linked to Supabase project `oxrqtwqkzkembnglhbtn`.
 - Migrations `20260717000000_initial_user_data.sql`, `20260717010000_strategy_reviews.sql`, and `20260718000000_social_multiplayer.sql` are recorded in remote migration history and applied. The multiplayer migration was pushed and verified against the linked project on 2026-07-18.
 - `20260719000000_strategy_leaderboard.sql` was applied to the hosted project through the SQL editor on 2026-07-19; the matching migration remains committed locally for reproducible setup.
@@ -393,8 +471,10 @@ The production backend and deployment are connected:
 - Vercel `optvis/poker-sim` has both public Supabase variables in Production and Preview.
 - The production deployment is aliased to `https://poker-sim-iota.vercel.app`.
 - The production root redirects signed-out visitors to `/login`; `/login` returned HTTP 200 after the JavaScript migration was pushed to the production branch.
-- JavaScript migration commit `7a8c247` is pushed to both `origin/agent/strategy-review-calibration` and the default production branch `origin/agent/supabase-backend`.
-- Production serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the final branch push.
+- Mobile poker-table commit `6efeda4` is pushed to `origin/agent/strategy-review-calibration` and merged into the default production branch `origin/agent/supabase-backend` at `2410d26`.
+- Calibration viewport-stability commit `ae4c1ab` is pushed directly on top of the default production branch. Production therefore includes the phone-first navigation/layout pass, unobstructed mobile poker-table geometry, reserved action-panel height, disabled calibration scroll anchoring, and exact viewport restoration between hands.
+- Opponent-type analytics commit `ae95054` is pushed to the default production branch, triggering its Vercel production deployment. Exact live-site verification of that deployment remains pending.
+- Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
 
@@ -407,27 +487,32 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 ## Important source map
 
 - `app/page.jsx` — dashboard hero, default calibration entry, workflow, and recent experiment summary
-- `app/calibrate/page.jsx` — creates and saves calibration datasets
-- `app/range-calibrate/page.jsx` — explicit 169-hand range selection plus timed betting calibration
+- `app/calibrate/page.jsx` — creates and saves unrestricted calibration datasets; preserves the phone viewport between hands
+- `app/range-calibrate/page.jsx` — explicit 169-hand range selection plus timed betting calibration; preserves the phone viewport between hands
 - `app/glossary/page.jsx` — full beginner-friendly poker and advanced analytics glossary
 - `app/experiments/new/page.jsx` — creates experiments
-- `app/experiments/[id]/page.jsx` — runs simulations and atomically finalizes results/hands
+- `app/experiments/[id]/page.jsx` — runs simulations, atomically finalizes results/hands, and renders opponent-type matchup analytics
 - `app/experiments/page.jsx` — previous-experiment history and saved-run entry points
 - `app/accuracy/page.jsx` — in-browser review-feedback summary
 - `app/settings/page.jsx` — active storage summary, delete operations, browser import
 - `app/login/page.jsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.js` — authentication callback
-- `components/Nav.jsx` — navigation, storage/account indicator, glossary link, and sign-out
+- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, and calibration height/scroll anchoring
+- `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
-- `components/PokerTable.jsx` — shared table layout, seat/action display, and calibration-specific user card sizing
+- `components/ChipAmountInput.jsx` — legal whole-chip entry plus explicit one-chip decrement/increment controls used by calibration and strategy review
+- `components/PokerTable.jsx` — shared desktop layout, dedicated 2–9 seat phone maps, unobstructed board/pot zone, action display, and calibration-specific user card sizing
 - `components/StartingHandGrid.jsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
 - `lib/audio/poker-sounds.js` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
 - `components/AnalyticsGlossary.jsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
+- `components/OpponentMatchups.jsx` — best/hardest matchup summaries and the ranked opponent-archetype performance table
 - `components/HandReplayer.jsx` — hand replay including voluntary-action timing and timeout labels
 - `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands
 - `lib/simulation/timing.js` — action clock constants, timing buckets, formatting, timeout defaults, and fallback timing samples
+- `lib/simulation/calibration.js` — combo-weighted hand sampler plus calibration-only hand-strength-weighted defense, postflop measurement scenarios, and balanced timing cues
 - `lib/simulation/manual.js` — manual calibration loop with real user timing and paced opponents
-- `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, and user decision logs
+- `lib/simulation/table.js` — virtual timing propagation, timing-aware decision contexts, user decision logs, and stable bot-archetype metadata on hand histories
+- `lib/analytics/aggregate.js` — incremental overall analytics plus proportional opponent-type matchup attribution and uncertainty ranges
 - `lib/player-model/policy.js` — v3 position- and timing-aware behavioral policy with v1/v2 compatibility
 - `lib/player-model/review.js` — review sampling, answer conversion, feedback weighting, and calibrated-policy rebuilding
 - `lib/agents/agent.js` — heuristic decisions, virtual pacing, and deliberately weak timing reads
@@ -445,6 +530,8 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `supabase/migrations/20260719000000_strategy_leaderboard.sql` — authenticated, aggregate top-strategy RPC
 - `supabase/tests/database/schema_and_rls.test.sql` — pgTAP database tests
 - `tests/timing.test.js` — timing classification, propagation, learning, compatibility, and batch-run coverage
+- `tests/calibration.test.js` — calibration hand sampling, defense probability, scenario coverage, later-street collection, and range legality
+- `tests/chip-amount.test.js` — exact one-chip stepping and legal-bound clamping
 - `tests/review.test.js` — run-spanning review sampling, feedback accuracy, and policy recalibration coverage
 - `README.md` — operator setup
 - `docs/ARCHITECTURE.md` — system design

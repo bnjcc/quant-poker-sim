@@ -766,6 +766,8 @@ export default function ExperimentDetailPage() {
                 and this simulated run. Large gaps can mean the model
                 hasn&apos;t captured your style — or that your small manual
                 sample ran hot or cold.
+                {cal.calibrationDesign === "information-rich-v1" &&
+                  " Calibration opponents used hand-strength-weighted defend chances and varied later-street pressure, so manual results measure learning coverage rather than realistic profitability."}
               </p>
               <table className="w-full text-sm max-w-2xl">
                 <thead>

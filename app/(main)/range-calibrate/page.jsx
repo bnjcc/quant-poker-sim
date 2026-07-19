@@ -342,6 +342,7 @@ export default function RangeCalibratePage() {
         name: `Range-first calibration ${new Date().toLocaleString()} (${preflopRangesByPosition ? "position ranges" : `${range.length} hands`})`,
         createdAt: new Date().toISOString(),
         method: "range-first",
+        calibrationDesign: "information-rich-v1",
         preflopRange: range,
         ...(preflopRangesByPosition ? { preflopRangesByPosition } : {}),
         seed: "range-manual",
@@ -421,7 +422,7 @@ export default function RangeCalibratePage() {
               Calibrate all hands
             </Link>
           }
-          sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. The range is exact; actions, sizing, response time, and reactions to opponent timing are learned."
+          sub="Choose the starting hands you play, then make online-paced decisions with a 15-second clock. Measurement opponents keep more pots alive and vary pressure and timing so each hand teaches the model more."
         />
 
         <div className="panel px-5 py-5">
@@ -661,7 +662,10 @@ export default function RangeCalibratePage() {
               : "The selected range controls first-in preflop play at every position. "}
             When the simulation faces a raise, your recorded reactions and the
             model prior still determine whether it folds, calls, or raises.
-            Timeouts check when free and fold otherwise.
+            Calibration opponents get a hand-strength-weighted chance to defend
+            raises and create later streets; calls are never forced. Experiments
+            use the normal configured player pool. Timeouts check when free and
+            fold otherwise.
           </WarningNote>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { ChipAmountInput } from "./ChipAmountInput";
 import { PokerTable } from "./PokerTable";
 import {
   DEFAULT_REVIEW_HAND_COUNT,
@@ -511,22 +512,18 @@ export function StrategyReview({
               </label>
               {(alternativeType === "bet" || alternativeType === "raise") && (
                 <div className="mt-2">
-                  <label className="block">
-                    <span className="label">
-                      {alternativeType === "raise" ? "Raise to" : "Bet"} (chips)
-                    </span>
-                    <input
-                      type="number"
-                      className="field mt-1"
+                  <div>
+                    <div className="label mb-1">
+                      {alternativeType === "raise" ? "Raise to" : "Bet"}
+                    </div>
+                    <ChipAmountInput
+                      value={alternativeSizeChips}
                       min={sizeMinimum}
                       max={legal.maxBetTo}
-                      step={1}
-                      value={alternativeSizeChips}
-                      onChange={(event) =>
-                        setAlternativeSizeChips(Number(event.target.value))
-                      }
+                      onChange={setAlternativeSizeChips}
+                      ariaLabel="Review bet size in chips"
                     />
-                  </label>
+                  </div>
                   <input
                     type="range"
                     className="w-full mt-3"

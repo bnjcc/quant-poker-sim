@@ -222,6 +222,7 @@ export default function CalibratePage() {
         name: `Calibration ${new Date().toLocaleString()} (${ms.handsPlayed} hands)`,
         createdAt: new Date().toISOString(),
         method: "full-session",
+        calibrationDesign: "information-rich-v1",
         seed: "manual",
         handsPlayed: ms.handsPlayed,
         decisions: ms.decisions,
@@ -283,7 +284,7 @@ export default function CalibratePage() {
               Choose my range first
             </Link>
           }
-          sub="Play an online-paced table with a 15-second action clock. The model learns what you choose, how quickly you choose it, and how your response changes after opponents snap or tank."
+          sub="Play an online-paced table with a 15-second action clock. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
         />
         <div className="panel px-6 py-6 max-w-xl">
           <div className="label mb-3">How many hands will you play?</div>
@@ -327,6 +328,9 @@ export default function CalibratePage() {
             {(100 * DEFAULT_TABLE.bigBlind).toLocaleString()}-chip buy-in (100
             big blinds), 5% rake capped at {DEFAULT_TABLE.rake.cap} chips. A
             timeout checks when checking is free and folds when facing a bet.
+            Calibration opponents get a hand-strength-weighted chance to defend
+            raises and create later streets; calls are never forced. Experiments
+            still use the normal configured player pool.
           </WarningNote>
         </div>
       </div>
