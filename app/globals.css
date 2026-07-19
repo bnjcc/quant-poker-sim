@@ -149,9 +149,10 @@ body::before {
 .range-scroll-hint { display: none; }
 .range-grid-scroll { scroll-snap-type: x proximity; }
 
-body:has(.calibration-play-layout) { overflow: hidden; overscroll-behavior: none; }
-body:has(.calibration-play-layout) .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
-body:has(.calibration-play-layout) .app-main { min-height: 0; overflow: hidden; }
+body.calibration-session-active, body:has(.calibration-play-layout) { overflow: hidden; overscroll-behavior: none; }
+body.calibration-session-active .app-shell, body:has(.calibration-play-layout) .app-shell { height: 100dvh; min-height: 0; overflow: hidden; }
+body.calibration-session-active .app-main, body:has(.calibration-play-layout) .app-main { min-height: 0; overflow: hidden; }
+body.calibration-session-active .mobile-tab-bar, body:has(.calibration-play-layout) .mobile-tab-bar { display: none; }
 .calibration-play-layout {
   display: grid;
   grid-template-rows: auto .375rem minmax(0, 1fr) auto;
@@ -425,6 +426,10 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   .hero-copy { padding-right: 30%; }
 }
 
+@media (max-width: 767px) {
+  body.calibration-session-active .app-main, body:has(.calibration-play-layout) .app-main { padding-bottom: max(.4rem, env(safe-area-inset-bottom)); }
+}
+
 @media (max-width: 640px) {
   body { background-attachment: fixed; }
   body::before { background-size: 44px 44px; opacity: .22; }
@@ -449,8 +454,7 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   body:has(.auth-shell) .app-atmosphere { opacity: .58; }
   .native-bar-row { grid-template-columns: 4.2rem minmax(4rem, 1fr) 4.1rem; gap: .45rem; }
   .native-chart-caption { flex-wrap: wrap; gap: .35rem .75rem; }
-  body:has(.calibration-play-layout) .app-main { padding: .4rem .5rem max(.4rem, env(safe-area-inset-bottom)); }
-  body:has(.calibration-play-layout) .mobile-tab-bar { display: none; }
+  body.calibration-session-active .app-main, body:has(.calibration-play-layout) .app-main { padding: .4rem .5rem max(.4rem, env(safe-area-inset-bottom)); }
   .calibration-play-layout { grid-template-rows: auto .25rem minmax(0, 1fr) auto; gap: .35rem; }
   .calibration-status-bar { gap: .2rem .5rem; }
   .calibration-status-bar .mono.text-sm { font-size: .69rem; }

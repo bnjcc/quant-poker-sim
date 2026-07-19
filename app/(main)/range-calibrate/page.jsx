@@ -315,6 +315,14 @@ export default function RangeCalibratePage() {
       window.clearTimeout(timeout);
     };
   }, [ctx, phase, sounds]);
+  useEffect(() => {
+    const sessionIsActive = phase !== "setup" && phase !== "done";
+    document.body.classList.toggle(
+      "calibration-session-active",
+      sessionIsActive,
+    );
+    return () => document.body.classList.remove("calibration-session-active");
+  }, [phase]);
   useEffect(
     () => () => {
       if (opponentTimerRef.current !== null)
