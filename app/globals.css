@@ -153,6 +153,7 @@ body::before {
   width: min(100%, calc((100dvh - 18.5rem) * 16 / 9));
   margin-inline: auto;
 }
+.calibration-controls { overflow-anchor: none; }
 
 .acting-seat {
   border-color: var(--accent);
@@ -438,6 +439,8 @@ body:has(.auth-shell) .app-atmosphere { opacity: .7; }
   .table-board .playing-card { min-width: 1.75rem; padding: .2rem .35rem; font-size: .82rem; }
   .table-pot { max-width: 9rem; padding: .18rem .38rem; font-size: .62rem; white-space: nowrap; }
   .acting-seat { outline-width: 2px; outline-offset: 1px; }
+  .calibration-table, .calibration-controls { overflow-anchor: none; }
+  .calibration-controls { min-height: 22rem; }
   .panel.overflow-x-auto, .overflow-x-auto { -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain; }
   .mobile-table-shell { margin-inline: -.1rem; border-radius: .75rem; }
   .mobile-sticky-column { position: sticky; left: 0; z-index: 1; background: #111319; box-shadow: 8px 0 14px rgba(0,0,0,.18); }

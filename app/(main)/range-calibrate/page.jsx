@@ -294,7 +294,15 @@ export default function RangeCalibratePage() {
   );
   const nextHand = () => {
     const session = sessionRef.current;
-    if (session) advanceRef.current(session);
+    if (!session) return;
+    const scrollLeft = window.scrollX;
+    const scrollTop = window.scrollY;
+    advanceRef.current(session);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ left: scrollLeft, top: scrollTop, behavior: "auto" });
+      });
+    });
   };
   const save = async () => {
     const session = sessionRef.current;
@@ -736,7 +744,7 @@ export default function RangeCalibratePage() {
         cardAnimationKey={engine.handNumber}
       />
 
-      <div className="panel mt-5 px-5 py-4">
+      <div className="panel calibration-controls mt-5 px-5 py-4">
         {phase === "playing" && ctx && legal ? (
           <div>
             <div className="flex flex-wrap items-center gap-3 mb-3 pb-3 border-b border-line">
