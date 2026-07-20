@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { visibleActionBySeat } from "@/lib/poker/action-display";
+import {
+  visibleActionBySeat,
+  visibleHoleCardsForSeat,
+} from "@/lib/poker/action-display";
 import { holeNotation } from "@/lib/poker/deck";
 import { ALL_STARTING_HANDS, rangeComboCount } from "@/lib/poker/range";
 import { Rng } from "@/lib/poker/rng";
@@ -433,10 +436,11 @@ export default function RangeCalibratePage() {
       isButton: player.seat === engine.buttonSeat,
       isActing: engine.currentSeat === player.seat,
       isUser: player.seat === session.userSeat,
-      holeCards:
-        player.seat === session.userSeat || engine.complete
-          ? player.holeCards
-          : null,
+      holeCards: visibleHoleCardsForSeat(
+        player,
+        session.userSeat,
+        engine.history?.results,
+      ),
       // Earlier checks disappear for every seat that still owes a response.
       lastAction:
         engine.currentSeat === player.seat && !engine.complete

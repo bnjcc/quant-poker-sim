@@ -196,12 +196,24 @@ export function PokerTable({
                   )}
                 </>
               ) : (
-                <div className="table-seat-opponent-meta mono truncate text-[9px] leading-tight text-muted sm:text-[10px]">
-                  <span>{s.stack.toLocaleString()}</span>
-                  {opponentAction && (
-                    <span className="text-info"> · {opponentAction}</span>
+                <>
+                  <div className="table-seat-opponent-meta mono truncate text-[9px] leading-tight text-muted sm:text-[10px]">
+                    <span>{s.stack.toLocaleString()}</span>
+                    {opponentAction && (
+                      <span className="text-info"> · {opponentAction}</span>
+                    )}
+                  </div>
+                  {s.holeCards && !s.folded && (
+                    <div className="table-seat-cards table-seat-opponent-cards mt-1 flex justify-center">
+                      <CardRow
+                        cards={s.holeCards}
+                        size="sm"
+                        animated={animateCards}
+                        animationKey={`${cardAnimationKey}:showdown:${s.seat}`}
+                      />
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
             {s.committed > 0 && (

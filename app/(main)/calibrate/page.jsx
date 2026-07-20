@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { visibleActionBySeat } from "@/lib/poker/action-display";
+import {
+  visibleActionBySeat,
+  visibleHoleCardsForSeat,
+} from "@/lib/poker/action-display";
 import { Rng } from "@/lib/poker/rng";
 import { ManualSession } from "@/lib/simulation/manual";
 import {
@@ -281,7 +284,11 @@ export default function CalibratePage() {
       isButton: p.seat === engine.buttonSeat,
       isActing: engine.currentSeat === p.seat,
       isUser: p.seat === ms.userSeat,
-      holeCards: p.seat === ms.userSeat || engine.complete ? p.holeCards : null,
+      holeCards: visibleHoleCardsForSeat(
+        p,
+        ms.userSeat,
+        engine.history?.results,
+      ),
       // The helper removes every action made before the latest wager; hiding
       // the current seat as well covers any remaining repeated-action edge.
       lastAction:
