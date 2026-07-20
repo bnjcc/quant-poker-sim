@@ -1,6 +1,34 @@
 const CHART_WIDTH = 720;
 const CHART_HEIGHT = 240;
 const CHART_PAD = { top: 14, right: 16, bottom: 28, left: 58 };
+
+export function AnalyticsHighlights({ items, label = "Section highlights" }) {
+  return (
+    <div
+      className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 pt-3 border-t border-line"
+      role="group"
+      aria-label={label}
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="rounded-lg border border-line bg-panel2 px-3 py-2.5 min-w-0"
+        >
+          <div className="label">{item.label}</div>
+          <div className="mono text-sm font-bold text-ink mt-1 break-words leading-snug">
+            {item.value}
+          </div>
+          {item.detail && (
+            <div className="text-[11px] text-muted mt-0.5 leading-relaxed">
+              {item.detail}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function compactNumber(value) {
   const absolute = Math.abs(value);
   if (absolute >= 1000)

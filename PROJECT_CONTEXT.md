@@ -12,8 +12,8 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Main live/production branch: `agent/supabase-backend` (`origin/agent/supabase-backend`). Vercel production deploys from this branch, and `origin/HEAD` points to it.
 - Active branch: `deploy/mobile-scroll-fix-20260719-030729`
 - Branch tracks: `origin/agent/supabase-backend`
-- Latest committed production implementation: `de2035f Restore desktop calibration scrolling`
-- Current uncommitted working tree: calibration opponents now keep their hole cards hidden unless that exact seat's engine result has `showedDown: true`. At showdown, compact opponent seats render both cards with the existing card-turn animation; folded players and winners of uncontested pots remain hidden. The behavior is implemented in both calibration flows and covered by rendering/privacy tests. These changes have not been committed, pushed, or deployed.
+- Latest committed production implementation: `1b25a96 Reveal opponent cards only at showdown`
+- Current uncommitted working tree: strategy/experiment review calls to action are larger; completed solo experiments also provide an in-flow review action at the bottom that opens or returns to the review panel without being covered by mobile navigation. Sparse profile and experiment analytics panels now use their available space for sample-backed highlights, and the advanced results grid includes current drawdown. These changes are not yet committed, pushed, or deployed.
 - Previous information-rich calibration and one-chip sizing implementation: `cb88e15 Improve calibration learning and chip sizing controls`
 - Previous opponent-type analytics implementation: `ae95054 Add opponent-type strategy analytics`
 - Previous calibration viewport-stability implementation: `ae4c1ab Keep mobile calibration controls in view`
@@ -26,7 +26,7 @@ This file is the handoff for future maintainers and LLM conversations. Read it b
 - Supabase backend commit: `23935e6 Add Supabase user data backend`
 - Original application commit: `b70bffa RangeBench: poker strategy simulation platform`
 - The GitHub repository was empty when the Supabase branch was first pushed, so `agent/supabase-backend` became its first/default branch. There was no base branch for a pull request.
-- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `de2035f`, which restores desktop active-calibration scrolling on top of range-selection scrolling, desktop navigation suppression, completed-hand navigation fixes, the persistent 3× BB shortcut, compact mobile calibration table, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
+- `origin/agent/strategy-review-calibration` points to `6efeda4`. The remote default/production branch `origin/agent/supabase-backend` and `origin/HEAD` point to `1b25a96`, which reveals calibration opponent cards only for seats whose engine result has `showedDown: true`, with the existing card-turn animation. It sits on top of desktop active-calibration scrolling, range-selection scrolling, desktop navigation suppression, completed-hand navigation fixes, the persistent 3× BB shortcut, compact mobile calibration table, 45-second user clock, calibration stakes/table-size selection, PokerStars-style sizing, selective-aggressor, opponent-type analytics, calibration viewport-stability, and mobile poker-table work.
 - Hosted Supabase project: `oxrqtwqkzkembnglhbtn` (`https://oxrqtwqkzkembnglhbtn.supabase.co`)
 - Vercel project: `optvis/poker-sim`
 - Production site: `https://poker-sim-iota.vercel.app`
@@ -283,6 +283,16 @@ QuantPoker now explains its poker acronyms and advanced analytics without removi
 - Both all-hands and range-first calibration synthesize lightweight card-deal and decision sounds without external media files. Sounds default on after a user gesture, persist their mute state locally, and have an in-session toggle.
 - Calibration hole cards and newly revealed board cards turn into view with staggered card animation. Reduced-motion preferences continue to collapse animation duration globally.
 
+## Analytics density and review access refinement
+
+- The strategy profile's **Use in an experiment** action and the experiment page's primary **Simulated Hand Review** action use a larger shared button treatment on desktop and mobile.
+- Completed solo experiments repeat the review action after the hand-history and interpretation content, so users who reach the bottom do not need to manually scroll back. If a review is already open, the action returns to it; otherwise it loads the stored hands, opens the review, and scrolls to the panel.
+- Both review actions remain in normal document flow. The existing mobile content padding keeps the bottom action above the fixed tab bar, and the review panel has scroll margin for the sticky mobile header, so neither action covers nearby content.
+- Strategy-profile showdown analytics now summarize the saw-flop sample, showdowns reached, and showdowns won. Bet-sizing analytics now distinguish observed data from the default prior and add the sample count, median, and middle-half sizing range.
+- Every experiment breakdown now ends with compact sample-derived highlights: best/hardest/largest samples for positions, pot types, and stack depths; total/aggressive/most-common actions; sized-action count, common sizing band, and large-sizing share; plus starting-hand coverage and observed best/hardest classes.
+- The six experiment breakdowns use two independently flowing desktop columns instead of stretching short panels to the height of a much taller neighbor. The advanced-stat grid's former empty eighth slot now reports current drawdown, with a safe unavailable state for legacy stored results.
+- `components/charts.jsx` owns the reusable accessible highlight strip; `app/globals.css` owns the prominent button size; `app/(main)/profile/page.jsx` and `app/(main)/experiments/[id]/page.jsx` provide the derived analytics and review behavior. No simulation, persistence, schema, or seeded-result behavior changed.
+
 ## Opponent-type strategy performance analytics completed
 
 - Completed solo and real-users-with-bots experiments now show which heuristic player archetypes the selected strategy performed best and worst against.
@@ -434,7 +444,8 @@ Validation on deployed JavaScript migration commit `7a8c247` passed:
 
 New application tests include:
 
-- Current working-tree validation after adding showdown-only opponent reveals: all 15 Vitest files / 102 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Tests verify that user cards remain visible, opponents stay hidden without a showdown or with `showedDown: false`, true-showdown cards render inside compact calibration seats, the two card glyphs are accessible, and the card-turn animation is present.
+- Current working-tree validation for the analytics-density and review-access refinement: all 15 Vitest files / 102 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
+- Validation for showdown-only opponent reveal commit `1b25a96`: all 15 Vitest files / 102 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Tests verify that user cards remain visible, opponents stay hidden without a showdown or with `showedDown: false`, true-showdown cards render inside compact calibration seats, the two card glyphs are accessible, and the card-turn animation is present.
 - Current working-tree validation after restoring desktop active-calibration scrolling: headless Chrome at 1440×900 reports `bodyOverflowY: auto`, a 931px document with the full betting panel visible, and a real mouse-wheel change from `scrollTop: 0` to `31`. At 1366×768 the document is 889px tall and the completed scroll position is 121px, with controls ending at 736.1px inside the viewport. The paired 390×844 phone check retains `overflow-y: hidden`, an 844px document, hidden bottom tabs, and fully visible controls. All 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices.
 - Current working-tree validation after restoring range-selection scrolling: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. Both calibration flows now enumerate the three active-hand phases explicitly instead of treating every non-setup phase as scroll-locked.
 - Current working-tree validation after making the bottom tab bar strictly phone-only: all 15 Vitest files / 99 tests pass, ESLint passes, the Next.js production build passes all 19 routes, and `git diff --check` is clean apart from expected Windows LF/CRLF notices. The new `min-width: 768px` rule changes only desktop/tablet-width rendering; phone navigation remains unchanged.
@@ -529,9 +540,9 @@ The production backend and deployment are connected:
 - The persistent 3× BB shortcut and prominent next-hand controls were committed and pushed through `f4a4a18`. Exact live-site verification of that deployment remains pending.
 - The full-mobile-range bottom-tab visibility fix was committed and pushed through `2b29885`. Exact live-site verification of that deployment remains pending.
 - The desktop bottom-tab suppression was committed and pushed through `37f4bc1`. Exact live-site verification of that deployment remains pending.
-- The range-selection scrolling fix was committed and pushed through `ee9c766`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
-- The desktop active-calibration scrolling fix was committed and pushed through `de2035f`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`. Exact live-site verification of that deployment remains pending.
-- The showdown-only opponent-card reveal is local and uncommitted. It has not been pushed to `agent/supabase-backend` or deployed to Vercel.
+- The range-selection scrolling fix was committed and pushed through `ee9c766`. Exact live-site verification of that deployment remains pending.
+- The desktop active-calibration scrolling fix was committed and pushed through `de2035f`. Exact live-site verification of that deployment remains pending.
+- The showdown-only opponent-card reveal was committed and pushed through `1b25a96`, the current local `HEAD`, `origin/agent/supabase-backend`, and `origin/HEAD`, triggering the production deployment workflow. Exact live-site verification of that deployment remains pending.
 - Production also serves the beginner-first percentage analytics, expandable review counts, repeatable post-acceptance reviews, calibration-style correction sizing, calibration sounds, and card-turn animation. Exact live asset fingerprints were checked after the earlier JavaScript production-branch push.
 
 Remaining external verification:
@@ -548,14 +559,15 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `app/calibrate/page.jsx` — creates and saves unrestricted calibration datasets with 1/3 or 2/5 stakes, an every-street chip-denominated three-big-blind sizing shortcut, prominent next-hand controls, showdown-gated opponent cards, hand-phase-only body state for navigation visibility, and phone viewport preservation between hands
 - `app/range-calibrate/page.jsx` — explicit scrollable 169-hand range selection plus timed 1/3 or 2/5 betting calibration, with the same every-street sizing shortcut, prominent next-selected-hand controls, showdown-gated opponent cards, hand-phase-only body state, and phone viewport preservation between hands
 - `app/glossary/page.jsx` — full beginner-friendly poker and advanced analytics glossary
+- `app/profile/page.jsx` — saved-strategy selection and naming, enlarged experiment entry action, tendency analytics, showdown samples, and bet-sizing distribution highlights
 - `app/experiments/new/page.jsx` — creates experiments with 1/3 and 2/5 stake presets plus editable custom blinds
-- `app/experiments/[id]/page.jsx` — runs simulations, atomically finalizes results/hands, and renders opponent-type matchup analytics
+- `app/experiments/[id]/page.jsx` — runs simulations, atomically finalizes results/hands, renders opponent-type and sample-derived breakdown analytics, and provides top/bottom Simulated Hand Review entry points
 - `app/experiments/page.jsx` — previous-experiment history and saved-run entry points
 - `app/accuracy/page.jsx` — in-browser review-feedback summary
 - `app/settings/page.jsx` — active storage summary, delete operations, browser import
 - `app/login/page.jsx` — sign-in/sign-up UI
 - `app/auth/confirm/route.js` — authentication callback
-- `app/globals.css` — shared themes plus phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, phone-only active-calibration viewport locking, desktop active-calibration document scrolling, responsive completed-hand controls, full-mobile-range bottom-tab suppression during calibration, and explicit desktop suppression of the phone-only tab bar
+- `app/globals.css` — shared themes plus prominent CTA sizing, phone safe areas, navigation, touch sizing, table geometry, data-view responsiveness, phone-only active-calibration viewport locking, desktop active-calibration document scrolling, responsive completed-hand controls, full-mobile-range bottom-tab suppression during calibration, and explicit desktop suppression of the phone-only tab bar
 - `components/Nav.jsx` — desktop sidebar plus phone top bar, bottom tabs, grouped drawer, storage/account indicator, and sign-out
 - `components/ActionClock.jsx` — reusable online-style decision countdown
 - `components/CalibrationGameSelector.jsx` — upfront 1/3-or-2/5 and 6-player-or-9-player calibration game selection plus the selected-game summary
@@ -565,6 +577,7 @@ Never expose a Supabase secret or service-role key through `NEXT_PUBLIC_*`.
 - `components/StartingHandGrid.jsx` — accessible 169-hand grid with single-click and primary-mouse drag painting
 - `lib/audio/poker-sounds.js` — browser-safe synthesized deal/action audio plus persisted calibration sound preference
 - `components/AnalyticsGlossary.jsx` — reusable glossary data, expandable contextual guides, and full glossary renderer
+- `components/charts.jsx` — native result charts plus reusable accessible analytics-highlight strips
 - `components/OpponentMatchups.jsx` — best/hardest matchup summaries and the ranked opponent-archetype performance table
 - `components/HandReplayer.jsx` — hand replay including voluntary-action timing and timeout labels
 - `components/StrategyReview.jsx` — in-browser simulated-decision survey over stored hands

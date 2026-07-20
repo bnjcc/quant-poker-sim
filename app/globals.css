@@ -114,6 +114,7 @@ body::before {
 .btn-primary:hover::after { transform: translateX(120%); }
 .btn-primary:hover { filter: brightness(1.06); box-shadow: 0 10px 32px rgba(var(--accent-rgb), 0.28); }
 .btn-danger:hover { border-color: var(--loss); color: var(--loss); }
+.btn.btn-prominent { min-height: 3rem; padding: .72rem 1.25rem; font-size: .9rem; }
 
 .field {
   background: rgba(5, 6, 9, 0.55);

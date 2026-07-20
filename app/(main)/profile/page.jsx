@@ -14,7 +14,20 @@ import {
   fmtPct,
 } from "@/components/ui";
 import { AnalyticsGlossary } from "@/components/AnalyticsGlossary";
+import { AnalyticsHighlights } from "@/components/charts";
 import { PREFLOP_POSITION_ORDER } from "@/types/poker";
+
+function percentile(sortedValues, fraction) {
+  if (sortedValues.length === 0) return null;
+  const index = (sortedValues.length - 1) * fraction;
+  const lowerIndex = Math.floor(index);
+  const upperIndex = Math.ceil(index);
+  const weight = index - lowerIndex;
+  return (
+    sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight
+  );
+}
+
 function TendencyRow({ label, stat, hint }) {
   return (
     <div
@@ -110,6 +123,10 @@ export default function ProfilePage() {
   const timingCueCount = timedDecisions.filter(
     (decision) => decision.context.lastOpponentAction,
   ).length;
+  const sortedBetSizes = [...t.betSizing.samples].sort((a, b) => a - b);
+  const medianBetSize = percentile(sortedBetSizes, 0.5);
+  const lowerBetQuartile = percentile(sortedBetSizes, 0.25);
+  const upperBetQuartile = percentile(sortedBetSizes, 0.75);
   const selectStrategy = (id) => {
     const next = cals.find((strategy) => strategy.id === id);
     setSelected(id);
@@ -157,7 +174,7 @@ export default function ProfilePage() {
         right={
           <Link
             href={`/experiments/new?strategy=${encodeURIComponent(cal.id)}`}
-            className="btn btn-primary"
+            className="btn btn-primary btn-prominent"
           >
             Use in an experiment
           </Link>
@@ -353,7 +370,7 @@ export default function ProfilePage() {
       )}
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <section className="panel px-5 py-4">
+        <section className="panel px-5 py-4 self-start">
           <h2 className="font-semibold mb-2">
             {rangeFirst
               ? "Actions within the selected range"
@@ -392,7 +409,7 @@ export default function ProfilePage() {
           />
         </section>
 
-        <section className="panel px-5 py-4">
+        <section className="panel px-5 py-4 self-start">
           <h2 className="font-semibold mb-2">Postflop tendencies</h2>
           <TendencyRow
             label="C-bet — continuation bet"
@@ -421,7 +438,7 @@ export default function ProfilePage() {
           />
         </section>
 
-        <section className="panel px-5 py-4">
+        <section className="panel px-5 py-4 self-start">
           <h2 className="font-semibold mb-2">Showdown behavior</h2>
           <TendencyRow
             label="Went to showdown (saw flop)"
@@ -438,9 +455,29 @@ export default function ProfilePage() {
             stat={t.bluffProxy}
             hint="Heuristic: turn/river aggression showed down with no pair"
           />
+          <AnalyticsHighlights
+            label="Showdown sample highlights"
+            items={[
+              {
+                label: "Saw-flop sample",
+                value: t.wentToShowdown.denominator.toLocaleString(),
+                detail: "hands eligible for the showdown rate",
+              },
+              {
+                label: "Showdowns reached",
+                value: t.wentToShowdown.numerator.toLocaleString(),
+                detail: "after seeing a flop",
+              },
+              {
+                label: "Showdowns won",
+                value: t.wonAtShowdown.numerator.toLocaleString(),
+                detail: `of ${t.wonAtShowdown.denominator.toLocaleString()} observed showdowns`,
+              },
+            ]}
+          />
         </section>
 
-        <section className="panel px-5 py-4">
+        <section className="panel px-5 py-4 self-start">
           <h2 className="font-semibold mb-2">
             Positional looseness (VPIP by position)
           </h2>
@@ -453,16 +490,49 @@ export default function ProfilePage() {
             />
           ))}
           <h2 className="font-semibold mb-2 mt-4">Bet sizing</h2>
-          <div className="text-sm text-muted">
-            Postflop bets average{" "}
-            <span className="mono text-ink">
-              {(t.betSizing.mean * 100).toFixed(0)}% of pot
-            </span>{" "}
-            (σ {(t.betSizing.std * 100).toFixed(0)}%,{" "}
-            {t.betSizing.samples.length} sized bets). The simulated model
-            samples from your observed sizes when enough exist, blended with a
-            ⅔-pot prior.
-          </div>
+          {sortedBetSizes.length > 0 ? (
+            <div className="text-sm text-muted">
+              Postflop bets average{" "}
+              <span className="mono text-ink">
+                {(t.betSizing.mean * 100).toFixed(0)}% of pot
+              </span>{" "}
+              (σ {(t.betSizing.std * 100).toFixed(0)}%,{" "}
+              {sortedBetSizes.length} sized bets). The simulated model samples
+              from your observed sizes when enough exist, blended with a ⅔-pot
+              prior.
+            </div>
+          ) : (
+            <div className="text-sm text-muted">
+              No postflop bet sizes were recorded in this calibration. The
+              simulated model currently relies on its ⅔-pot prior.
+            </div>
+          )}
+          <AnalyticsHighlights
+            label="Bet sizing highlights"
+            items={[
+              {
+                label: "Sized bets",
+                value: sortedBetSizes.length.toLocaleString(),
+                detail: "recorded postflop bets and raises",
+              },
+              {
+                label: "Median size",
+                value:
+                  medianBetSize === null
+                    ? "—"
+                    : `${(medianBetSize * 100).toFixed(0)}% pot`,
+                detail: "half of observed sizes were above and below",
+              },
+              {
+                label: "Middle 50%",
+                value:
+                  lowerBetQuartile === null || upperBetQuartile === null
+                    ? "—"
+                    : `${(lowerBetQuartile * 100).toFixed(0)}–${(upperBetQuartile * 100).toFixed(0)}% pot`,
+                detail: "typical sizing range, excluding the outer quarters",
+              },
+            ]}
+          />
         </section>
       </div>
 

@@ -17,6 +17,7 @@ import { riskOfRuin } from "@/lib/analytics/aggregate";
 import { formatDecisionTime } from "@/lib/simulation/timing";
 import { getStore, newId } from "@/lib/storage/store";
 import {
+  AnalyticsHighlights,
   BetSizeChart,
   BreakdownBars,
   EquityCurve,
@@ -48,6 +49,170 @@ const POSITION_ORDER = [
   "SB",
   "BB",
 ];
+
+const BET_SIZE_LABELS = [
+  "Under ⅓ pot",
+  "⅓–½ pot",
+  "½–¾ pot",
+  "¾ pot–pot",
+  "Pot–1.5x",
+  "Over 1.5x pot",
+];
+
+function breakdownHighlights(rows) {
+  const entries = Object.entries(rows ?? {}).filter(
+    ([, row]) => row && row.hands > 0 && Number.isFinite(row.bb100),
+  );
+  if (entries.length === 0) {
+    return [
+      {
+        label: "Categories covered",
+        value: "0",
+        detail: "no qualifying hands in this run",
+      },
+      {
+        label: "Best observed",
+        value: "—",
+        detail: "not enough data",
+      },
+      {
+        label: "Hardest observed",
+        value: "—",
+        detail: "not enough data",
+      },
+    ];
+  }
+  const strongest = entries.reduce((best, entry) =>
+    entry[1].bb100 > best[1].bb100 ? entry : best,
+  );
+  const hardest = entries.reduce((worst, entry) =>
+    entry[1].bb100 < worst[1].bb100 ? entry : worst,
+  );
+  const mostSeen = entries.reduce((most, entry) =>
+    entry[1].hands > most[1].hands ? entry : most,
+  );
+  const item = (label, entry) => ({
+    label,
+    value: entry[0],
+    detail: `${fmtWinRatePct(entry[1].bb100)} over ${entry[1].hands.toLocaleString()} hands`,
+  });
+  return [
+    item("Best observed", strongest),
+    item("Hardest observed", hardest),
+    item("Largest sample", mostSeen),
+  ];
+}
+
+function actionHighlights(counts) {
+  const entries = Object.entries(counts ?? {}).filter(
+    ([, count]) => Number.isFinite(count) && count > 0,
+  );
+  const total = entries.reduce((sum, [, count]) => sum + count, 0);
+  const aggressive = ["bet", "raise", "all-in"].reduce(
+    (sum, action) => sum + (counts?.[action] ?? 0),
+    0,
+  );
+  const mostCommon = entries.reduce(
+    (most, entry) => (!most || entry[1] > most[1] ? entry : most),
+    null,
+  );
+  return [
+    {
+      label: "Actions observed",
+      value: total.toLocaleString(),
+      detail: "voluntary simulated decisions",
+    },
+    {
+      label: "Aggressive share",
+      value: total ? fmtPct(aggressive / total, 1) : "—",
+      detail: "bets, raises, and all-ins",
+    },
+    {
+      label: "Most common",
+      value: mostCommon?.[0] ?? "—",
+      detail: mostCommon
+        ? `${fmtPct(mostCommon[1] / total, 1)} of observed actions`
+        : "no actions observed",
+    },
+  ];
+}
+
+function betSizeHighlights(histogram) {
+  const counts = BET_SIZE_LABELS.map((_, index) => histogram?.[index] ?? 0);
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  const mostCommonIndex = counts.reduce(
+    (bestIndex, count, index) => (count > counts[bestIndex] ? index : bestIndex),
+    0,
+  );
+  const threeQuarterPotOrMore = counts
+    .slice(3)
+    .reduce((sum, count) => sum + count, 0);
+  return [
+    {
+      label: "Sized actions",
+      value: total.toLocaleString(),
+      detail: "bets and raises with a measurable pot fraction",
+    },
+    {
+      label: "Most common size",
+      value: total ? BET_SIZE_LABELS[mostCommonIndex] : "—",
+      detail: total
+        ? `${fmtPct(counts[mostCommonIndex] / total, 1)} of sized actions`
+        : "no sized actions observed",
+    },
+    {
+      label: "¾ pot or more",
+      value: total ? fmtPct(threeQuarterPotOrMore / total, 1) : "—",
+      detail: "large bets, pot-sized bets, and overbets",
+    },
+  ];
+}
+
+function startingHandHighlights(rows) {
+  const entries = Object.entries(rows ?? {}).filter(
+    ([, row]) => row && row.hands > 0 && Number.isFinite(row.bb100),
+  );
+  if (entries.length === 0) {
+    return [
+      {
+        label: "Hands mapped",
+        value: "0 / 169",
+        detail: "no starting-hand results in this run",
+      },
+      {
+        label: "Best observed",
+        value: "—",
+        detail: "not enough data",
+      },
+      {
+        label: "Hardest observed",
+        value: "—",
+        detail: "not enough data",
+      },
+    ];
+  }
+  const strongest = entries.reduce((best, entry) =>
+    entry[1].bb100 > best[1].bb100 ? entry : best,
+  );
+  const hardest = entries.reduce((worst, entry) =>
+    entry[1].bb100 < worst[1].bb100 ? entry : worst,
+  );
+  const resultItem = (label, entry) => ({
+    label,
+    value: entry[0],
+    detail: `${fmtWinRatePct(entry[1].bb100)} over ${entry[1].hands.toLocaleString()} hands`,
+  });
+  return [
+    {
+      label: "Hands mapped",
+      value: `${entries.length} / 169`,
+      detail: "distinct starting-hand classes observed",
+    },
+    resultItem("Best observed", strongest),
+    resultItem("Hardest observed", hardest),
+  ];
+}
+
 export default function ExperimentDetailPage() {
   const { id } = useParams();
   const [exp, setExp] = useState(undefined);
@@ -65,6 +230,8 @@ export default function ExperimentDetailPage() {
   const [sortByLoss, setSortByLoss] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const reviewSectionRef = useRef(null);
+  const scrollToReviewOnOpenRef = useRef(false);
   useEffect(() => {
     (async () => {
       const store = getStore();
@@ -73,6 +240,14 @@ export default function ExperimentDetailPage() {
       if (e?.calibrationId) setCal(await store.getCalibration(e.calibrationId));
     })();
   }, [id]);
+  useEffect(() => {
+    if (!reviewOpen || !scrollToReviewOnOpenRef.current) return;
+    scrollToReviewOnOpenRef.current = false;
+    reviewSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [reviewOpen]);
   const executeRun = useCallback(async (source, policy) => {
     setRunning(true);
     setError(null);
@@ -159,9 +334,10 @@ export default function ExperimentDetailPage() {
         setError(
           "No simulated hands were stored for review. Run the experiment again to create a review sample.",
         );
-        return;
+        return false;
       }
       setReviewOpen(true);
+      return true;
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -172,6 +348,18 @@ export default function ExperimentDetailPage() {
       setReviewLoading(false);
     }
   }, [hands, loadHands]);
+  const startReviewFromBottom = useCallback(async () => {
+    if (reviewOpen) {
+      reviewSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      return;
+    }
+    scrollToReviewOnOpenRef.current = true;
+    const opened = await startReview();
+    if (!opened) scrollToReviewOnOpenRef.current = false;
+  }, [reviewOpen, startReview]);
   const submitStrategyReview = useCallback(
     async (answers) => {
       if (!exp || !cal || answers.length === 0) return;
@@ -288,8 +476,16 @@ export default function ExperimentDetailPage() {
     r && r.bb100 !== 0
       ? riskOfRuin(r.bb100, r.stdDevBBPerHand, bankroll)
       : null;
+  const currentDrawdownBB = Number.isFinite(r?.currentDrawdownBB)
+    ? r.currentDrawdownBB
+    : null;
   const manual = cal?.manualAggregates ?? null;
   const strategyName = cal?.name ?? exp.strategyName ?? "Deleted strategy";
+  const reviewButtonLabel = reviewLoading
+    ? "Loading review hands..."
+    : exp.strategyReview?.acceptedAt
+      ? "Review more simulated hands"
+      : "Simulated Hand Review";
   return (
     <div>
       <PageHeader
@@ -454,7 +650,10 @@ export default function ExperimentDetailPage() {
           )}
 
           {!isMultiplayer && (
-          <section className="panel px-5 py-4 mb-6">
+          <section
+            ref={reviewSectionRef}
+            className="panel px-5 py-4 mb-6 scroll-mt-20 md:scroll-mt-4"
+          >
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
               <div>
                 <h2 className="font-semibold">Simulated Hand Review</h2>
@@ -529,15 +728,11 @@ export default function ExperimentDetailPage() {
                   </div>
                 )}
                 <button
-                  className="btn btn-primary"
-                  onClick={startReview}
+                  className="btn btn-primary btn-prominent"
+                  onClick={() => void startReview()}
                   disabled={running || reviewLoading}
                 >
-                  {reviewLoading
-                    ? "Loading review hands..."
-                    : exp.strategyReview?.acceptedAt
-                      ? "Review more simulated hands"
-                      : "Simulated Hand Review"}
+                  {reviewButtonLabel}
                 </button>
               </div>
             )}
@@ -724,35 +919,65 @@ export default function ExperimentDetailPage() {
           </div>
 
           {/* Breakdowns */}
-          <div className="grid lg:grid-cols-2 gap-4 mb-6">
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Win rate by position (%)</h2>
-              <BreakdownBars rows={r.byPosition} order={POSITION_ORDER} />
-            </section>
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Win rate by pot type (%)</h2>
-              <BreakdownBars rows={r.byPotType} />
-            </section>
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">
-                Win rate by your stack depth (%)
-              </h2>
-              <BreakdownBars rows={r.byStackDepth} />
-            </section>
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Simulated action mix</h2>
-              <FrequencyBars counts={r.actionCounts} />
-            </section>
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">
-                Bet sizing (fraction of pot)
-              </h2>
-              <BetSizeChart hist={r.betSizeHistogram} />
-            </section>
-            <section className="panel px-5 py-4">
-              <h2 className="font-semibold mb-2">Starting-hand win rate (%)</h2>
-              <StartingHandHeatmap rows={r.byHoleCards} />
-            </section>
+          <div className="grid lg:grid-cols-2 gap-4 mb-6 items-start">
+            <div className="grid gap-4 min-w-0">
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">Win rate by position (%)</h2>
+                <BreakdownBars rows={r.byPosition} order={POSITION_ORDER} />
+                <AnalyticsHighlights
+                  label="Position highlights"
+                  items={breakdownHighlights(r.byPosition)}
+                />
+              </section>
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">
+                  Win rate by your stack depth (%)
+                </h2>
+                <BreakdownBars rows={r.byStackDepth} />
+                <AnalyticsHighlights
+                  label="Stack-depth highlights"
+                  items={breakdownHighlights(r.byStackDepth)}
+                />
+              </section>
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">
+                  Bet sizing (fraction of pot)
+                </h2>
+                <BetSizeChart hist={r.betSizeHistogram} />
+                <AnalyticsHighlights
+                  label="Bet sizing highlights"
+                  items={betSizeHighlights(r.betSizeHistogram)}
+                />
+              </section>
+            </div>
+            <div className="grid gap-4 min-w-0">
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">Win rate by pot type (%)</h2>
+                <BreakdownBars rows={r.byPotType} />
+                <AnalyticsHighlights
+                  label="Pot-type highlights"
+                  items={breakdownHighlights(r.byPotType)}
+                />
+              </section>
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">Simulated action mix</h2>
+                <FrequencyBars counts={r.actionCounts} />
+                <AnalyticsHighlights
+                  label="Action-mix highlights"
+                  items={actionHighlights(r.actionCounts)}
+                />
+              </section>
+              <section className="panel px-5 py-4">
+                <h2 className="font-semibold mb-2">
+                  Starting-hand win rate (%)
+                </h2>
+                <StartingHandHeatmap rows={r.byHoleCards} />
+                <AnalyticsHighlights
+                  label="Starting-hand highlights"
+                  items={startingHandHighlights(r.byHoleCards)}
+                />
+              </section>
+            </div>
           </div>
 
           {/* Manual vs simulated */}
@@ -875,6 +1100,16 @@ export default function ExperimentDetailPage() {
               label="Timeout rate"
               value={timeoutRate === null ? "—" : fmtPct(timeoutRate, 2)}
               sub="auto check/fold"
+            />
+            <Stat
+              label="Current drawdown"
+              value={
+                currentDrawdownBB === null
+                  ? "—"
+                  : `${currentDrawdownBB.toFixed(0)} bb`
+              }
+              tone={currentDrawdownBB > 0 ? "loss" : undefined}
+              sub="below this run's prior peak"
             />
           </div>
 
@@ -1025,6 +1260,31 @@ export default function ExperimentDetailPage() {
             a small sample — a positive result here is evidence about this
             simulated pool, not a guarantee about live play.
           </div>
+
+          {!isMultiplayer &&
+            exp.status === "complete" &&
+            !exp.strategyReview?.pendingRerunRoundId && (
+              <section className="panel px-5 py-4 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="font-semibold">
+                    Review the simulated decisions
+                  </h2>
+                  <p className="text-xs text-muted mt-1 max-w-2xl">
+                    Confirm where the model matches your strategy and correct
+                    the decisions you would play differently.
+                  </p>
+                </div>
+                <button
+                  className="btn btn-primary btn-prominent shrink-0"
+                  onClick={() => void startReviewFromBottom()}
+                  disabled={running || reviewLoading}
+                >
+                  {reviewOpen
+                    ? "Continue Simulated Hand Review"
+                    : reviewButtonLabel}
+                </button>
+              </section>
+            )}
         </>
       )}
 
