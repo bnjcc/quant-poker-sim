@@ -1,94 +1,279 @@
-# QuantPoker — Poker Strategy Simulation Platform
+# QuantPoker
 
-Play a small calibration sample yourself, let the system learn a behavioral model of _your_ strategy, then backtest that model over hundreds of thousands of simulated hands against configurable opponent pools — and analyze the results like a quant.
+### Learn a player's poker strategy, simulate it at scale, and explain the result.
 
-6-max No-Limit Hold'em cash games. Next.js 15 · Supabase · JavaScript · Tailwind v4 · Recharts · Zod · Vitest.
+[Live demo](https://poker-sim-iota.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [Limitations](docs/LIMITATIONS.md) · [Maintainer context](PROJECT_CONTEXT.md)
 
-## Quick start
+QuantPoker is a behavioral modeling and reproducible backtesting platform for No-Limit Hold'em. A player completes a short calibration, the application turns those decisions into an uncertainty-aware policy, and that policy is tested across configurable poker environments.
+
+It is designed to answer questions such as:
+
+- How does this strategy perform against a tighter or more aggressive opponent pool?
+- How much of the result is signal, and how much is normal poker variance?
+- Where does the strategy win or lose: position, stack depth, pot type, sizing, or opponent archetype?
+- Which simulated decisions came from player data, and which leaned on the model's prior?
+
+> QuantPoker is a strategy-comparison instrument, not a GTO solver or an earnings forecast. Results describe a learned policy against a synthetic pool under the selected rules.
+
+## Why this project matters
+
+Poker players usually assess a strategy through memory, small samples, or aggregate tracker statistics. Those methods make controlled experiments difficult: the cards change, the opponents change, and variance can overwhelm the effect being measured.
+
+QuantPoker creates a repeatable experimental loop:
+
+```mermaid
+flowchart LR
+    A["Play calibration hands"] --> B["Build behavioral policy"]
+    B --> C["Configure opponent pool and rules"]
+    C --> D["Run seeded simulation"]
+    D --> E["Analyze uncertainty and breakdowns"]
+    E --> F["Review low-confidence decisions"]
+    F --> B
+```
+
+The same seed, configuration, and simulation version reproduce the same cards, decisions, and table events. A user can therefore change one variable and make a much cleaner comparison.
+
+## Hackathon demo path
+
+For the fastest end-to-end review:
+
+1. Open the [live application](https://poker-sim-iota.vercel.app) and create an account, or run locally in browser-only mode.
+2. Choose **Range-first calibration** and select a shared or position-specific starting range.
+3. Play a short sample and inspect the generated **Strategy profile**.
+4. Create an experiment with a fixed seed, opponent mix, stakes, rake, and hand count.
+5. Run the experiment and inspect win rate, confidence interval, drawdown, matchup, and hand-history views.
+6. Open **Simulated Hand Review**, correct a low-confidence action, and rerun the same seed.
+7. Duplicate the experiment, change one variable, and compare both runs side by side.
+
+For a live presentation, prepare one completed calibration and one completed experiment in advance. A small run demonstrates execution quickly; a larger saved run better demonstrates the statistical views.
+
+## What the system records
+
+Calibration captures the full decision context rather than only the chosen button:
+
+- street, position, hole cards, board, and active-player count;
+- effective stack, pot, amount faced, pot odds, and stack-to-pot ratio;
+- legal actions and prior action history;
+- selected action and bet size as a fraction of the pot;
+- real response time, timeout state, and the previous opponent's timing cue.
+
+Range-first calibration supports one exact 169-hand chart for all seats or independent charts by position. The table can be six-handed or full ring. Calibration drafts checkpoint after every completed hand and can resume after navigation, refresh, sign-out, or closing the browser.
+
+Calibration opponents are intentionally optimized for measurement coverage. They produce varied pressure, timing, and showdown opportunities so a limited sample teaches the model more. Calibration winnings are therefore not treated as a realistic performance estimate.
+
+## How the learned strategy works
+
+QuantPoker produces two separate model layers.
+
+### Descriptive profile
+
+The profile reports poker statistics such as VPIP, PFR, three-bet rate, continuation betting, aggression, sizing, showdown behavior, and timing. Frequencies use smoothing and Wilson 95% intervals so sparse samples do not look more certain than they are.
+
+These statistics explain the sample; they do not directly control simulated actions.
+
+### Generative behavioral policy
+
+The policy groups decisions by:
+
+```text
+street × position class × facing situation × hand-strength quartile × opponent timing
+```
+
+Each bucket stores action counts, empirical bet sizes, and response-time samples. At decision time:
+
+- observed action frequencies are blended with a strength-aware prior;
+- the data weight is `n / (n + 8)`, so sparse buckets remain conservative;
+- empty exact buckets fall back through broader contexts;
+- timing-specific contexts can fall back to dense untimed buckets;
+- probability assigned to illegal actions flows to sensible legal substitutes;
+- sizing and decision time are sampled from player observations with safe priors.
+
+Every simulated user decision records its probability distribution and data-versus-prior confidence. The results can therefore expose how much of the generated play was supported by calibration data.
+
+## Simulation architecture
+
+The application is layered so the simulation core is independent of React, Next.js, and the browser DOM:
+
+```mermaid
+flowchart TD
+    UI["Next.js UI · calibration · charts · replay"]
+    SIM["Simulation · manual session · table lifecycle · batch runner"]
+    POLICY["Learned policy · 14 heuristic opponent archetypes"]
+    CORE["Poker engine · seeded RNG · evaluator · Monte Carlo equity"]
+    DATA["Incremental analytics · storage abstraction"]
+    CLOUD["Supabase Auth · Postgres · RLS"]
+
+    UI --> SIM
+    SIM --> POLICY
+    POLICY --> CORE
+    SIM --> DATA
+    DATA --> CLOUD
+```
+
+### Poker engine
+
+`HandEngine` owns blinds, dealing, betting rounds, burn cards, all-in runouts, side pots, rake, and settlement. Tests cover chip conservation, legal minimum raises, incomplete all-in raises, folded contributions, refunds, split pots, odd chips, and heads-up blind rules.
+
+Two hand evaluators are cross-validated:
+
+- a readable reference evaluator checks all 21 five-card combinations;
+- an allocation-free bitmask evaluator powers the Monte Carlo hot path.
+
+### Reproducible randomness
+
+A seeded Mulberry32 generator controls shuffling, equity samples, agent choices, timing, and player turnover. Each hand stores the RNG state from before the deal. The tuple `(seed, configuration, simulation version)` determines an entire run.
+
+### Opponent population
+
+Fourteen heuristic archetypes represent styles such as tight-aggressive, loose-aggressive, passive, calling, bluff-heavy, and adaptive play. Profiles are parameter vectors rather than fixed scripts. Per-instance jitter prevents every instance of an archetype from behaving identically.
+
+Preflop decisions combine hand strength, position, stack state, and profile thresholds. Postflop decisions combine seeded Monte Carlo equity, pot odds, and profile-driven value, bluff, calling, and aggression behavior. These agents are intentionally exploitable approximations, not equilibrium players.
+
+### Table lifecycle
+
+Experiments model session lengths, stop-loss and stop-win departures, rebuys, random turnover, short-handed play, button movement, and replacements from a weighted pool. Multiplayer runs can seat published learned policies with bots or run a players-only table.
+
+### Batch runner
+
+`runSimulation` is environment-agnostic. It runs an asynchronous loop in 200-hand chunks, reports progress, supports cancellation, and yields between chunks to keep the page responsive. The current browser implementation reaches roughly 1,500–2,000 hands per second on typical development hardware.
+
+Because the core has no DOM dependency, the same runner can move to a Web Worker or server job worker without rewriting the game model.
+
+## Analytics and review loop
+
+The incremental aggregator performs constant work per completed hand and bounds chart data to roughly 2,000 points. It reports:
+
+- win rate in big blinds per 100 hands and a 95% confidence interval;
+- per-hand volatility, significance relative to break-even, and risk of ruin;
+- bankroll curve, current drawdown, and maximum drawdown;
+- profit factor, rake, and showdown/non-showdown winnings;
+- position, starting-hand, stack-depth, pot-type, action, sizing, and opponent breakdowns.
+
+Detailed runs retain hand histories. Runs over 20,000 hands automatically use high-speed mode, preserving complete aggregates plus sampled histories.
+
+**Simulated Hand Review** samples low-confidence decisions from different stored hands, reconstructs the table immediately before each action, and hides future cards. Confirmations and corrections become higher-weight training observations. If a correction changes the policy, QuantPoker reruns the same seed to isolate the policy change from environmental randomness.
+
+## Multiplayer and privacy
+
+Cloud users receive unique usernames and can connect through accepted friendships. A user may explicitly publish one learned strategy snapshot to direct friends and friends of friends.
+
+Only the serialized policy and presentation metadata are shared. Raw calibration decisions, email addresses, experiments, and hand histories remain private. Multiplayer experiments copy selected policies as point-in-time snapshots so later profile or friendship changes do not mutate an existing run.
+
+Supabase row-level security ties private rows to `auth.uid()`. Security-definer database functions handle social graph operations, atomic experiment finalization, review commits, and the aggregate strategy leaderboard.
+
+## Built with Codex and GPT-5.6
+
+Codex powered by GPT-5.6 was used as an engineering copilot across the repository—not as a runtime dependency of the poker product.
+
+The Codex-assisted workflow included:
+
+- translating the product idea into separable engine, policy, simulation, analytics, storage, and UI layers;
+- implementing and reviewing poker-rule edge cases such as side pots, minimum raises, all-ins, rake, and heads-up transitions;
+- building deterministic tests for seeded runs, evaluator agreement, table turnover, policy compatibility, storage, security, and review recalibration;
+- iterating on responsive calibration layouts and diagnosing mobile viewport behavior;
+- designing Supabase migrations, row-level-security boundaries, and local/cloud storage parity;
+- maintaining `PROJECT_CONTEXT.md` as a durable handoff between long, multi-step Codex sessions;
+- running test, lint, and production-build checks after changes and documenting unresolved limitations.
+
+Human judgment remained responsible for product direction, poker assumptions, feature selection, final review, and deployment decisions. QuantPoker's learned player policy is implemented locally in JavaScript; it does not call GPT-5.6 or another language model during calibration or simulation.
+
+## Technology
+
+| Layer | Technology |
+|---|---|
+| Application | Next.js 15 App Router, React 19, JavaScript, JSX |
+| Styling | Tailwind CSS 4, custom responsive CSS |
+| Validation | Zod |
+| Testing | Vitest, pgTAP database assertions |
+| Data visualization | Lightweight native React/SVG chart components |
+| Persistence | Supabase Auth, PostgreSQL, JSONB, row-level security |
+| Deployment | Vercel |
+
+The source is JavaScript and JSX rather than TypeScript. SQL is used for database migrations, functions, grants, and security tests.
+
+## Run locally
+
+Prerequisites: Node.js 20 or newer and npm.
 
 ```bash
+git clone https://github.com/bnjcc/poker-sim.git
+cd poker-sim
 npm install
-npm run dev        # http://localhost:3000
+npm run dev
 ```
 
-```bash
-npm test           # unit + integration tests (engine, side pots, seeds, turnover, model)
-npm run lint
-npm run build      # production build
-```
+Open [http://localhost:3000](http://localhost:3000).
 
-Without environment variables the demo still works with browser storage. Configure Supabase for authenticated, private, cross-device persistence.
+No environment variables are required for the browser-only demo. Local storage provides the complete solo workflow with an approximately 5 MB budget and a 3,000-hand stored-history cap per experiment.
 
-## Supabase setup
+### Enable cloud mode
 
 1. Create a Supabase project.
-2. Copy `.env.example` to `.env.local`, then set the project URL and publishable key from the Supabase Connect dialog.
-3. Apply the files in `supabase/migrations/` in timestamp order with the Supabase CLI (`supabase db push`) or paste them into the SQL editor.
-4. Add `http://localhost:3000/auth/confirm` and the deployed equivalent to the Auth redirect URL allow list.
-5. Start the app and create an account at `/login`.
+2. Copy `.env.example` to `.env.local`.
+3. Add the project URL and publishable key:
 
-The browser receives only the publishable key. Every table has row-level security tied to `auth.uid()`; never add a Supabase secret or service-role key to `NEXT_PUBLIC_*` variables.
+```env
+NEXT_PUBLIC_SUPABASE_URL="https://your-project-ref.supabase.co"
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="sb_publishable_your-key"
+```
 
-## The workflow
+4. Apply files in `supabase/migrations/` in timestamp order.
+5. Add `http://localhost:3000/auth/confirm` and the deployed equivalent to the Supabase Auth redirect allow list.
 
-1. **Calibrate** — start at `/range-calibrate`, choose the game before editing the range (1/3 or 2/5 chips and a 6-player or 9-player table), then select one exact 169-grid first-in range for every active seat or independent position ranges. Six-max position mode uses UTG, HJ, CO, BTN, SB, and BB; full ring uses all nine positions. Calibration lineups stay full at the selected seat count instead of inheriting experiment turnover or sit-outs. Use **Calibrate all hands** for an unrestricted sample at `/calibrate`, which offers the same game choices. Both flows give the user a 45-second action clock for calculating odds and a **Check / Fold rest of hand** shortcut, then show each opponent turn for 0.5 seconds and retain the opponent's full simulated decision time. Sizing controls keep a three-big-blind chip shortcut available on every street, disabled only when that total is outside the legal range, while the slider and step buttons move in small-blind increments like PokerStars; amounts, stacks, and actions remain displayed in chips. Every decision retains position, stack depth, pot size, bet faced, SPR, street, action history, hole cards, real response time, timeout state, and the most recent opponent timing cue.
-2. **Profile** (`/profile`) — save multiple named strategies in one account, switch or rename them, and choose the exact strategy to use in an experiment. The system estimates each strategy's tendencies (VPIP, PFR, 3-bet, fold-to-3-bet, c-bet, check-raise, river calls, bet sizing, positional looseness…) with **Wilson 95% confidence intervals** and explicit sample-size warnings. Beginner-friendly expandable guides and the full `/glossary` explain every acronym with examples and advanced interpretation. The profile also reports average/median response time, snap rate, and timeouts, then trains a bucketed behavioral policy (street × position × situation × hand-strength × opponent-timing cue) with hierarchical shrinkage toward a strength-aware prior.
-3. **Connect** (`/friends`) — every cloud account has a unique `@username`. Send and accept friend requests, then explicitly publish one saved strategy for multiplayer use. Direct friends and friends of friends are eligible; the selected players do not need to be friends with one another. Published policies are visible to the two-hop network, while raw calibration decisions and private experiment history remain private.
-4. **Experiment** (`/experiments/new`) — run solo, combine at least two real-user strategy models with bots, or seat at least three real-user strategy models at a players-only table. Start from the 1/3-chip default, switch directly to the 2/5-chip preset, or configure custom blinds, rake, buy-ins, hand count, seed, and (when used) the 14-archetype bot pool.
-5. **Analyze** (`/experiments/[id]`) — multiplayer results rank only the real users by normalized win rate and compare total result, hands won, and drawdown; bots are excluded from that leaderboard. Solo and multiplayer results retain the full beginner-first analytics, breakdowns, and replayable hand explorer.
-6. **Simulated Hand Review** — solo experiments can review and correct sampled model decisions, retrain the experiment-specific policy, and rerun the same seed. `/accuracy` summarizes saved feedback without exposing user exports.
-7. **Iterate** — duplicate an experiment, change one variable (e.g. rake, pool skill), re-run, and compare runs side by side (`/compare`). Same seed ⇒ identical results within the same engine version, verified by tests.
+Never expose a Supabase secret or service-role key through a `NEXT_PUBLIC_*` variable.
 
-The dashboard also shows the top three strategies by hand-weighted win rate across completed runs. In cloud mode this is an authenticated database aggregate that exposes only leaderboard fields, not private experiment payloads or hand histories.
+## Validation
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+The current suite covers the engine, evaluator agreement, equity, deterministic simulation, timing, range handling, calibration, multiplayer seating, analytics, storage, redirects, review feedback, leaderboards, and responsive poker-table behavior. Database security assertions live in `supabase/tests/database/schema_and_rls.test.sql`.
+
+## Repository map
+
+```text
+app/                    Next.js routes, calibration, profiles, experiments, auth
+components/             Poker table, hand replay, range grid, charts, UI controls
+lib/poker/              Engine, deck, RNG, evaluator, equity, action ledger
+lib/agents/             Fourteen heuristic profiles and decision policy
+lib/player-model/       Descriptive statistics, learned policy, review training
+lib/simulation/         Manual calibration, table lifecycle, batch execution
+lib/analytics/          Incremental aggregation and leaderboard logic
+lib/storage/            Browser and Supabase implementations of one contract
+lib/supabase/           Browser/server clients and session middleware
+supabase/migrations/    Schema, functions, row-level security, social features
+supabase/tests/         pgTAP schema and security assertions
+tests/                  Vitest unit and integration coverage
+docs/                   Architecture, limitations, and implementation plan
+```
 
 ## Honest limitations
 
-- **Opponents are heuristic archetypes**, not learned models of real player populations. Their aggregate stats are realistic; their postflop play is simpler than strong humans.
-- **Your model is a statistical imitation** of a small behavioral sample. It reproduces frequencies and sizing in bucketed situations; it does not capture deep hand-reading or exploitative adjustments you might make.
-- **Equities are Monte Carlo estimates** (fast bitmask 7-card evaluator, cross-validated against a reference evaluator in tests).
-- A positive simulated win rate is evidence about **this synthetic pool**, not a prediction of live results. The UI repeats this wherever results are shown.
+- The learned strategy is a bucketed statistical imitation. It cannot represent full combo-level blocker logic, multi-street planning, or every exploitative adjustment a player may make.
+- Small calibration samples remain prior-dominated. The UI warns below 100 hands and exposes average model confidence.
+- Opponents are synthetic heuristic archetypes. Their aggregate styles are plausible, but their postflop reasoning is simpler than strong human play.
+- Equity uses Monte Carlo estimates, which introduce sampling noise.
+- Batch execution is currently single-threaded in the browser, so the tab must remain open.
+- Risk-of-ruin calculations assume stationary win rate and variance.
+- Positive results apply only to the configured simulated environment.
 
-## Performance
+See [docs/LIMITATIONS.md](docs/LIMITATIONS.md) for the full gap analysis and scaling path.
 
-The hot path uses an allocation-free bitmask hand evaluator; the batch runner processes roughly **1,500–2,000 hands/sec** in-browser (single thread) and yields between chunks so the UI stays responsive with progress and cancellation. 100k hands ≈ 1 minute. See `docs/ARCHITECTURE.md` for the worker-service scaling path.
+## Roadmap
 
-## Storage and run modes
+1. Move batch execution into Web Workers and merge deterministic parallel shards.
+2. Add a server-side job queue for transactional, resumable million-hand runs.
+3. Add browser-level end-to-end smoke coverage in CI.
+4. Estimate opponent populations from imported real hand histories.
+5. Add exact turn and river equity enumeration.
+6. Introduce finer or sequential policy models once calibration datasets justify the added complexity.
 
-- **Supabase cloud** — authenticated users get private calibrations, experiments, hand histories, and strategy-review feedback plus usernames, friend requests, and opt-in shared policy snapshots. Social access is limited to direct friends and friends of friends; experiment ownership and history remain isolated by RLS.
-- **Browser fallback** — when Supabase is not configured, the original zero-setup local store remains available with its ~3,000-hand cap.
-- **Browser import** — after enabling Supabase, Settings can copy existing browser data into the signed-in account while retaining the local copy as a backup.
+## Documentation
 
-- **Detailed** — every hand history stored; browser fallback mode caps this at 3,000 per experiment.
-- **High-speed** — full aggregates plus 1-in-N sampled histories; automatic for runs over 20k hands.
-
-## Deploying to Vercel
-
-```bash
-npm i -g vercel
-vercel        # add the two NEXT_PUBLIC_SUPABASE_* values for cloud mode
-```
-
-Or connect the GitHub repo in the Vercel dashboard — the default Next.js settings work as-is.
-
-## Project layout
-
-```
-app/                  # Next.js App Router pages and auth confirmation endpoint
-components/           # PokerTable, HandReplayer, charts, UI primitives
-lib/poker/            # deck, RNG (seeded, checkpointable), evaluator (+ fast path), equity, engine
-lib/agents/           # 14 archetype profiles + decision logic
-lib/player-model/     # tendency statistics (Wilson CIs) + bucketed behavioral policy
-lib/simulation/       # table session (turnover), manual session, batch runner, defaults
-lib/analytics/        # incremental aggregator, risk of ruin
-lib/storage/          # DataStore interface + local and Supabase implementations
-lib/supabase/         # browser/server clients and auth session middleware
-supabase/             # local config, schema migration, and database security tests
-tests/                # engine correctness, side pots, seeds, turnover, model, analytics
-docs/                 # PLAN, ARCHITECTURE, LIMITATIONS
-```
-
-## Docs
-
-- `docs/PLAN.md` — the implementation plan and scope decisions
-- `docs/ARCHITECTURE.md` — engine design, player model math, scaling path, DB schema sketch
-- `docs/LIMITATIONS.md` — every simplification, stated plainly, with the roadmap
+- [Architecture](docs/ARCHITECTURE.md) explains the engine, learned policy, analytics, storage, and scaling path.
+- [Limitations](docs/LIMITATIONS.md) separates what ships from the honest modeling gap.
+- [Implementation plan](docs/PLAN.md) records the original build sequence and scope decisions.
+- [Project context](PROJECT_CONTEXT.md) is the current maintainer and Codex handoff.
