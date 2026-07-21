@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calibrationFromRow,
   decodeStorageJson,
   encodeStorageJson,
   experimentFromRow,
+  LocalStorageStore,
   strategyReviewFromRow,
 } from "@/lib/storage/store";
+afterEach(() => vi.unstubAllGlobals());
 describe("storage JSON codec", () => {
   it("round-trips non-finite aggregate values without turning them into null", () => {
     const input = {
@@ -19,6 +21,47 @@ describe("storage JSON codec", () => {
     expect(output.negative).toBe(-Infinity);
     expect(Number.isNaN(output.invalid)).toBe(true);
     expect(output.nested).toEqual([1, Infinity]);
+  });
+});
+describe("calibration draft storage", () => {
+  it("keeps unfinished sessions resumable but out of completed strategy lists", async () => {
+    const values = new Map();
+    vi.stubGlobal("window", {
+      localStorage: {
+        get length() {
+          return values.size;
+        },
+        getItem: (key) => values.get(key) ?? null,
+        setItem: (key, value) => values.set(key, value),
+        removeItem: (key) => values.delete(key),
+        key: (index) => [...values.keys()][index] ?? null,
+      },
+    });
+    const store = new LocalStorageStore();
+    await store.saveCalibrationDraft({
+      id: "draft_range",
+      method: "range-first",
+      name: "Unfinished",
+      createdAt: "2026-07-20T00:00:00.000Z",
+      handsPlayed: 12,
+      targetHands: 50,
+    });
+    await store.saveCalibration({
+      id: "complete",
+      method: "full-session",
+      name: "Finished",
+      createdAt: "2026-07-19T00:00:00.000Z",
+      handsPlayed: 50,
+    });
+
+    expect(await store.listCalibrations()).toHaveLength(1);
+    expect((await store.getCalibrationDraft("range-first"))?.handsPlayed).toBe(
+      12,
+    );
+
+    await store.deleteCalibrationDraft("range-first");
+    expect(await store.getCalibrationDraft("range-first")).toBeNull();
+    expect((await store.listCalibrations())[0].id).toBe("complete");
   });
 });
 describe("Supabase row mapping", () => {

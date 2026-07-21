@@ -51,6 +51,8 @@ export default function RangeCalibratePage() {
   const activeDecisionRef = useRef(null);
   const audibleCardsRef = useRef(null);
   const decisionStartedAtRef = useRef(0);
+  const draftRef = useRef(null);
+  const checkpointWriteRef = useRef(Promise.resolve());
   const sounds = usePokerSounds();
   const [phase, setPhase] = useState("range");
   const [tableConfig, setTableConfig] = useState(DEFAULT_TABLE);
@@ -70,6 +72,8 @@ export default function RangeCalibratePage() {
     useState(ACTION_CLOCK_MS);
   const [opponentName, setOpponentName] = useState("Opponent");
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
+  const [draft, setDraft] = useState(null);
+  const [draftLoading, setDraftLoading] = useState(true);
   const [, force] = useState(0);
   const rerender = () => force((value) => value + 1);
   const tablePositions = useMemo(
@@ -147,6 +151,105 @@ export default function RangeCalibratePage() {
       ),
     );
   };
+  useEffect(() => {
+    let active = true;
+    getStore()
+      .getCalibrationDraft("range-first")
+      .then((saved) => {
+        if (!active) return;
+        draftRef.current = saved;
+        setDraft(saved);
+      })
+      .catch((caught) => {
+        if (active)
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load saved calibration progress.",
+          );
+      })
+      .finally(() => {
+        if (active) setDraftLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const buildSession = useCallback((saved) => {
+    const session = new ManualSession({
+      config: saved.table,
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: saved.sessionSeed,
+      targetHands: saved.targetHands,
+      userBuyInBB: 100,
+      fixedLineup: buildCalibrationLineup(saved.table.maxSeats),
+      ...(saved.rangeMode === "position"
+        ? { startingHandsByPosition: saved.preflopRangesByPosition }
+        : { startingHands: saved.preflopRange }),
+      completedProgress: saved,
+    });
+    sessionRef.current = session;
+    setTableConfig(saved.table);
+    setTarget(saved.targetHands);
+    setCustomTarget("");
+    setRangeMode(saved.rangeMode);
+    setSelected(new Set(saved.preflopRange ?? []));
+    if (saved.preflopRangesByPosition) {
+      setPositionRanges(
+        Object.fromEntries(
+          PREFLOP_POSITION_ORDER.map((position) => [
+            position,
+            new Set(saved.preflopRangesByPosition[position] ?? []),
+          ]),
+        ),
+      );
+    }
+    setPhase("playing");
+    advanceRef.current(session);
+  }, []);
+  const resume = useCallback(() => {
+    if (!draftRef.current) return;
+    sounds.unlock();
+    audibleCardsRef.current = null;
+    buildSession(draftRef.current);
+  }, [buildSession, sounds]);
+  const discardDraft = useCallback(async () => {
+    try {
+      await getStore().deleteCalibrationDraft("range-first");
+      draftRef.current = null;
+      setDraft(null);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not discard saved calibration progress.",
+      );
+    }
+  }, []);
+  const checkpoint = (session) => {
+    const current = draftRef.current;
+    if (!current || session.handsPlayed >= session.targetHands) return;
+    const saved = {
+      ...current,
+      updatedAt: new Date().toISOString(),
+      handsPlayed: session.handsPlayed,
+      decisions: session.decisions,
+      histories: session.histories.slice(0, 500),
+      userSeatByHand: Object.fromEntries(session.userSeatByHand),
+    };
+    draftRef.current = saved;
+    setDraft(saved);
+    checkpointWriteRef.current = checkpointWriteRef.current
+      .catch(() => undefined)
+      .then(() => getStore().saveCalibrationDraft(saved))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not save calibration progress.",
+        );
+      });
+  };
   const advance = (session) => {
     const step = session.step(true);
     if ("engine" in step) {
@@ -211,6 +314,7 @@ export default function RangeCalibratePage() {
           ? `Hand #${step.history.handNumber}: ${fmtChips(result.net)} chips`
           : null,
       );
+      checkpoint(session);
       setPhase(
         session.handsPlayed >= session.targetHands ? "done" : "hand-done",
       );
@@ -221,7 +325,7 @@ export default function RangeCalibratePage() {
     rerender();
   };
   advanceRef.current = advance;
-  const start = useCallback(() => {
+  const start = useCallback(async () => {
     const serializedPositionRanges = Object.fromEntries(
       tablePositions.map((position) => [
         position,
@@ -242,20 +346,40 @@ export default function RangeCalibratePage() {
     const hands = customTarget
       ? Math.max(5, Math.min(2000, Number(customTarget) || 50))
       : target;
-    const session = new ManualSession({
-      config: tableConfig,
-      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
-      seed: `range-cal-${Date.now()}`,
+    const createdAt = new Date().toISOString();
+    const saved = {
+      id: newId("cal"),
+      name: "Unfinished range-first calibration",
+      createdAt,
+      updatedAt: createdAt,
+      draft: true,
+      method: "range-first",
+      table: tableConfig,
+      sessionSeed: `range-cal-${Date.now()}`,
       targetHands: hands,
-      userBuyInBB: 100,
-      fixedLineup: buildCalibrationLineup(tableConfig.maxSeats),
+      rangeMode,
+      preflopRange: [...selected].sort(),
       ...(rangeMode === "position"
-        ? { startingHandsByPosition: serializedPositionRanges }
-        : { startingHands: [...selected] }),
-    });
-    sessionRef.current = session;
-    setPhase("playing");
-    advanceRef.current(session);
+        ? { preflopRangesByPosition: serializedPositionRanges }
+        : {}),
+      handsPlayed: 0,
+      decisions: [],
+      histories: [],
+      userSeatByHand: {},
+    };
+    setError(null);
+    try {
+      await getStore().saveCalibrationDraft(saved);
+      draftRef.current = saved;
+      setDraft(saved);
+      buildSession(saved);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save calibration progress.",
+      );
+    }
   }, [
     customTarget,
     positionRanges,
@@ -265,6 +389,7 @@ export default function RangeCalibratePage() {
     sounds,
     tableConfig,
     tablePositions,
+    buildSession,
   ]);
   const act = (type) => {
     const session = sessionRef.current;
@@ -382,9 +507,9 @@ export default function RangeCalibratePage() {
         policy.setPreflopRangesByPosition(preflopRangesByPosition);
       }
       const dataset = {
-        id: newId("cal"),
+        id: draftRef.current?.id ?? newId("cal"),
         name: `Range-first calibration ${new Date().toLocaleString()} (${preflopRangesByPosition ? "position ranges" : `${range.length} hands`})`,
-        createdAt: new Date().toISOString(),
+        createdAt: draftRef.current?.createdAt ?? new Date().toISOString(),
         method: "range-first",
         calibrationDesign: "information-rich-v1",
         table: session.session.config,
@@ -400,7 +525,10 @@ export default function RangeCalibratePage() {
         // The dealt sample is conditional on the chosen range, so its win rate is not an unbiased manual benchmark.
         manualAggregates: null,
       };
+      await checkpointWriteRef.current;
       await getStore().saveCalibration(dataset);
+      draftRef.current = null;
+      setDraft(null);
       router.push("/profile");
     } catch (caught) {
       setError(
@@ -470,6 +598,24 @@ export default function RangeCalibratePage() {
           }
           sub="Choose the starting hands you play, then make decisions with a 45-second clock so you have time to calculate odds. Measurement opponents keep more pots alive and vary pressure and timing so each hand teaches the model more."
         />
+
+        {draft && draft.handsPlayed < draft.targetHands && (
+          <div className="panel px-5 py-5 mb-4 max-w-2xl">
+            <div className="font-semibold">Continue your saved session</div>
+            <div className="text-sm text-muted mt-1">
+              {draft.handsPlayed} of {draft.targetHands} hands completed. Your
+              selected ranges and progress are saved.
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button className="btn btn-primary" onClick={resume}>
+                Continue calibration
+              </button>
+              <button className="btn" onClick={discardDraft}>
+                Discard saved progress
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="panel px-5 py-5 mb-4 max-w-2xl">
           <CalibrationGameSelector
@@ -695,7 +841,7 @@ export default function RangeCalibratePage() {
             className="btn btn-primary mt-5"
             type="button"
             onClick={start}
-            disabled={!rangeReady}
+            disabled={!rangeReady || draftLoading || Boolean(draft)}
           >
             Next: calibrate my betting
           </button>
@@ -704,6 +850,11 @@ export default function RangeCalibratePage() {
               {rangeMode === "position"
                 ? `Set at least one hand for: ${missingPositions.join(", ")}. Start with one chart and use “Copy to all positions” if you want a quick baseline.`
                 : "Select at least one hand to continue."}
+            </div>
+          )}
+          {error && (
+            <div className="text-xs text-loss mt-2" role="alert">
+              {error}
             </div>
           )}
         </div>

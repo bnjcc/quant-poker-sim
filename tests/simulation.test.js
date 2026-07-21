@@ -242,6 +242,41 @@ describe("manual calibration session", () => {
       expect(d.context.legal.types.length).toBeGreaterThan(0);
     }
   });
+  it("continues completed progress with unique hand numbers", () => {
+    const savedDecision = { action: { type: "fold" } };
+    const ms = new ManualSession({
+      config: DEFAULT_TABLE,
+      pool,
+      seed: "resumed-manual",
+      targetHands: 5,
+      userBuyInBB: 100,
+      completedProgress: {
+        handsPlayed: 3,
+        decisions: [savedDecision],
+        histories: [{ handNumber: 1 }, { handNumber: 2 }, { handNumber: 3 }],
+        userSeatByHand: { 1: 0, 2: 0, 3: 0 },
+      },
+    });
+    let guard = 0;
+    while (guard++ < 2000) {
+      const step = ms.step();
+      if (step.kind === "session-complete") break;
+      if (step.kind === "awaiting-user") {
+        ms.submitUserAction(
+          step.context,
+          step.context.legal.types.includes("check")
+            ? { type: "check" }
+            : { type: "fold" },
+        );
+      }
+    }
+
+    expect(ms.handsPlayed).toBe(5);
+    expect(ms.histories.map((history) => history.handNumber)).toEqual([
+      1, 2, 3, 4, 5,
+    ]);
+    expect(ms.decisions[0]).toBe(savedDecision);
+  });
 });
 describe("player-model statistics", () => {
   it("Wilson intervals shrink with sample size and Laplace smoothing is applied", () => {

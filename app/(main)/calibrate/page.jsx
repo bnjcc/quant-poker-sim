@@ -41,6 +41,8 @@ export default function CalibratePage() {
   const activeDecisionRef = useRef(null);
   const audibleCardsRef = useRef(null);
   const decisionStartedAtRef = useRef(0);
+  const draftRef = useRef(null);
+  const checkpointWriteRef = useRef(Promise.resolve());
   const sounds = usePokerSounds();
   const [phase, setPhase] = useState("setup");
   const [tableConfig, setTableConfig] = useState(DEFAULT_TABLE);
@@ -56,26 +58,128 @@ export default function CalibratePage() {
     useState(ACTION_CLOCK_MS);
   const [opponentName, setOpponentName] = useState("Opponent");
   const [opponentCallAmount, setOpponentCallAmount] = useState(0);
+  const [draft, setDraft] = useState(null);
+  const [draftLoading, setDraftLoading] = useState(true);
   const [, force] = useState(0);
   const rerender = () => force((x) => x + 1);
-  const start = useCallback(() => {
+  useEffect(() => {
+    let active = true;
+    getStore()
+      .getCalibrationDraft("full-session")
+      .then((saved) => {
+        if (!active) return;
+        draftRef.current = saved;
+        setDraft(saved);
+      })
+      .catch((caught) => {
+        if (active)
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load saved calibration progress.",
+          );
+      })
+      .finally(() => {
+        if (active) setDraftLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  const buildSession = useCallback((saved) => {
+    const ms = new ManualSession({
+      config: saved.table,
+      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
+      seed: saved.sessionSeed,
+      targetHands: saved.targetHands,
+      userBuyInBB: 100,
+      fixedLineup: buildCalibrationLineup(saved.table.maxSeats),
+      completedProgress: saved,
+    });
+    sessionRef.current = ms;
+    setTableConfig(saved.table);
+    setPhase("playing");
+    advanceRef.current(ms);
+  }, []);
+  const start = useCallback(async () => {
     sounds.unlock();
     audibleCardsRef.current = null;
     const hands = customTarget
       ? Math.max(5, Math.min(2000, Number(customTarget) || 50))
       : target;
-    const ms = new ManualSession({
-      config: tableConfig,
-      pool: buildPoolConfig(DEFAULT_POOL_SETTINGS),
-      seed: `cal-${Date.now()}`,
+    const createdAt = new Date().toISOString();
+    const saved = {
+      id: newId("cal"),
+      name: "Unfinished all-hands calibration",
+      createdAt,
+      updatedAt: createdAt,
+      draft: true,
+      method: "full-session",
+      table: tableConfig,
+      sessionSeed: `cal-${Date.now()}`,
       targetHands: hands,
-      userBuyInBB: 100,
-      fixedLineup: buildCalibrationLineup(tableConfig.maxSeats),
-    });
-    sessionRef.current = ms;
-    setPhase("playing");
-    advanceRef.current(ms);
-  }, [target, customTarget, sounds, tableConfig]);
+      handsPlayed: 0,
+      decisions: [],
+      histories: [],
+      userSeatByHand: {},
+    };
+    setError(null);
+    try {
+      await getStore().saveCalibrationDraft(saved);
+      draftRef.current = saved;
+      setDraft(saved);
+      buildSession(saved);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not save calibration progress.",
+      );
+    }
+  }, [target, customTarget, sounds, tableConfig, buildSession]);
+  const resume = useCallback(() => {
+    if (!draftRef.current) return;
+    sounds.unlock();
+    audibleCardsRef.current = null;
+    buildSession(draftRef.current);
+  }, [buildSession, sounds]);
+  const discardDraft = useCallback(async () => {
+    try {
+      await getStore().deleteCalibrationDraft("full-session");
+      draftRef.current = null;
+      setDraft(null);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not discard saved calibration progress.",
+      );
+    }
+  }, []);
+  const checkpoint = (ms) => {
+    const current = draftRef.current;
+    if (!current || ms.handsPlayed >= ms.targetHands) return;
+    const saved = {
+      ...current,
+      updatedAt: new Date().toISOString(),
+      handsPlayed: ms.handsPlayed,
+      decisions: ms.decisions,
+      histories: ms.histories.slice(0, 500),
+      userSeatByHand: Object.fromEntries(ms.userSeatByHand),
+    };
+    draftRef.current = saved;
+    setDraft(saved);
+    checkpointWriteRef.current = checkpointWriteRef.current
+      .catch(() => undefined)
+      .then(() => getStore().saveCalibrationDraft(saved))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not save calibration progress.",
+        );
+      });
+  };
   const advance = (ms) => {
     const step = ms.step(true);
     if ("engine" in step) {
@@ -138,6 +242,7 @@ export default function CalibratePage() {
           ? `Hand #${step.history.handNumber}: ${fmtChips(res.net)} chips`
           : null,
       );
+      checkpoint(ms);
       setPhase(ms.handsPlayed >= ms.targetHands ? "done" : "hand-done");
     } else {
       activeDecisionRef.current = null;
@@ -235,11 +340,16 @@ export default function CalibratePage() {
       const policy = new BehavioralPolicy();
       policy.train(ms.decisions, new Rng("train"));
       const agg = new Aggregator(ms.session.config.bigBlind);
-      for (const h of ms.histories) agg.addHand(h, ms.userSeat, true);
+      for (const h of ms.histories)
+        agg.addHand(
+          h,
+          ms.userSeatByHand.get(h.handNumber) ?? ms.userSeat,
+          true,
+        );
       const dataset = {
-        id: newId("cal"),
+        id: draftRef.current?.id ?? newId("cal"),
         name: `Calibration ${new Date().toLocaleString()} (${ms.handsPlayed} hands)`,
-        createdAt: new Date().toISOString(),
+        createdAt: draftRef.current?.createdAt ?? new Date().toISOString(),
         method: "full-session",
         calibrationDesign: "information-rich-v1",
         table: ms.session.config,
@@ -252,7 +362,10 @@ export default function CalibratePage() {
         policy: policy.serialize(),
         manualAggregates: agg.snapshot(),
       };
+      await checkpointWriteRef.current;
       await getStore().saveCalibration(dataset);
+      draftRef.current = null;
+      setDraft(null);
       router.push("/profile");
     } catch (e) {
       setError(
@@ -311,6 +424,23 @@ export default function CalibratePage() {
           sub="Play an online-paced table with a 45-second action clock so you have time to calculate odds. Measurement opponents vary calls, raises, postflop pressure, and timing so the model can observe more of your strategy."
         />
         <div className="panel px-6 py-6 max-w-xl">
+          {draft && draft.handsPlayed < draft.targetHands && (
+            <div className="mb-6 rounded border border-line bg-panel2 px-4 py-4">
+              <div className="font-semibold">Continue your saved session</div>
+              <div className="text-sm text-muted mt-1">
+                {draft.handsPlayed} of {draft.targetHands} hands completed. Your
+                progress was saved after the last finished hand.
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button className="btn btn-primary" onClick={resume}>
+                  Continue calibration
+                </button>
+                <button className="btn" onClick={discardDraft}>
+                  Discard saved progress
+                </button>
+              </div>
+            </div>
+          )}
           <CalibrationGameSelector
             table={tableConfig}
             onChange={setTableConfig}
@@ -345,9 +475,18 @@ export default function CalibratePage() {
             {RELIABLE_SAMPLE_THRESHOLD} hands, estimates carry wide uncertainty
             and the profile will say so.
           </div>
-          <button className="btn btn-primary mt-5" onClick={start}>
+          <button
+            className="btn btn-primary mt-5"
+            onClick={start}
+            disabled={draftLoading || Boolean(draft)}
+          >
             Deal me in
           </button>
+          {error && (
+            <div className="text-xs text-loss mt-2" role="alert">
+              {error}
+            </div>
+          )}
         </div>
         <div className="mt-4 max-w-xl">
           <WarningNote>

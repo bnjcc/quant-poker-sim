@@ -25,7 +25,8 @@ export default function SettingsPage() {
       ]);
       setCals(calibrations);
       setExps(experiments);
-      setSummary(storage);
+      // Draft calibration rows support resume but are not completed strategies.
+      setSummary({ ...storage, calibrations: calibrations.length });
       if (store.mode === "supabase") {
         const local = await getLocalStore().getStorageSummary();
         setLocalCount(
