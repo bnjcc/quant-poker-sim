@@ -155,7 +155,7 @@ Detailed runs retain hand histories. Runs over 20,000 hands automatically use hi
 
 ## Multiplayer and privacy
 
-Cloud users receive unique usernames and can connect through accepted friendships. A user may explicitly publish one learned strategy snapshot to direct friends and friends of friends.
+Cloud users receive unique usernames and can connect through accepted friendships. Chosen capitalization is preserved for display, while uniqueness and friend lookup are case-insensitive. A user may explicitly publish one learned strategy snapshot to direct friends and friends of friends.
 
 Only the serialized policy and presentation metadata are shared. Raw calibration decisions, email addresses, experiments, and hand histories remain private. Multiplayer experiments copy selected policies as point-in-time snapshots so later profile or friendship changes do not mutate an existing run.
 

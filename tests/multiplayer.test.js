@@ -44,7 +44,8 @@ describe("multiplayer setup rules", () => {
   });
 
   it("normalizes and validates public usernames", () => {
-    expect(normalizeUsername("  River_Reader ")).toBe("river_reader");
+    expect(normalizeUsername("  River_Reader ")).toBe("River_Reader");
+    expect(usernameError("River_Reader")).toBeNull();
     expect(usernameError("river_reader")).toBeNull();
     expect(usernameError("No spaces allowed")).not.toBeNull();
     expect(usernameError("ab")).not.toBeNull();

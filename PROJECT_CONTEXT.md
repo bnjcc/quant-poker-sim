@@ -14,22 +14,20 @@ This is the concise handoff for maintainers and future Codex sessions. Read it b
 | Production URL | `https://poker-sim-iota.vercel.app` |
 | Production/default branch | `agent/supabase-backend` |
 | Local branch | `deploy/mobile-scroll-fix-20260719-030729` |
-| Current local and remote HEAD | `b63cf05 Improve analytics and review actions` |
+| Current local HEAD | `8d828e5 Save and resume calibration progress` |
+| Current remote HEAD | `0e5fe28 Improve documents` |
 | Supabase project | `oxrqtwqkzkembnglhbtn` |
 | Vercel project | `optvis/poker-sim` |
 | Simulation version | `1.7.0` |
 | Stack | Next.js 15.5.20, React 19.1, JavaScript/JSX, Tailwind CSS 4, Zod, Vitest, Supabase |
 
-The local branch tracks `origin/agent/supabase-backend`; at the start of this documentation task they were synchronized.
+The local branch tracks `origin/agent/supabase-backend` and is currently one commit ahead because the resumable-calibration commit has not been pushed.
 
 ### Current uncommitted work
 
-The working tree contains two intentional groups of changes:
+The working tree adds case-preserving usernames. Signup and profile editing now accept uppercase and lowercase ASCII letters, selected capitalization is retained for display, and availability, uniqueness, and friend lookup remain case-insensitive. Sign-in continues to use email and is unchanged.
 
-1. **Resumable calibration implementation** in both calibration flows, storage, settings, manual-session support, and tests. This work checkpoints after each completed hand and is not yet committed, pushed, deployed, or live-verified.
-2. **Hackathon documentation refresh** in `README.md` and this file. The README now leads with the problem, demo flow, architecture, modeling details, evidence, limitations, and a transparent explanation of how Codex with GPT-5.6 supported development. This is documentation-only and is not yet committed or pushed.
-
-Do not discard or overwrite the resumable-calibration changes when working on documentation or preparing a commit.
+Affected files: `app/login/page.jsx`, `app/(main)/friends/page.jsx`, `lib/social/usernames.js`, `tests/multiplayer.test.js`, `supabase/migrations/20260722000000_case_preserving_usernames.sql`, `README.md`, `docs/ARCHITECTURE.md`, and this file. This work is not yet committed, pushed, migrated, deployed, or live-verified.
 
 ## Product in one paragraph
 
@@ -102,7 +100,7 @@ The user receives a real 45-second clock. A timeout checks when free and folds o
 
 Starting hands use a shuffled, combo-weighted bag. Shared and position-specific 169-hand charts are supported. Stakes default to 1/3 with a 2/5 preset. Sizing remains chip-denominated with small-blind step controls, exact numeric entry, and an every-street 3× BB shortcut when legal.
 
-### Resumable calibration — pending implementation
+### Resumable calibration
 
 Both calibration methods now create a private draft before the first hand and checkpoint after every completed hand:
 
@@ -117,7 +115,7 @@ Both calibration methods now create a private draft before the first hand and ch
 
 Affected files: `app/(main)/calibrate/page.jsx`, `app/(main)/range-calibrate/page.jsx`, `app/(main)/settings/page.jsx`, `lib/simulation/manual.js`, `lib/storage/store.js`, `tests/simulation.test.js`, and `tests/storage.test.js`.
 
-Fresh validation on 2026-07-21, after the documentation rewrite: 15 Vitest files / 104 tests passed, ESLint passed, and the production build succeeded across 19 routes.
+The implementation is committed locally as `8d828e5 Save and resume calibration progress` but has not yet been pushed or deployed. Validation on 2026-07-21: 15 Vitest files / 104 tests passed, ESLint passed, and the production build succeeded across 19 routes.
 
 ### Table lifecycle and multiplayer
 
@@ -158,7 +156,7 @@ Large nested domain data remains JSONB while query fields are normalized. Hand w
 
 ### Social sharing
 
-Cloud accounts have unique lowercase usernames. Friendships are canonical unordered pairs managed through security-definer RPCs. Users explicitly publish at most one policy snapshot to direct friends and friends of friends. Raw decisions, private experiments, hand histories, and email remain private. Removing the supporting friendship removes access. Experiment participants are copied as point-in-time snapshots.
+Cloud accounts have unique usernames. Capitalization is preserved, while identity, availability checks, and friend lookup are case-insensitive. Friendships are canonical unordered pairs managed through security-definer RPCs. Users explicitly publish at most one policy snapshot to direct friends and friends of friends. Raw decisions, private experiments, hand histories, and email remain private. Removing the supporting friendship removes access. Experiment participants are copied as point-in-time snapshots.
 
 ### Database migrations
 
@@ -166,6 +164,7 @@ Cloud accounts have unique lowercase usernames. Friendships are canonical unorde
 - `20260717010000_strategy_reviews.sql`: review rows, RLS, and atomic experiment/review commit.
 - `20260718000000_social_multiplayer.sql`: profiles, friendships, published policies, social RPCs, and access rules.
 - `20260719000000_strategy_leaderboard.sql`: authenticated aggregate leaderboard RPC.
+- `20260722000000_case_preserving_usernames.sql`: case-preserving username constraint, case-insensitive unique index, signup/profile functions, and friend lookup.
 
 The pgTAP file contains 28 schema, ownership, grant, isolation, cascade, and function assertions. It has been statically reviewed but has not been run in a local Supabase/Docker stack.
 
@@ -182,7 +181,7 @@ The pgTAP file contains 28 schema, ownership, grant, isolation, cascade, and fun
 
 ## Validation status
 
-Most recent full validation, run on 2026-07-21 after this README/context rewrite:
+Most recent full validation, run on 2026-07-22 after the case-preserving username change:
 
 - Vitest: 15 files / 104 tests passed.
 - ESLint: passed.
@@ -217,6 +216,7 @@ Local provider links and public environment values live in ignored `.vercel/` an
 - `app/(main)/experiments/[id]/page.jsx` — run orchestration, analytics, hands, and review loop.
 - `app/(main)/compare/page.jsx` — side-by-side completed-run comparison.
 - `app/(main)/friends/page.jsx` — usernames, social graph, and strategy publishing.
+- `app/login/page.jsx` — email/password authentication and case-preserving username signup.
 - `app/(main)/settings/page.jsx` — storage summary, draft-aware counts, import, and deletion.
 - `components/PokerTable.jsx` — responsive 2–9 seat layouts and card privacy.
 - `components/StrategyReview.jsx` — reconstructed low-confidence decision review.
@@ -238,6 +238,7 @@ Local provider links and public environment values live in ignored `.vercel/` an
 - `lib/simulation/runner.js` — chunked environment-independent batch runner.
 - `lib/analytics/aggregate.js` — bounded incremental analytics.
 - `lib/storage/store.js` — local/cloud store implementations and drafts.
+- `lib/social/usernames.js` — case-preserving username normalization and validation.
 - `lib/supabase/` — public clients, cookie-aware server access, and middleware.
 
 ### Tests and documentation

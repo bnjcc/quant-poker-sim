@@ -90,7 +90,7 @@ For multiplayer runs, `TableSession` owns a fixed map of real-user policy seats 
 
 ## Usernames, friends, and shared strategies
 
-Cloud accounts receive a unique lowercase username in `profiles`. Canonical unordered rows in `friendships` model pending and accepted connections. Security-definer RPCs handle requests and responses so clients cannot forge accepted relationships.
+Cloud accounts receive a unique username in `profiles`. Capitalization is preserved for display, while a unique `lower(username)` index and case-insensitive RPC comparisons prevent case-variant duplicates and make friend lookup case-insensitive. Canonical unordered rows in `friendships` model pending and accepted connections. Security-definer RPCs handle requests and responses so clients cannot forge accepted relationships.
 
 `multiplayer_strategies` contains at most one opt-in policy snapshot per account. It references an owned calibration but stores only the learned policy and presentation metadata—not raw recorded decisions. Its RLS read rule uses `is_multiplayer_connection` to allow the owner, accepted direct friends, and friends exactly one additional hop away. Removing a friendship immediately removes any access that depended on that path. The social-graph RPC returns direct friends, pending requests, and the nearest eligible two-hop players. Experiment creation copies selected policies as point-in-time participant snapshots into the creator's private experiment payload, so later friendship or strategy changes do not mutate a saved run.
 

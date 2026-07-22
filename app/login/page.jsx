@@ -63,13 +63,13 @@ export default async function LoginPage({ searchParams }) {
                   autoComplete="username"
                   minLength={3}
                   maxLength={24}
-                  pattern="[a-z0-9_]+"
-                  placeholder="river_reader"
+                  pattern="[A-Za-z0-9_]+"
+                  placeholder="River_Reader"
                   required
                 />
                 <span className="block text-[11px] text-muted mt-1">
-                  3–24 lowercase letters, numbers, or underscores. Friends find
-                  you by this name.
+                  3–24 letters, numbers, or underscores. Capitalization is
+                  preserved, and friends can search without matching case.
                 </span>
               </label>
             )}

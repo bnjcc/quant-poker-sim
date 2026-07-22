@@ -104,7 +104,7 @@ export default function FriendsPage() {
                 value={username}
                 minLength={3}
                 maxLength={24}
-                onChange={(event) => setUsername(event.target.value.toLowerCase())}
+                onChange={(event) => setUsername(event.target.value)}
               />
             </div>
             <button
@@ -128,8 +128,8 @@ export default function FriendsPage() {
         <section className="panel px-5 py-4">
           <h2 className="font-semibold">Add a friend</h2>
           <p className="text-xs text-muted mt-1 mb-3">
-            Enter an exact username. If they already requested you, the connection
-            is accepted immediately.
+            Username searches ignore capitalization. If they already requested
+            you, the connection is accepted immediately.
           </p>
           <div className="flex gap-2">
             <div className="field flex items-center flex-1">
@@ -137,8 +137,8 @@ export default function FriendsPage() {
               <input
                 className="bg-transparent outline-none min-w-0 flex-1"
                 value={friendUsername}
-                placeholder="river_reader"
-                onChange={(event) => setFriendUsername(event.target.value.toLowerCase())}
+                placeholder="River_Reader"
+                onChange={(event) => setFriendUsername(event.target.value)}
               />
             </div>
             <button
